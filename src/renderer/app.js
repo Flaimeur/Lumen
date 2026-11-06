@@ -663,6 +663,24 @@
   window.addEventListener('blur', () => { if (mapperTimer) mapperSeenBlur = true; });
   window.addEventListener('focus', () => { if (mapperTimer && mapperSeenBlur) stopMapper(); });
 
+  // Test en direct : boutons et sticks tels que Lumen les reçoit.
+  function openPadTest() {
+    const out = h('pre', { class: 'pad-test' }, '');
+    const box = h('div', { class: 'modal prompt' },
+      h('div', { class: 'eyebrow' }, 'Manettes'), h('h2', {}, 'Test de la manette'),
+      h('p', { class: 'muted small' }, 'Appuie sur des boutons et bouge les sticks. Clic en dehors ou Échap pour fermer.'), out);
+    openOverlay(box);
+    const timer = setInterval(() => {
+      if (!box.isConnected) { clearInterval(timer); return; }
+      const pads = Array.from(navigator.getGamepads ? navigator.getGamepads() : []).filter(Boolean);
+      out.textContent = pads.length
+        ? pads.map((p) => `Manette n°${p.index + 1} : ${p.id}\nType détecté : ${Input.padType} · disposition : ${p.mapping || 'non standard'}\n`
+          + `Boutons pressés : ${p.buttons.map((b, i) => (b.pressed ? i : null)).filter((x) => x !== null).join(', ') || 'aucun'}\n`
+          + `Sticks : ${p.axes.map((a) => a.toFixed(2)).join('  ')}`).join('\n\n')
+        : `Aucune manette visible par Lumen.\nFenêtre au premier plan : ${document.hasFocus() ? 'oui' : 'non'}\n\nAppuie sur un bouton de la manette. Si rien ne change, Windows ne la transmet pas à Lumen (Bluetooth, pilote ou logiciel qui la capture).`;
+    }, 60);
+  }
+
   // ---------- Sons perso par jeu ----------
   async function pickGameSound(g) {
     const file = api.pickAudio && await api.pickAudio(`Son pour ${g.name}`);
@@ -1668,6 +1686,7 @@
       row(`${PAD_LABEL[p.type] || 'Manette'} · n°${p.index + 1}`, p.rumble ? 'Tester la vibration' : '', p.rumble ? () => Input.rumble(0.8, 400) : null,
         `${p.name.replace(/\s*\(.*$/, '')} · disposition ${p.mapping === 'standard' ? 'standard' : 'non standard (corrigée par Lumen)'} · ${p.buttons} boutons`);
     }
+    row('Tester la manette', 'Ouvrir', () => openPadTest(), 'Affiche en direct ce que Lumen reçoit : boutons pressés et sticks. Appuie d’abord sur un bouton, Windows ne montre la manette qu’après.');
     section('Boutons');
     row('Inverser A/B et X/Y', toggle(c.swapAB), () => { c.swapAB = !c.swapAB; Input.swapAB = c.swapAB; saveCfg(); rerender(); }, 'Pour toutes les manettes.');
     row('Manette Switch : valider avec A', toggle(c.nintendoConfirm !== false), () => {

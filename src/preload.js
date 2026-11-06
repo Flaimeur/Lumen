@@ -58,6 +58,7 @@ contextBridge.exposeInMainWorld('lumen', {
   readSound: (file) => ipcRenderer.invoke('sound:read', file),
   quit: () => ipcRenderer.invoke('app:quit'),
   version: ipcRenderer.sendSync('app:version'),
+  padLog: (msg) => ipcRenderer.send('pad:log', msg),
   mapper: {
     start: () => ipcRenderer.invoke('mapper:start'),
     send: (events) => ipcRenderer.send('mapper:send', events),

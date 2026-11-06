@@ -156,7 +156,24 @@
   }
   requestAnimationFrame(poll);
 
+  // Journal de diagnostic (fichier pad-diagnostic.log dans les données de Lumen) : connexions, focus,
+  // et les premiers changements de boutons de chaque session.
+  const diag = (m) => { try { if (window.lumen && window.lumen.padLog) window.lumen.padLog(m); } catch { /* journal facultatif */ } };
+  let diagChanges = 0;
+  let diagLast = '';
+  diag('démarrage · manettes visibles : ' + (navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean).length : 'API absente'));
+  window.addEventListener('focus', () => diag('focus · manettes visibles : ' + Array.from(navigator.getGamepads()).filter(Boolean).map((p) => p.id + ' [' + p.mapping + ']').join(' ; ')));
+  setInterval(() => {
+    if (diagChanges > 40) return;
+    const p = Array.from(navigator.getGamepads ? navigator.getGamepads() : []).filter(Boolean)[0];
+    if (!p) return;
+    const s = 'boutons ' + p.buttons.map((b, i) => (b.pressed ? i : null)).filter((x) => x !== null).join(',') + ' · axes ' + p.axes.map((a) => a.toFixed(1)).join(' ');
+    if (s !== diagLast) { diagLast = s; diagChanges++; diag(s + ' · focus=' + document.hasFocus()); }
+  }, 100);
+  window.addEventListener('gamepaddisconnected', (e) => diag('déconnectée : ' + e.gamepad.id));
+
   window.addEventListener('gamepadconnected', (e) => {
+    diag('connectée : ' + e.gamepad.id + ' · mapping=' + (e.gamepad.mapping || 'aucun') + ' · ' + e.gamepad.buttons.length + ' boutons, ' + e.gamepad.axes.length + ' axes · type=' + padType(e.gamepad.id));
     notePad(e.gamepad);
     setDevice('gamepad');
     window.dispatchEvent(new CustomEvent('lumen:pad', { detail: { connected: true, id: e.gamepad.id, type: padType(e.gamepad.id) } }));

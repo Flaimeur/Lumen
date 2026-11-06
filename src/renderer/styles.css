@@ -773,3 +773,5 @@ h1.with-icon { display: flex; align-items: center; gap: 14px; }
 }
 .focused.art-pick { outline-color: var(--accent); }
 .focused.art-pick .art-credit, .art-pick:hover .art-credit { opacity: 1; }
+
+.pad-test { white-space: pre-wrap; font: 13px/1.6 ui-monospace, Consolas, monospace; background: rgba(0, 0, 0, 0.3); border-radius: 14px; padding: 14px 16px; margin-top: 12px; min-height: 120px; }

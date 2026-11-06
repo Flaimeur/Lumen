@@ -615,6 +615,14 @@ ipcMain.handle('sgdb:cancel', () => { if (sgdbAbort) sgdbAbort.abort(); });
 
 ipcMain.handle('app:quit', () => app.quit());
 ipcMain.on('app:version', (e) => { e.returnValue = app.getVersion(); });
+// Journal de diagnostic des manettes (limité à ~200 Ko, remis à zéro au-delà).
+ipcMain.on('pad:log', (_e, msg) => {
+  try {
+    const file = path.join(app.getPath('userData'), 'pad-diagnostic.log');
+    if (fs.existsSync(file) && fs.statSync(file).size > 200 * 1024) fs.writeFileSync(file, '');
+    fs.appendFileSync(file, new Date().toISOString() + ' ' + String(msg).slice(0, 500) + '\n');
+  } catch { /* journal facultatif */ }
+});
 
 // Manette → clavier/souris (profils par jeu) : le rendu lit la manette, le processus d'aide tape.
 const padmapper = require('./padmapper');
