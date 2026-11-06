@@ -39,7 +39,8 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "shortcutName": "Lumen"
+      "shortcutName": "Lumen",
+      "artifactName": "${productName}-Setup-${version}.${ext}"
     },
     "publish": [
       {
