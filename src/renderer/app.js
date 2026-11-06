@@ -381,7 +381,7 @@
   async function openArtEditor(t) {
     if (!t.options && api.artOptions) {
       toast('Recherche des images sur iiDB…', 'info', 8000);
-      t.options = await api.artOptions({ type: t.type, key: t.key, name: t.name, systemId: t.systemId });
+      t.options = await api.artOptions({ type: t.type, key: t.key, name: t.name, query: t.query, systemId: t.systemId });
       document.getElementById('toast').hidden = true;
     }
     const cur = t.type === 'game' ? S.byPath.get(t.key) || t.current : t.type === 'platform' ? platformArt(t.key) : (S.lib.collectionArt || {})[t.key] || {};
@@ -400,6 +400,22 @@
           a: () => openArtKindMenu(t, kind),
           focus: () => setHints('action'),
         });
+      }),
+      // Le nom ne correspond pas à iiDB (dossier perso, abréviation…) : recherche manuelle.
+      focusable(h('div', { class: 'art-row' },
+        h('div', { class: 'art-thumb' }, '🔎'),
+        h('div', { class: 'ach-text' },
+          h('b', {}, t.type === 'collection' ? 'Chercher une collection iiDB…' : 'Chercher sous un autre nom…'),
+          h('span', { class: 'muted small' }, t.query ? `Recherche actuelle : « ${t.query} »` : `Recherche actuelle : « ${t.name} »`))), {
+        a: async () => {
+          const v = await openPrompt({ title: t.type === 'collection' ? 'Collection iiDB' : 'Nom à chercher sur iiDB', value: t.query || t.name,
+            help: t.type === 'collection' ? 'Par exemple Mario, Sonic, Zelda, Pokémon… (nom d’une collection d’iidb.iisu.network)' : 'Le nom du jeu tel qu’il apparaît sur iiDB.' });
+          if (v === null || !v.trim()) return;
+          t.query = v.trim();
+          t.options = null;
+          openArtEditor(t);
+        },
+        focus: () => setHints('action'),
       })));
     sfx('select');
   }

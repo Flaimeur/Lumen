@@ -221,8 +221,12 @@ async function iidbOptions(target, { signal, fetchImpl } = {}) {
       for (let skip = 0; skip < 2000 && !id; skip += 50) {
         const r = await call(`/collections/browse?skip=${skip}&limit=50`);
         const items = (r && r.items) || [];
-        const c = items.find((x) => fold(x.name) === fold(target.name) || fold(x.query) === fold(target.name))
-          || items.find((x) => fold(x.name).includes(fold(target.name)) || fold(target.name).includes(fold(x.name)));
+        // Nom identique, sinon tous les mots de la collection présents en entier dans le nom du dossier
+        // (« Mes jeux Mario » → Mario). Pas de sous-chaîne : « Favoris » ne doit pas donner « Ori ».
+        const want = fold(target.query || target.name);
+        const words = new Set(want.split(' ').filter(Boolean));
+        const c = items.find((x) => fold(x.name) === want || fold(x.query) === want)
+          || items.find((x) => { const w = fold(x.name).split(' ').filter(Boolean); return w.length && w.every((t) => words.has(t)); });
         if (c) id = c.id;
         if (items.length < 50) break;
       }

@@ -563,9 +563,10 @@ h1.with-icon { display: flex; align-items: center; gap: 14px; }
 
 /* ---------- Visuels de consoles (fournis par l'utilisateur) ---------- */
 .sys-hero { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.45; z-index: 0; }
-.syscard.has-icon { padding-right: 96px; }
-.sys-icon { position: absolute; right: 14px; top: 50%; translate: 0 -50%; width: 74px; height: 74px; object-fit: contain; border-radius: 16px; z-index: 1; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45)); }
-.sys-logo { max-width: 150px; max-height: 44px; object-fit: contain; object-position: left center; filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5)); }
+/* Icône de console : petit badge dans le coin, le logo garde la place principale. */
+.syscard.has-icon { padding-right: 18px; }
+.sys-icon { position: absolute; right: 12px; top: 12px; width: 40px; height: 40px; object-fit: contain; border-radius: 11px; z-index: 1; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.45)); }
+.sys-logo { max-width: 72%; max-height: 48px; object-fit: contain; object-position: left center; filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5)); }
 .syscard.has-icon .sys-count { right: auto; left: 18px; }
 .sys-banner { height: 130px; margin: 0 10px 8px; border-radius: 22px; overflow: hidden; -webkit-mask-image: linear-gradient(180deg, #000 40%, transparent); mask-image: linear-gradient(180deg, #000 40%, transparent); }
 .sys-banner img { width: 100%; height: 100%; object-fit: cover; animation: kenburns 26s ease-in-out infinite alternate; }

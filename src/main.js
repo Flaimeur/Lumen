@@ -313,8 +313,10 @@ ipcMain.handle('art:options', async (_e, target = {}) => {
     let id = null;
     if (target.type === 'game') id = ((cache.games || {})[target.key] || {}).id;
     if (target.type === 'platform') id = plat && plat.id;
-    if (target.type === 'collection') id = ((cache.collections || {})[target.name] || {}).id;
-    const opts = await iidbOptions({ type: target.type, name: target.name, sys, id }, { fetchImpl: (u, o) => net.fetch(u, o) });
+    if (target.type === 'collection' && !target.query) id = ((cache.collections || {})[target.name] || {}).id;
+    // Recherche saisie par l'utilisateur : elle remplace le nom pour trouver la fiche iiDB.
+    if (target.query) id = null;
+    const opts = await iidbOptions({ type: target.type, name: target.query || target.name, query: target.query, sys, id }, { fetchImpl: (u, o) => net.fetch(u, o) });
     return { ok: true, ...opts };
   } catch (err) { return { ok: false, error: err.message, cover: [], icon: [], logo: [], hero: [] }; }
 });
