@@ -1040,7 +1040,7 @@
     h('div', { class: 'gen-title' }, name));
   }
 
-  function heroCard(g, eyebrow) {
+  function heroCard(g, eyebrow, variant = '') {
     const sys = sysById(g.system) || {};
     const art = g.hero || g.background || g.cover;
     const focus = () => {
@@ -1050,7 +1050,7 @@
       startPreview(g, null);
     };
     const btn = (label, fn, primary) => focusable(h('div', { class: 'btn' + (primary ? ' primary' : '') }, label), { a: fn, focus });
-    return h('section', { class: 'hero', '--c': sys.color || '#475569' },
+    return h('section', { class: 'hero ' + variant, '--c': sys.color || '#475569' },
       h('div', { class: 'hero-art' }, art ? h('img', { src: api.mediaUrl(art), alt: '' }) : fallbackArt(g.name, sys.color)),
       h('div', { class: 'hero-body' },
         h('div', { class: 'eyebrow' }, eyebrow),
@@ -1266,8 +1266,8 @@
     }
     const widgets = home.widgets.filter((w) => WIDGETS[w]);
     return h('div', { class: 'home' },
-      widgets.length ? h('section', { class: 'widgets' }, widgets.map((w) => widgetCard(w))) : null,
-      home.blocks.hero ? heroCard(featured, recent.length ? 'Reprendre' : 'À la une') : null,
+      widgets.length ? h('section', { class: 'widgets', style: `--n:${Math.min(widgets.length, 4)}` }, widgets.map((w) => widgetCard(w))) : null,
+      home.blocks.hero ? heroCard(featured, recent.length ? 'Reprendre' : 'À la une', widgets.length ? 'compact' : '') : null,
       shelves.map(([title, items]) =>
         h('section', { class: 'shelf' }, h('div', { class: 'shelf-title' }, title), h('div', { class: 'row' }, items))));
   }
@@ -1332,8 +1332,9 @@
     achievements: { name: 'Rang et XP', render: () => {
       if (!S.ach) return [h('div', { class: 'w-big' }, '🏆'), h('div', { class: 'w-sub' }, 'Lecture des succès…')];
       const st = achStats(S.ach);
-      return [h('div', { class: 'w-rank', '--rc': st.rank.color }, rankEmblem(st), h('div', {}, h('b', {}, `Rang ${st.rank.name}`), h('div', { class: 'w-sub' }, `Niveau ${st.lvl} · ${st.unlocked} succès`))),
-        h('div', { class: 'xp-bar', '--rc': st.rank.color }, h('div', { class: 'xp-fill', style: `width:${Math.round((st.into / st.need) * 100)}%` }))];
+      return [h('div', { class: 'w-rank', '--rc': st.rank.color }, rankEmblem(st), h('div', { class: 'w-rank-text' }, h('b', {}, `Rang ${st.rank.name}`), h('div', { class: 'w-sub' }, `Niveau ${st.lvl} · ${st.unlocked} succès`),
+        h('div', { class: 'xp-bar', '--rc': st.rank.color }, h('div', { class: 'xp-fill', style: `width:${Math.max(3, Math.round((st.into / st.need) * 100))}%` })),
+        h('div', { class: 'w-xp' }, `${st.into} / ${st.need} XP`)))];
     }, act: () => openTab('achievements') },
     playtime: { name: 'Temps de jeu', render: () => {
       const pt = S.cfg.playtime || {};
@@ -1359,7 +1360,8 @@
       if (!S.surprise || !S.byPath.has(S.surprise)) S.surprise = all.length ? all[Math.floor(Math.random() * all.length)].path : null;
       const g = S.surprise && S.byPath.get(S.surprise);
       if (!g) return [h('div', { class: 'w-big' }, '🎲'), h('div', { class: 'w-sub' }, 'Aucun jeu')];
-      return [h('div', { class: 'w-surprise' }, h('img', { src: api.mediaUrl(g.cover), alt: '' }), h('div', {}, h('b', {}, g.name), h('div', { class: 'w-sub' }, 'A : lancer la roulette · X : un autre')))];
+      return [h('div', { class: 'w-surprise' }, h('img', { src: api.mediaUrl(g.cover), alt: '' }),
+        h('div', { class: 'w-surprise-text' }, h('b', {}, g.name), h('div', { class: 'w-sub' }, (sysById(g.system) || {}).name || ''), h('div', { class: 'w-hint' }, '🎲 A : roulette · X : autre')))];
     }, act: () => openRoll(), x: () => { S.surprise = null; rerender(); } },
     note: { name: 'Mémo', render: () => [h('div', { class: 'w-note' }, (S.cfg.homeNote || '').trim() || 'Écris un petit mot ici (bouton A)')], act: async () => {
       const v = await openPrompt({ title: 'Mémo', value: S.cfg.homeNote || '', help: 'Un rappel, une liste de jeux à finir…' });
@@ -1381,19 +1383,21 @@
   function mediaBody() {
     const m = S.media;
     if (!api.media) return [h('div', { class: 'w-big' }, '🎧'), h('div', { class: 'w-sub' }, 'Disponible dans l’application')];
+    if (m === undefined) setTimeout(pollMedia, 0); // premier affichage : on lit l'état tout de suite
     if (!m || !m.active) return [h('div', { class: 'w-big' }, '🎧'), h('div', { class: 'w-sub' }, 'Rien en lecture (Spotify, YouTube…)')];
     const playing = m.status === 'Playing';
-    const btn = (label, cmd) => h('button', { class: 'w-mbtn', onClick: (e) => { e.stopPropagation(); mediaCmd(cmd); } }, label);
+    const btn = (label, cmd, extra = '') => h('button', { class: 'w-mbtn ' + extra, onClick: (e) => { e.stopPropagation(); mediaCmd(cmd); } }, label);
     return [h('div', { class: 'w-np' },
       m.thumb ? h('img', { class: 'w-np-cover', src: api.mediaUrl(m.thumb), alt: '' }) : h('div', { class: 'w-np-cover empty' }, playing ? h('span', { class: 'w-eq' }, h('i'), h('i'), h('i')) : '♪'),
-      h('div', { class: 'w-np-text' }, h('b', {}, m.title || 'Sans titre'), h('div', { class: 'w-sub' }, [m.artist, appName(m.app)].filter(Boolean).join(' · ')))),
-    h('div', { class: 'w-np-ctrl' }, btn('⏮', 'prev'), btn(playing ? '⏸' : '▶', 'toggle'), btn('⏭', 'next'), h('span', { class: 'w-sub' }, 'A ⏯ · X ⏭ · Y ⏮'))];
+      h('div', { class: 'w-np-text' },
+        h('b', {}, m.title || 'Sans titre'),
+        h('div', { class: 'w-sub' }, [m.artist, appName(m.app)].filter(Boolean).join(' · ')),
+        h('div', { class: 'w-np-ctrl' }, btn('⏮', 'prev'), btn(playing ? '⏸' : '▶', 'toggle', 'main'), btn('⏭', 'next'))))];
   }
   function refreshMediaWidget() {
-    const el = document.querySelector('.widget.w-nowplaying');
+    const el = document.querySelector('.widget.w-nowplaying .w-body');
     if (!el) return;
-    const title = el.querySelector('.w-title');
-    el.replaceChildren(title, ...mediaBody());
+    el.replaceChildren(...mediaBody());
   }
   async function pollMedia() {
     if (!api.media || S.mediaBusy) return;
@@ -1455,11 +1459,14 @@
     }, 3600);
   }
 
+  const WIDGET_ICONS = { clock: '🕒', weather: '🌤️', achievements: '🏆', playtime: '⏱️', music: '🎵', nowplaying: '🎧', favorites: '⭐', surprise: '🎲', note: '📝', stats: '📚' };
   function widgetCard(id) {
     const w = WIDGETS[id];
     let body;
     try { body = w.render(); } catch { body = [h('div', { class: 'w-sub' }, 'Indisponible')]; }
-    return focusable(h('div', { class: 'widget w-' + id }, h('div', { class: 'w-title' }, w.name), ...body), {
+    return focusable(h('div', { class: 'widget w-' + id },
+      h('div', { class: 'w-head' }, h('span', { class: 'w-ico' }, WIDGET_ICONS[id] || '•'), h('span', { class: 'w-title' }, w.name)),
+      h('div', { class: 'w-body' }, ...body)), {
       a: w.act || (() => openHomeEditor()),
       x: w.x,
       y: w.y,
