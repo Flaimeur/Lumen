@@ -294,7 +294,7 @@
   function updateMusic() {
     if (!S.cfg) return;
     const m = musicCfg();
-    const play = m.enabled && musicList.length && !S.cfg.muted && !S.inGame && !musicDucked && !windowAway;
+    const play = m.enabled && musicList.length && !S.cfg.muted && !S.inGame && !musicDucked && !windowAway && !(S.media && S.media.status === 'Playing');
     if (!play) { music.pause(); return; }
     if (!music.getAttribute('src')) music.src = api.mediaUrl(musicList[musicIdx]);
     music.volume = Math.min(1, (m.volume ?? 0.35) * (S.cfg.volume ?? 0.7));
@@ -1072,14 +1072,14 @@
     } else {
       tile.append(fallbackArt(g.name, sys && sys.color, sys && sys.short));
     }
-    if (isFav(g)) tile.append(h('span', { class: 'badge-fav' }, '★'));
+    if (isFav(g)) tile.append(starIcon());
     if (g.soundbite || g.video) tile.append(h('span', { class: 'badge-media' }, g.video ? '▶' : '♪'));
     if (g.source === 'romm' && !g.downloaded) tile.append(h('span', { class: 'badge-cloud', title: 'Sur ton serveur RomM' }, '☁'));
     if (g.appIcon) tile.classList.add('app-tile');
     // Applications : le nom reste lisible sous l'icône.
     if (g.source === 'app' && g.cover) tile.append(h('div', { class: 'app-name' }, g.name));
     const ai = achInfo(g);
-    if (ai && ai.total && ai.unlocked === ai.total) tile.append(h('span', { class: 'gg-badge', title: 'Tous les succès débloqués' }, 'GG'));
+    if (ai && ai.total && ai.unlocked === ai.total) tile.append(trophyIcon('on-tile'));
     if (g.installed === false) { tile.classList.add('not-installed'); tile.append(h('span', { class: 'badge-cloud badge-dl', title: 'Non installé' }, '⬇')); }
     tile._game = g;
     return focusable(tile, {
@@ -1272,9 +1272,24 @@
         h('section', { class: 'shelf' }, h('div', { class: 'shelf-title' }, title), h('div', { class: 'row' }, items))));
   }
 
+  // Coupe en or : la récompense d'un jeu terminé à 100 %.
+  function trophyIcon(cls = '') {
+    const el = h('span', { class: 'trophy ' + cls, title: 'Tous les succès débloqués' });
+    el.innerHTML = '<svg viewBox="0 0 24 24"><defs><linearGradient id="tg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff7c2"/><stop offset=".45" stop-color="#fbbf24"/><stop offset="1" stop-color="#b45309"/></linearGradient></defs>'
+      + '<path fill="url(#tg)" stroke="#78350f" stroke-width=".8" d="M7 3h10v4.5a5 5 0 0 1-4 4.9V15h2.5a1 1 0 0 1 1 1v1.2H7.5V16a1 1 0 0 1 1-1H11v-2.6a5 5 0 0 1-4-4.9z"/>'
+      + '<path fill="none" stroke="#b45309" stroke-width="1.6" stroke-linecap="round" d="M7 5H4.6a.6.6 0 0 0-.6.6C4 8 5.4 9.6 7.4 9.9M17 5h2.4c.3 0 .6.3.6.6 0 2.4-1.4 4-3.4 4.3"/>'
+      + '<rect x="6.5" y="17.6" width="11" height="3.2" rx="1" fill="url(#tg)" stroke="#78350f" stroke-width=".8"/><path d="M9.3 4.6c0 2 .5 3.5 1.6 4.4" stroke="#fffbea" stroke-width="1.2" stroke-linecap="round" fill="none" opacity=".9"/></svg>';
+    return el;
+  }
+  function starIcon() {
+    const el = h('span', { class: 'badge-fav', title: 'Favori' });
+    el.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 2.8l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 16.8l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>';
+    return el;
+  }
+
   // ---------- Accueil : widgets et blocs (Réglages → Affichage → Personnaliser l'accueil) ----------
   const HOME_DEFAULT = {
-    widgets: ['clock', 'achievements', 'music'],
+    widgets: ['clock', 'nowplaying', 'achievements', 'surprise'],
     blocks: { hero: true, recent: true, favorites: false, systems: true, folders: true, discover: true, discoverAlways: false },
   };
   function homeCfg() {
@@ -1332,13 +1347,20 @@
       const name = (musicList[musicIdx] || '').split(/[\\/]/).pop().replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ');
       return [h('div', { class: 'w-music' }, h('span', { class: 'w-eq' }, h('i'), h('i'), h('i')), h('b', {}, name)), h('div', { class: 'w-sub' }, 'A : morceau suivant')];
     }, act: () => { if (musicList.length) { nextTrack(); setTimeout(rerender, 100); } else openTab('settings'); } },
+    nowplaying: { name: 'Lecture en cours', render: () => mediaBody(), act: () => mediaCmd('toggle'), x: () => mediaCmd('next'), y: () => mediaCmd('prev') },
+    favorites: { name: 'Favoris', render: () => {
+      const favs = (S.cfg.favorites || []).map((p) => S.byPath.get(p)).filter(Boolean);
+      if (!favs.length) return [h('div', { class: 'w-big' }, '☆'), h('div', { class: 'w-sub' }, 'X sur un jeu pour l’ajouter')];
+      return [h('div', { class: 'w-favs' }, favs.slice(0, 4).map((g) => g.cover ? h('img', { src: api.mediaUrl(g.cover), alt: '' }) : h('div', { class: 'w-fav-empty' }, g.name.slice(0, 2)))),
+        h('div', { class: 'w-sub' }, plural(favs.length, 'favori', 'favoris'))];
+    }, act: () => go({ view: 'folder', id: '★' }) },
     surprise: { name: 'Jeu surprise', render: () => {
       const all = S.lib.systems.flatMap((x) => x.games).filter((g) => g.cover);
       if (!S.surprise || !S.byPath.has(S.surprise)) S.surprise = all.length ? all[Math.floor(Math.random() * all.length)].path : null;
       const g = S.surprise && S.byPath.get(S.surprise);
       if (!g) return [h('div', { class: 'w-big' }, '🎲'), h('div', { class: 'w-sub' }, 'Aucun jeu')];
-      return [h('div', { class: 'w-surprise' }, h('img', { src: api.mediaUrl(g.cover), alt: '' }), h('div', {}, h('b', {}, g.name), h('div', { class: 'w-sub' }, 'A : voir · X : un autre')))];
-    }, act: () => { const g = S.byPath.get(S.surprise); if (g) openDetails(g); }, x: () => { S.surprise = null; rerender(); } },
+      return [h('div', { class: 'w-surprise' }, h('img', { src: api.mediaUrl(g.cover), alt: '' }), h('div', {}, h('b', {}, g.name), h('div', { class: 'w-sub' }, 'A : lancer la roulette · X : un autre')))];
+    }, act: () => openRoll(), x: () => { S.surprise = null; rerender(); } },
     note: { name: 'Mémo', render: () => [h('div', { class: 'w-note' }, (S.cfg.homeNote || '').trim() || 'Écris un petit mot ici (bouton A)')], act: async () => {
       const v = await openPrompt({ title: 'Mémo', value: S.cfg.homeNote || '', help: 'Un rappel, une liste de jeux à finir…' });
       if (v === null) return;
@@ -1352,6 +1374,87 @@
     }, act: () => openTab('systems') },
   };
 
+  // ---------- Lecture en cours (Spotify, YouTube…) ----------
+  const APP_NAMES = [[/spotify/i, 'Spotify'], [/chrome/i, 'Chrome'], [/msedge|edge/i, 'Edge'], [/firefox/i, 'Firefox'], [/opera/i, 'Opera'], [/brave/i, 'Brave'],
+    [/deezer/i, 'Deezer'], [/vlc/i, 'VLC'], [/zunemusic|music\.ui/i, 'Lecteur multimédia'], [/discord/i, 'Discord'], [/apple/i, 'Apple Music'], [/tidal/i, 'Tidal']];
+  const appName = (id) => { const hit = APP_NAMES.find(([re]) => re.test(id || '')); return hit ? hit[1] : String(id || '').split(/[!\\.]/)[0] || 'Lecteur'; };
+  function mediaBody() {
+    const m = S.media;
+    if (!api.media) return [h('div', { class: 'w-big' }, '🎧'), h('div', { class: 'w-sub' }, 'Disponible dans l’application')];
+    if (!m || !m.active) return [h('div', { class: 'w-big' }, '🎧'), h('div', { class: 'w-sub' }, 'Rien en lecture (Spotify, YouTube…)')];
+    const playing = m.status === 'Playing';
+    const btn = (label, cmd) => h('button', { class: 'w-mbtn', onClick: (e) => { e.stopPropagation(); mediaCmd(cmd); } }, label);
+    return [h('div', { class: 'w-np' },
+      m.thumb ? h('img', { class: 'w-np-cover', src: api.mediaUrl(m.thumb), alt: '' }) : h('div', { class: 'w-np-cover empty' }, playing ? h('span', { class: 'w-eq' }, h('i'), h('i'), h('i')) : '♪'),
+      h('div', { class: 'w-np-text' }, h('b', {}, m.title || 'Sans titre'), h('div', { class: 'w-sub' }, [m.artist, appName(m.app)].filter(Boolean).join(' · ')))),
+    h('div', { class: 'w-np-ctrl' }, btn('⏮', 'prev'), btn(playing ? '⏸' : '▶', 'toggle'), btn('⏭', 'next'), h('span', { class: 'w-sub' }, 'A ⏯ · X ⏭ · Y ⏮'))];
+  }
+  function refreshMediaWidget() {
+    const el = document.querySelector('.widget.w-nowplaying');
+    if (!el) return;
+    const title = el.querySelector('.w-title');
+    el.replaceChildren(title, ...mediaBody());
+  }
+  async function pollMedia() {
+    if (!api.media || S.mediaBusy) return;
+    S.mediaBusy = true;
+    try { S.media = await api.media('state'); } catch { S.media = null; }
+    S.mediaBusy = false;
+    refreshMediaWidget();
+    updateMusic();
+  }
+  async function mediaCmd(cmd) {
+    if (!api.media) return;
+    sfx('select');
+    await api.media(cmd);
+    setTimeout(pollMedia, 350);
+  }
+  // Suivi toutes les 3 s tant que le widget est affiché à l'accueil.
+  setInterval(() => { if (S.cfg && S.route.view === 'home' && homeCfg().widgets.includes('nowplaying') && document.hasFocus()) pollMedia(); }, 3000);
+
+  // ---------- Roulette : un jeu au hasard, façon machine à sous ----------
+  function openRoll(systemId) {
+    const pool = S.lib.systems.filter((x) => !x.apps && (!systemId || x.id === systemId)).flatMap((x) => x.games).filter((g) => g.cover && g.installed !== false);
+    if (pool.length < 2) { toast('Pas assez de jeux avec une jaquette pour la roulette', 'error'); return; }
+    const pick = () => pool[Math.floor(Math.random() * pool.length)];
+    const STOP = 34;
+    const items = Array.from({ length: STOP + 4 }, pick);
+    const winner = items[STOP];
+    const strip = h('div', { class: 'roll-strip' }, items.map((g, i) => h('div', { class: 'roll-item' + (i === STOP ? ' winner' : '') }, h('img', { src: api.mediaUrl(g.cover), alt: '' }))));
+    const title = h('h2', { class: 'roll-title' }, 'La roulette tourne…');
+    const actions = h('div', { class: 'actions roll-actions' });
+    const box = h('div', { class: 'modal roll' }, h('div', { class: 'eyebrow' }, '🎲 Jeu au hasard'), title,
+      h('div', { class: 'roll-window' }, h('div', { class: 'roll-marker' }), strip), actions);
+    openOverlay(box);
+    const step = 172; // largeur d'une case + espace
+    requestAnimationFrame(() => {
+      const center = box.querySelector('.roll-window').clientWidth / 2 - 80;
+      strip.style.transform = `translateX(${center}px)`;
+      requestAnimationFrame(() => {
+        strip.classList.add('spin');
+        strip.style.transform = `translateX(${center - STOP * step}px)`;
+      });
+    });
+    // Tic-tac qui ralentit, comme une vraie roue.
+    let t = 0;
+    for (let i = 0; i < 26; i++) { t += 40 + i * i * 0.55; setTimeout(() => { if (box.isConnected) sfx('move'); }, t); }
+    setTimeout(() => {
+      if (!box.isConnected) return;
+      sfx('launch');
+      Input.rumble && Input.rumble(0.5, 140);
+      strip.querySelector('.winner').classList.add('won');
+      title.textContent = winner.name;
+      const sys = sysById(winner.system);
+      actions.append(
+        actionButton('▶ Jouer', () => { closeOverlay(true); launch(winner); }, true),
+        actionButton('Détails', () => { closeOverlay(true); openDetails(winner); }),
+        actionButton('🎲 Relancer', () => openRoll(systemId)),
+        sys ? h('span', { class: 'muted small' }, sys.name) : null);
+      const first = actions.querySelector('.f');
+      if (first) setFocus(first, { silent: true });
+    }, 3600);
+  }
+
   function widgetCard(id) {
     const w = WIDGETS[id];
     let body;
@@ -1359,6 +1462,7 @@
     return focusable(h('div', { class: 'widget w-' + id }, h('div', { class: 'w-title' }, w.name), ...body), {
       a: w.act || (() => openHomeEditor()),
       x: w.x,
+      y: w.y,
       focus: () => { setTitle(w.name, 'Widget'); setHints('action'); },
     });
   }
@@ -2123,6 +2227,7 @@
       else items.push(['Jaquettes de cette console', () => { closeOverlay(true); openThumbs(sysId); }]);
     }
     if (S.route.view === 'home') items.push(['🎨 Personnaliser l’accueil', () => { closeOverlay(true); openHomeEditor(); }]);
+    if (!g || S.route.view === 'games') items.push([sysId ? '🎲 Jeu au hasard (cette console)' : '🎲 Jeu au hasard', () => { closeOverlay(true); openRoll(sysId || null); }]);
     if (S.route.view !== 'search') items.push(['Rechercher un jeu', () => { closeOverlay(true); openTab('search'); }]);
     items.push(
       ['Télécharger les jaquettes manquantes', () => { closeOverlay(true); openThumbs(); }],
@@ -2460,7 +2565,7 @@
         h('span', { class: 'muted small' }, `${st.into.toLocaleString('fr-FR')} / ${st.need.toLocaleString('fr-FR')} XP · ${st.xp.toLocaleString('fr-FR')} XP au total${st.next ? ` · ${st.next.name} au niveau ${st.next.min}` : ' · rang maximal'}`)),
       h('div', { class: 'ach-profile-stats' },
         h('div', {}, h('b', {}, String(st.unlocked)), h('span', { class: 'muted small' }, 'succès')),
-        h('div', {}, h('b', { class: 'gg-text' }, String(st.perfect)), h('span', { class: 'muted small' }, 'jeux GG')))), {
+        h('div', {}, h('b', { class: 'gg-text' }, trophyIcon('inline small'), String(st.perfect)), h('span', { class: 'muted small' }, 'jeux à 100 %')))), {
       a: () => toast(`${XP_PER_ACH} XP par succès · ${XP_PERFECT} XP par jeu terminé à 100 %`, 'info', 4000),
       focus: () => { setTitle(`Niveau ${st.lvl}`, `Rang ${st.rank.name}`); setHints('action'); },
     });
@@ -2475,7 +2580,7 @@
       const gained = st.unlocked - (prev.unlocked || 0);
       const gg = st.perfect - (prev.perfect || 0);
       if (st.lvl > (prev.lvl || 1)) setTimeout(() => toast(`⬆ Niveau ${st.lvl} atteint ! Rang ${st.rank.name}`, 'info', 6000), 600);
-      else if (gg > 0) setTimeout(() => toast(`GG ! ${plural(gg, 'jeu terminé', 'jeux terminés')} à 100 % (+${gg * XP_PERFECT} XP)`, 'info', 6000), 600);
+      else if (gg > 0) setTimeout(() => toast(`🏆 Coupe d’or ! ${plural(gg, 'jeu terminé', 'jeux terminés')} à 100 % (+${gg * XP_PERFECT} XP)`, 'info', 6000), 600);
       else if (gained > 0) setTimeout(() => toast(`🏆 +${plural(gained, 'succès', 'succès')} (+${gained * XP_PER_ACH} XP)`, 'info', 5000), 600);
     }
     if (!prev || prev.unlocked !== seen.unlocked || prev.lvl !== seen.lvl || prev.perfect !== seen.perfect) {
@@ -2516,7 +2621,7 @@
     const rows = shown.slice(0, 300).map((x) => {
       const g = achGame(x);
       return focusable(h('div', { class: 'ach-game' + (x.unlocked === x.total ? ' perfect' : '') },
-        x.unlocked === x.total ? h('span', { class: 'gg-badge' }, 'GG') : null,
+        x.unlocked === x.total ? trophyIcon('on-card') : null,
         g.cover ? h('img', { class: 'ach-cover', src: api.mediaUrl(g.cover), alt: '', loading: 'lazy' }) : h('div', { class: 'ach-cover' }),
         h('div', { class: 'ach-text' },
           h('b', {}, g.name),
@@ -2562,7 +2667,7 @@
       h('div', { class: 'eyebrow' }, `Succès · ${/^ra:/.test(key) ? 'RetroAchievements' : 'Steam'}`),
       h('h2', {}, g.name),
       h('div', { class: 'ach-head' }, progressBar(d.unlocked, d.total), h('b', {}, `${d.unlocked} / ${d.total}`),
-        d.total && d.unlocked === d.total ? h('span', { class: 'gg-badge inline' }, 'GG') : null),
+        d.total && d.unlocked === d.total ? trophyIcon('inline') : null),
       h('div', { class: 'ach-items' }, list.map((a) => {
         const secret = a.hidden && !a.unlocked;
         const img = a.unlocked ? a.icon : a.iconGray || a.icon;

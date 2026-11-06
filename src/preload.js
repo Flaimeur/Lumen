@@ -60,6 +60,7 @@ contextBridge.exposeInMainWorld('lumen', {
   version: ipcRenderer.sendSync('app:version'),
   padLog: (msg) => ipcRenderer.send('pad:log', msg),
   weather: (city) => ipcRenderer.invoke('weather:get', city),
+  media: (cmd) => ipcRenderer.invoke('media:ask', cmd || 'state'),
   onNativePad: (cb) => ipcRenderer.on('pad:native', (_e, ev) => cb(ev)),
   mapper: {
     start: () => ipcRenderer.invoke('mapper:start'),

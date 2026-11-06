@@ -39,7 +39,7 @@
     id: 'pc-steam', name: 'Steam', short: 'Steam', color: '#2a475e', folder: null, pc: true,
     games: Array.from({ length: 14 }, (_v, i) => {
       const genres = [pick(GENRES), pick(GENRES)].filter((x, k, a) => a.indexOf(x) === k);
-      return { path: `steam:${100 + i}`, system: 'pc-steam', name: `${pick(A)} ${pick(B)} ${i}`, cover: null, source: 'pc', store: 'steam',
+      return { path: `steam:${100 + i}`, system: 'pc-steam', name: `${pick(A)} ${pick(B)} ${i}`, cover: "demo-cover", source: 'pc', store: 'steam',
         installed: i % 3 === 0, genres, genre: genres.join(', '), adult: i % 4 === 1, tags: [pick(['Horreur', 'Anime', 'Multijoueur', 'Jeu solo']), pick(['2D', '3D', 'Exploration'])], year: '2024', developer: 'Studio Démo', desc: '' };
     }).sort((a, b) => a.name.localeCompare(b.name)),
   });
@@ -71,6 +71,7 @@
       return { ok: true, cover: opt(8, 'iisu boxart'), icon: opt(3, 'icon'), logo: opt(2, 'logo'), hero: opt(4, 'hero') };
     },
     pickImage: async () => null,
+    media: (() => { let playing = true; return async (cmd) => { if (cmd === 'toggle') playing = !playing; return cmd === 'state' || !cmd ? { active: true, status: playing ? 'Playing' : 'Paused', title: 'Blinding Lights', artist: 'The Weeknd', app: 'Spotify.exe', thumb: '' } : { ok: true }; }; })(),
     mapper: { start: async () => true, send: () => {}, stop: async () => true },
     achievements: {
       summary: async () => ({
@@ -133,6 +134,6 @@
       }
       return { ok: true, checked: total, downloaded: 32, notFound: 8, unsupported: [], errors: 0, cancelled: false };
     },
-    mediaUrl: () => '',
+    mediaUrl: (p) => (p === 'demo-cover' ? 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10" fill="hsl(' + Math.floor(Math.random() * 360) + ',60%,45%)"/></svg>') : ''),
   };
 })();

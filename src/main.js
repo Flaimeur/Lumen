@@ -621,6 +621,14 @@ app.whenReady().then(() => nativepad.start((ev) => { if (win && !win.isDestroyed
 app.on('will-quit', () => nativepad.stop());
 
 // Journal de diagnostic des manettes (limité à ~200 Ko, remis à zéro au-delà).
+// Média en cours sur le PC (Spotify, YouTube…) pour le widget « Lecture en cours ».
+const mediactl = require('./mediactl');
+ipcMain.handle('media:ask', async (_e, cmd) => {
+  const c = ['state', 'toggle', 'next', 'prev'].includes(cmd) ? cmd : 'state';
+  return mediactl.ask(c, path.join(app.getPath('userData'), 'media-covers'));
+});
+app.on('will-quit', () => mediactl.stop());
+
 // Météo du widget d'accueil : Open-Meteo (gratuit, sans clé), gardée 20 minutes.
 const weatherCache = new Map();
 ipcMain.handle('weather:get', async (_e, city) => {

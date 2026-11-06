@@ -304,11 +304,15 @@ body.has-cursor .f.focused { outline-color: transparent !important; }
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
   text-wrap: balance; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
 }
+/* Favori : étoile dorée sur pastille sombre, avec un léger éclat. */
 .badge-fav {
-  position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; border-radius: 50%; z-index: 2;
-  display: grid; place-items: center; font-size: 13px; color: #1a1300;
-  background: #fcd34d; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 50%; z-index: 2;
+  display: grid; place-items: center; background: radial-gradient(circle at 35% 30%, #3b2a06, #120c02);
+  box-shadow: 0 0 0 1.5px rgba(252, 211, 77, 0.85), 0 3px 10px rgba(0, 0, 0, 0.5), 0 0 14px rgba(251, 191, 36, 0.45);
 }
+.badge-fav svg { width: 17px; height: 17px; fill: #fcd34d; filter: drop-shadow(0 0 3px rgba(251, 191, 36, 0.8)); }
+.focused .badge-fav svg { animation: star-pop 0.5s var(--spring); }
+@keyframes star-pop { 50% { transform: scale(1.35) rotate(12deg); } }
 
 /* ---------- Cartes console ---------- */
 .syscard {
@@ -825,3 +829,59 @@ body.wp-on:not(.wp-fixed) .bg-layer.on { opacity: 0.7; }
 .w-note { white-space: pre-wrap; font-size: 15px; line-height: 1.45; max-height: 4.4em; overflow: hidden; }
 /* Fond perso : l assombrissement vient du réglage, pas du dégradé général. */
 body.wp-on .bg-shade { opacity: 0.3; }
+
+/* ---------- Coupe en or (jeu terminé à 100 %) ---------- */
+.trophy { display: inline-grid; place-items: center; flex: none; }
+.trophy svg { width: 100%; height: 100%; filter: drop-shadow(0 2px 6px rgba(180, 83, 9, 0.6)); }
+.trophy.on-tile, .trophy.on-card {
+  position: absolute; z-index: 3; width: 40px; height: 40px; padding: 5px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #4a3206, #1a1003);
+  box-shadow: 0 0 0 2px #fbbf24, 0 0 22px rgba(251, 191, 36, 0.75), 0 4px 12px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+.trophy.on-tile { bottom: 8px; right: 8px; }
+.tile.not-installed .trophy.on-tile { bottom: 40px; }
+.trophy.on-card { top: 10px; right: 10px; width: 34px; height: 34px; }
+/* Reflet qui passe sur la coupe. */
+.trophy.on-tile::after, .trophy.on-card::after {
+  content: ""; position: absolute; inset: -40%; background: linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.75) 50%, transparent 60%);
+  animation: trophy-shine 3.2s ease-in-out infinite; pointer-events: none;
+}
+@keyframes trophy-shine { 0%, 60% { transform: translateX(-70%); } 100% { transform: translateX(70%); } }
+.trophy.inline { width: 30px; height: 30px; }
+.trophy.inline.small { width: 22px; height: 22px; vertical-align: -4px; margin-right: 4px; }
+.ach-game.perfect { box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.5), 0 0 24px rgba(251, 191, 36, 0.12); }
+
+/* ---------- Widgets : lecture en cours, favoris ---------- */
+.w-nowplaying { min-height: 150px; }
+.w-np { display: flex; align-items: center; gap: 12px; min-width: 0; margin-top: 14px; }
+.w-np-cover { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; flex: none; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45); }
+.w-np-cover.empty { display: grid; place-items: center; font-size: 26px; background: rgba(255, 255, 255, 0.08); }
+.w-np-text { min-width: 0; }
+.w-np-text b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w-np-ctrl { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.w-np-ctrl .w-sub { margin-left: 6px; font-size: 11px; }
+.w-mbtn {
+  width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.08);
+  color: var(--text); font-size: 13px; cursor: pointer; display: grid; place-items: center;
+}
+.w-mbtn:hover { background: rgba(255, 255, 255, 0.18); }
+.w-favs { display: flex; gap: 6px; margin-top: 14px; }
+.w-favs img, .w-fav-empty { width: 46px; height: 46px; border-radius: 10px; object-fit: cover; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4); }
+.w-fav-empty { display: grid; place-items: center; background: rgba(255, 255, 255, 0.1); font-weight: 800; font-size: 13px; }
+
+/* ---------- Roulette ---------- */
+.modal.roll { max-width: min(980px, 94vw); text-align: center; }
+.roll-title { min-height: 1.3em; }
+.roll-window {
+  position: relative; overflow: hidden; height: 196px; margin: 14px -28px; padding: 18px 0;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
+}
+.roll-strip { display: flex; gap: 12px; will-change: transform; }
+.roll-strip.spin { transition: transform 3.5s cubic-bezier(0.12, 0.8, 0.12, 1); }
+.roll-item { flex: 0 0 160px; height: 160px; border-radius: 18px; overflow: hidden; background: #141826; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45); transition: scale 0.4s var(--spring), box-shadow 0.4s; }
+.roll-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.roll-item.won { scale: 1.1; box-shadow: 0 0 0 3px var(--accent), 0 0 40px color-mix(in srgb, var(--accent) 60%, transparent); }
+.roll-marker { position: absolute; z-index: 2; left: 50%; top: 4px; bottom: 4px; width: 172px; translate: -50% 0; border-radius: 22px; border: 2px dashed color-mix(in srgb, var(--accent) 70%, transparent); pointer-events: none; }
+.roll-actions { justify-content: center; align-items: center; }
