@@ -1,7 +1,7 @@
 {
   "name": "lumen-frontend",
   "productName": "Lumen",
-  "version": "0.13.1",
+  "version": "0.14.0",
   "description": "Frontend d'émulation pour PC, pensé pour la manette.",
   "author": "Lumen",
   "main": "src/main.js",
@@ -40,10 +40,21 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "shortcutName": "Lumen"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Flaimeur",
+        "repo": "Lumen",
+        "releaseType": "release"
+      }
+    ]
   },
   "devDependencies": {
     "electron": "^45.2.3",
     "electron-builder": "^26.18.0"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
   }
 }

@@ -621,6 +621,59 @@ app.whenReady().then(() => nativepad.start((ev) => { if (win && !win.isDestroyed
 app.on('will-quit', () => nativepad.stop());
 
 // Journal de diagnostic des manettes (limité à ~200 Ko, remis à zéro au-delà).
+// ---------- Mises à jour automatiques (releases GitHub de Flaimeur/Lumen) ----------
+// Lumen vérifie au démarrage puis toutes les 6 h, télécharge en arrière-plan et propose de redémarrer.
+let updater = null;
+const updateState = { status: 'idle', version: null, progress: 0, error: null };
+function sendUpdate() { if (win && !win.isDestroyed()) win.webContents.send('update:state', updateState); }
+function setupUpdater() {
+  if (!app.isPackaged || updater) return;
+  try { updater = require('electron-updater').autoUpdater; } catch { return; }
+  updater.autoDownload = true;
+  updater.autoInstallOnAppQuit = true;
+  updater.on('checking-for-update', () => { Object.assign(updateState, { status: 'checking', error: null }); sendUpdate(); });
+  updater.on('update-available', (i) => { Object.assign(updateState, { status: 'downloading', version: i.version, progress: 0 }); sendUpdate(); });
+  updater.on('update-not-available', () => { Object.assign(updateState, { status: 'uptodate' }); sendUpdate(); });
+  updater.on('download-progress', (p) => { updateState.progress = Math.round(p.percent || 0); sendUpdate(); });
+  updater.on('update-downloaded', (i) => { Object.assign(updateState, { status: 'ready', version: i.version, progress: 100 }); sendUpdate(); });
+  updater.on('error', (err) => { Object.assign(updateState, { status: 'error', error: String(err && err.message || err).slice(0, 200) }); sendUpdate(); });
+  const check = () => updater.checkForUpdates().catch(() => {});
+  setTimeout(check, 15000);
+  setInterval(check, 6 * 60 * 60 * 1000);
+}
+app.whenReady().then(setupUpdater);
+ipcMain.handle('update:state', () => ({ ...updateState, current: app.getVersion(), packaged: app.isPackaged }));
+ipcMain.handle('update:check', async () => {
+  if (!app.isPackaged) return { ...updateState, status: 'dev' };
+  setupUpdater();
+  try { await updater.checkForUpdates(); } catch (err) { Object.assign(updateState, { status: 'error', error: err.message }); }
+  return updateState;
+});
+ipcMain.handle('update:install', () => { if (updater && updateState.status === 'ready') setImmediate(() => updater.quitAndInstall(false, true)); return true; });
+
+// Sauvegarde / restauration : la config (favoris, dossiers, profils manette, images et sons choisis,
+// accueil, applications…) dans un fichier .json. Les clés et mots de passe chiffrés n'y sont jamais.
+ipcMain.handle('config:export', async () => {
+  const stamp = new Date().toISOString().slice(0, 10);
+  const r = await dialog.showSaveDialog(win, { title: 'Sauvegarder la configuration de Lumen', defaultPath: path.join(app.getPath('documents'), `Lumen-sauvegarde-${stamp}.json`), filters: [{ name: 'Sauvegarde Lumen', extensions: ['json'] }] });
+  if (r.canceled || !r.filePath) return { ok: false };
+  const bundle = { lumen: 'backup', version: 1, app: app.getVersion(), date: new Date().toISOString(), config: loadConfig() };
+  fs.writeFileSync(r.filePath, JSON.stringify(bundle, null, 2));
+  return { ok: true, file: r.filePath };
+});
+ipcMain.handle('config:import', async () => {
+  const r = await dialog.showOpenDialog(win, { title: 'Restaurer une sauvegarde de Lumen', properties: ['openFile'], filters: [{ name: 'Sauvegarde Lumen', extensions: ['json'] }] });
+  if (r.canceled || !r.filePaths[0]) return { ok: false };
+  try {
+    const bundle = JSON.parse(fs.readFileSync(r.filePaths[0], 'utf8'));
+    if (!bundle || bundle.lumen !== 'backup' || typeof bundle.config !== 'object') return { ok: false, error: 'Ce fichier n’est pas une sauvegarde de Lumen.' };
+    // L'ancienne config est gardée à côté, au cas où.
+    try { fs.copyFileSync(configPath(), configPath() + '.avant-restauration'); } catch { /* pas encore de config */ }
+    saveConfig({ ...defaultConfig(), ...bundle.config });
+    return { ok: true, date: bundle.date };
+  } catch (err) { return { ok: false, error: `Sauvegarde illisible : ${err.message}` }; }
+});
+
 // Média en cours sur le PC (Spotify, YouTube…) pour le widget « Lecture en cours ».
 const mediactl = require('./mediactl');
 ipcMain.handle('media:ask', async (_e, cmd) => {

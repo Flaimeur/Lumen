@@ -180,6 +180,30 @@ async function readSteamAppInfo(steamDir, wanted) {
   return info;
 }
 
+// Temps de jeu noté par Steam (userdata/<compte>/config/localconfig.vdf, en minutes) ; plusieurs comptes : le plus grand.
+async function readSteamPlaytime(steamDir) {
+  const out = new Map();
+  let accounts = [];
+  try { accounts = await fsp.readdir(path.join(steamDir, 'userdata')); } catch { return out; }
+  for (const acc of accounts) {
+    const text = await readText(path.join(steamDir, 'userdata', acc, 'config', 'localconfig.vdf'));
+    if (!text) continue;
+    const v = parseVdf(text);
+    const store = v.UserLocalConfigStore || {};
+    const sw = store.Software || store.software || {};
+    const valve = sw.Valve || sw.valve || {};
+    const apps = (valve.Steam || valve.steam || {}).apps || (valve.Steam || valve.steam || {}).Apps || {};
+    for (const [id, a] of Object.entries(apps)) {
+      const minutes = Number(a && a.Playtime) || 0;
+      const last = (Number(a && a.LastPlayed) || 0) * 1000;
+      if (!minutes && !last) continue;
+      const prev = out.get(Number(id)) || { seconds: 0, last: 0 };
+      out.set(Number(id), { seconds: Math.max(prev.seconds, minutes * 60), last: Math.max(prev.last, last) });
+    }
+  }
+  return out;
+}
+
 async function getSteamDir() {
   const raw = await regValue('HKCU\\Software\\Valve\\Steam', 'SteamPath');
   const dir = raw ? path.normalize(raw) : '';
@@ -222,6 +246,7 @@ async function scanSteam() {
   } catch { /* dossier absent */ }
 
   const ids = new Set([...installed.keys(), ...plugin]);
+  const steamTime = await readSteamPlaytime(steamDir);
   const info = await readSteamAppInfo(steamDir, ids);
   const games = [];
   for (const appid of ids) {
@@ -247,7 +272,8 @@ async function scanSteam() {
       webHero: web('library_hero.jpg'),
       // Non installé : Steam ouvre sa fenêtre d'installation.
       uri: st ? `steam://rungameid/${appid}` : `steam://install/${appid}`,
-      lastPlayed: st && Number(st.LastPlayed) ? Number(st.LastPlayed) * 1000 : 0,
+      lastPlayed: Math.max(st && Number(st.LastPlayed) ? Number(st.LastPlayed) * 1000 : 0, (steamTime.get(appid) || {}).last || 0),
+      playtime: (steamTime.get(appid) || {}).seconds || 0,
       size: st ? Number(st.SizeOnDisk) || 0 : 0,
       genres: meta.genres || [],
       tags: meta.tags || [],
@@ -384,6 +410,7 @@ async function scanPcStores(enabled = {}, art = {}, tagNames = {}) {
             store: id,
             installed: g.installed !== false,
             storeLastPlayed: g.lastPlayed || 0,
+            storePlaytime: g.playtime || 0,
             size: g.size || 0,
             genres: g.genres || [],
             // Les 10 étiquettes les plus pertinentes, sans celles qui doublent un genre.

@@ -61,6 +61,14 @@ contextBridge.exposeInMainWorld('lumen', {
   padLog: (msg) => ipcRenderer.send('pad:log', msg),
   weather: (city) => ipcRenderer.invoke('weather:get', city),
   media: (cmd) => ipcRenderer.invoke('media:ask', cmd || 'state'),
+  exportConfig: () => ipcRenderer.invoke('config:export'),
+  update: {
+    state: () => ipcRenderer.invoke('update:state'),
+    check: () => ipcRenderer.invoke('update:check'),
+    install: () => ipcRenderer.invoke('update:install'),
+    onState: (cb) => ipcRenderer.on('update:state', (_e, s) => cb(s)),
+  },
+  importConfig: () => ipcRenderer.invoke('config:import'),
   onNativePad: (cb) => ipcRenderer.on('pad:native', (_e, ev) => cb(ev)),
   mapper: {
     start: () => ipcRenderer.invoke('mapper:start'),

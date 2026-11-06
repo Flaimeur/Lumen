@@ -120,6 +120,17 @@
     trackRaf = requestAnimationFrame(() => { trackRaf = 0; placeCursor(true); });
   }
   document.addEventListener('scroll', trackCursor, true);
+  // La mise en page bouge sans défilement (scan, images, polices, contenu qui change de hauteur) :
+  // le cadre suit l'élément sélectionné au lieu de rester à son ancienne place.
+  if (window.ResizeObserver) {
+    const ro = new ResizeObserver(() => trackCursor());
+    const watch = () => { const v = document.getElementById('view'); if (v) { ro.observe(v); for (const c of v.children) ro.observe(c); } ro.observe(document.body); };
+    new MutationObserver(() => { watch(); trackCursor(); }).observe(document.documentElement, { childList: true, subtree: false });
+    window.addEventListener('DOMContentLoaded', watch);
+    setTimeout(watch, 0);
+    // Contenu remplacé dans la vue (rendu, panneau des Réglages) : on recale aussi.
+    setTimeout(() => { const v = document.getElementById('view'); if (v) new MutationObserver(() => { watch(); trackCursor(); }).observe(v, { childList: true, subtree: true }); }, 0);
+  }
   window.addEventListener('resize', () => { trackCursor(); renderDock(); });
 
   function pressFx(el) {
@@ -1111,13 +1122,17 @@
     return grid;
   }
 
+  // Temps de jeu : celui compté par Lumen, ou celui de Steam s'il est plus grand (jeux lancés hors de Lumen).
+  const playtimeOf = (g) => Math.max((S.cfg.playtime || {})[g.path] || 0, g.storePlaytime || 0);
+
   function sortGames(games) {
     const mode = S.cfg.sort || 'name';
     if (mode === 'name') return games;
     const list = [...games];
     const last = S.cfg.lastPlayed || {};
-    if (mode === 'recent') list.sort((a, b) => (last[b.path] || 0) - (last[a.path] || 0) || a.name.localeCompare(b.name));
-    if (mode === 'playtime') list.sort((a, b) => (S.cfg.playtime[b.path] || 0) - (S.cfg.playtime[a.path] || 0) || a.name.localeCompare(b.name));
+    const lastOf = (g) => Math.max(last[g.path] || 0, g.storeLastPlayed || 0);
+    if (mode === 'recent') list.sort((a, b) => lastOf(b) - lastOf(a) || a.name.localeCompare(b.name));
+    if (mode === 'playtime') list.sort((a, b) => playtimeOf(b) - playtimeOf(a) || a.name.localeCompare(b.name));
     if (mode === 'year') list.sort((a, b) => (a.year || '9999').localeCompare(b.year || '9999') || a.name.localeCompare(b.name));
     if (mode === 'genre') list.sort((a, b) => (genresOf(a)[0] || '\uffff').localeCompare(genresOf(b)[0] || '\uffff', 'fr') || a.name.localeCompare(b.name));
     return list;
@@ -1337,7 +1352,8 @@
         h('div', { class: 'w-xp' }, `${st.into} / ${st.need} XP`)))];
     }, act: () => openTab('achievements') },
     playtime: { name: 'Temps de jeu', render: () => {
-      const pt = S.cfg.playtime || {};
+      const pt = {};
+      for (const sys of S.lib.systems) for (const g of sys.games) { const t = playtimeOf(g); if (t) pt[g.path] = t; }
       const total = Object.values(pt).reduce((n, v) => n + v, 0);
       const best = Object.entries(pt).sort((a, b) => b[1] - a[1]).map(([p]) => S.byPath.get(p)).find(Boolean);
       return [h('div', { class: 'w-big' }, total ? formatTime(total) : '0 min'), h('div', { class: 'w-sub' }, best ? `Le plus joué : ${best.name}` : 'Temps passé en jeu depuis Lumen')];
@@ -2074,7 +2090,31 @@
     cat('about');
     section('Lumen');
     row('Version', api.version || '', null, 'Frontend de jeux pour Windows : ROMs, jeux PC et applications.');
+    if (api.update) {
+      const u = S.update || {};
+      const label = { checking: 'Recherche…', downloading: `Téléchargement ${u.version || ''} · ${u.progress || 0} %`, ready: `${u.version} prête · redémarrer`,
+        uptodate: 'À jour', error: 'Erreur · réessayer', dev: 'Version de développement' }[u.status] || 'Vérifier';
+      row('Mises à jour', label, async () => {
+        if (u.status === 'ready') { toast('Installation de la mise à jour…'); api.update.install(); return; }
+        toast('Recherche de mises à jour…');
+        S.update = await api.update.check();
+        rerender();
+      }, u.status === 'error' ? `Dernière erreur : ${u.error}` : 'Automatiques : Lumen vérifie au démarrage, télécharge en arrière-plan et s’installe à la fermeture.');
+    }
     row('Quitter un jeu en cours', 'Select + Start (2 s)', null, 'Ou Ctrl + Maj + Q au clavier. Ferme l’émulateur et revient dans Lumen.');
+    section('Sauvegarde');
+    row('Sauvegarder ma configuration', 'Exporter…', async () => {
+      await saveCfg();
+      const r = await api.exportConfig();
+      if (r && r.ok) toast('Sauvegarde enregistrée : ' + r.file.split(/[\\/]/).pop());
+    }, 'Favoris, dossiers, profils manette, images et sons choisis, accueil, applications… (sans tes clés ni mots de passe).');
+    row('Restaurer une sauvegarde', 'Importer…', async () => {
+      const r = await api.importConfig();
+      if (!r || !r.ok) { if (r && r.error) toast(r.error, 'error', 6000); return; }
+      toast('Sauvegarde restaurée, Lumen redémarre…');
+      setTimeout(() => location.reload(), 1200);
+    }, 'Remplace la configuration actuelle (une copie de l’ancienne est gardée).');
+    section('Aide');
     row('Configuration guidée', '', () => openWelcome());
     row('Quitter Lumen', '', () => api.quit());
     };
@@ -2141,7 +2181,7 @@
 
   function openDetails(g) {
     const sys = sysById(g.system);
-    const played = S.cfg.playtime[g.path] || 0;
+    const played = playtimeOf(g);
     const meta = [sys && sys.name, g.year, g.developer].filter(Boolean).join(' · ');
     const facts = [
       ['Genre', g.genre], ['Étiquettes', (g.tags || []).slice(0, 6).join(', ')], ['Contenu', g.adult ? 'NSFW (adultes)' : null],
@@ -3205,6 +3245,15 @@
     if (api.ra) S.raStatus = await api.ra.status();
     renderMuteIndicator();
     applyWallpaper();
+    if (api.update) {
+      api.update.state().then((st) => { S.update = st; });
+      api.update.onState((st) => {
+        const was = S.update && S.update.status;
+        S.update = st;
+        if (st.status === 'ready' && was !== 'ready') toast(`⬆ Lumen ${st.version} est prête : elle s’installera à la fermeture (ou Réglages → Lumen → Mises à jour).`, 'info', 8000);
+        if (S.route.view === 'settings' && S.setCat === 'about' && !S.overlay) rerender();
+      });
+    }
     loadMusic();
     loadUiSounds();
     // Les succès sont lus en arrière-plan pour pouvoir les afficher dans les fiches.
