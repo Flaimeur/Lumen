@@ -55,6 +55,9 @@
     { id: 'eden', name: 'Émulateur Switch', desc: 'Eden, Ryujinx ou compatible (options -f -g).' },
     { id: 'switch2', name: 'Émulateur Switch 2', desc: 'Lichii ou autre dérivé d’Eden (options -f -g).' },
     { id: 'azahar', name: 'Azahar', desc: 'Nintendo 3DS.' },
+    { id: 'duckstation', name: 'DuckStation', desc: 'PlayStation (optionnel, sinon RetroArch).' },
+    { id: 'melonds', name: 'melonDS', desc: 'Nintendo DS (optionnel, sinon RetroArch).' },
+    { id: 'ppsspp', name: 'PPSSPP', desc: 'PSP (optionnel, sinon RetroArch).' },
   ];
   const ACCENTS = ['#5eead4', '#a78bfa', '#f472b6', '#fbbf24', '#60a5fa', '#4ade80', '#fb7185'];
 
@@ -1218,7 +1221,7 @@
       art.icon ? h('img', { class: 'sys-icon', src: api.mediaUrl(art.icon), alt: '' }) : null,
       h('div', { class: 'sys-count' }, plural(s.games.length, 'jeu', 'jeux')),
       art.logo ? h('img', { class: 'sys-logo', src: api.mediaUrl(art.logo), alt: s.name }) : h('div', { class: 'sys-short' }, s.short),
-      h('div', { class: 'sys-name' }, s.name));
+      h('div', { class: 'sys-name' }, s.name, sysMeta(s) ? h('span', { class: 'sys-meta' }, sysMeta(s)) : null));
     const withBg = art.hero ? { background: art.hero } : s.games.find((g) => g.background || g.cover);
     card._system = s.id;
     return focusable(card, {
@@ -1597,13 +1600,38 @@
     }
   }
 
+  // Fabricant et année d'une console (fiches de systems.js ; les launchers PC ont les leurs).
+  const PC_META = { 'pc-steam': ['Valve', 2003], 'pc-epic': ['Epic Games', 2018], 'pc-gog': ['CD Projekt', 2008] };
+  function sysMetaOf(s) {
+    const d = (S.defs || []).find((x) => x.id === s.id);
+    if (d && d.maker) return { maker: d.maker, year: d.year };
+    const p = PC_META[s.id];
+    return p ? { maker: p[0], year: p[1] } : null;
+  }
+  const sysMeta = (s) => { const m = sysMetaOf(s); return m ? [m.maker, m.year].filter(Boolean).join(' · ') : ''; };
+  const SYS_SORTS = [['default', 'Ordre de la bibliothèque'], ['name', 'Nom'], ['maker', 'Fabricant'], ['year', 'Année'], ['count', 'Nombre de jeux']];
+  function sortedSystems() {
+    const mode = S.cfg.sysSort || 'default';
+    const list = [...S.lib.systems];
+    const meta = (s) => sysMetaOf(s) || {};
+    if (mode === 'name') list.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+    if (mode === 'maker') list.sort((a, b) => (meta(a).maker || 'zz').localeCompare(meta(b).maker || 'zz') || (meta(a).year || 9999) - (meta(b).year || 9999));
+    if (mode === 'year') list.sort((a, b) => (meta(a).year || 9999) - (meta(b).year || 9999));
+    if (mode === 'count') list.sort((a, b) => b.games.length - a.games.length);
+    return list;
+  }
+
   function viewSystems() {
     if (!S.lib.systems.length) return emptyLibrary();
     return h('div', {},
-      h('div', { class: 'view-head' }, h('div', {},
+      h('div', { class: 'view-head' }, h('div', { class: 'vh-text' },
         h('h1', {}, 'Consoles'),
-        h('p', { class: 'muted' }, `${plural(S.lib.systems.length, 'console', 'consoles')} · ${plural(totalGames(), 'jeu', 'jeux')}`))),
-      h('div', { class: 'grid systems' }, S.lib.systems.map(systemCard)));
+        h('p', { class: 'muted' }, `${plural(S.lib.systems.length, 'console', 'consoles')} · ${plural(totalGames(), 'jeu', 'jeux')}`)),
+        focusable(h('div', { class: 'chip' }, '⇅ ', (SYS_SORTS.find(([id]) => id === (S.cfg.sysSort || 'default')) || SYS_SORTS[0])[1]), {
+          a: () => { const i = SYS_SORTS.findIndex(([id]) => id === (S.cfg.sysSort || 'default')); S.cfg.sysSort = SYS_SORTS[(i + 1) % SYS_SORTS.length][0]; saveCfg(); S.keepAnim = true; render(indexOfFocus()); },
+          focus: () => { setTitle('Trier les consoles', ''); setHints('action'); },
+        })),
+      h('div', { class: 'grid systems' }, sortedSystems().map(systemCard)));
   }
 
   function sortChip() {
@@ -1709,6 +1737,7 @@
     if (!words.length) return [];
     const out = [];
     for (const s of S.lib.systems) {
+      if (S.searchSys && s.id !== S.searchSys) continue;
       for (const g of s.games) {
         const name = g._fold || (g._fold = fold(g.name));
         if (words.every((w) => name.includes(w))) out.push(g);
@@ -1764,10 +1793,17 @@
     };
     S.searchType = (ch) => { S.search = applyKey(S.search, ch, 60); update(); };
     update();
+    // Filtre par console : la puce fait défiler « Toutes » puis chaque console.
+    const sysLabel = () => (S.searchSys ? (S.lib.systems.find((x) => x.id === S.searchSys) || {}).name || 'Toutes les consoles' : 'Toutes les consoles');
+    const sysChip = focusable(h('div', { class: 'chip' + (S.searchSys ? ' active' : '') }, '⏷ ', sysLabel()), {
+      a: () => openMenu('Chercher dans', [['Toutes les consoles', () => { S.searchSys = null; closeOverlay(true); render(0); }],
+        ...S.lib.systems.map((x) => [`${x.name} (${x.games.length})`, () => { S.searchSys = x.id; closeOverlay(true); render(0); }])]),
+      focus: () => { setTitle('Chercher dans', sysLabel()); setHints('action'); },
+    });
     return h('div', { class: 'search' },
       h('div', { class: 'search-top' },
         h('div', { class: 'search-box' }, icon('search'), field),
-        count),
+        count, sysChip),
       vkeyboard((ch) => S.searchType(ch)),
       results);
   }
@@ -2008,7 +2044,8 @@
     section('Commandes par console');
     for (const sys of S.defs) {
       const custom = c.commands[sys.id];
-      row(sys.name, custom ? 'Personnalisée' : 'Par défaut', () => editCommand(sys));
+      const alt = (sys.alts || []).find((a) => a.command === (custom || sys.command));
+      row(sys.name, alt ? alt.label + (custom ? '' : ' (défaut)') : custom ? 'Personnalisée' : 'Par défaut', () => editCommand(sys));
     }
 
     cat('controls');
@@ -2188,6 +2225,7 @@
       ['Joueurs', g.players], ['Éditeur', g.publisher],
       ['Note', g.rating != null ? `${g.rating} / 5` : null],
       ['Temps de jeu', played ? formatTime(played) : null],
+      ['Dernière session', (() => { const t = Math.max((S.cfg.lastPlayed || {})[g.path] || 0, g.storeLastPlayed || 0); return t ? new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : null; })()],
       ['Source', g.source === 'romm' ? (g.downloaded ? 'RomM · sur ce PC' : `RomM · ${fmtSize(g.size) || 'à télécharger'}`) : null],
       ['État', g.source === 'pc' ? (g.installed === false ? 'Non installé · s’installe via le launcher' : `Installé${g.size ? ' · ' + fmtSize(g.size) : ''}`) : null],
     ].filter(([, v]) => v);
@@ -2196,17 +2234,25 @@
     const art = g.cover
       ? h('img', { class: 'details-art', src: api.mediaUrl(g.cover), alt: '' })
       : h('div', { class: 'details-art' }, fallbackArt(g.name, sys && sys.color, sys && sys.short));
-    openOverlay(h('div', { class: 'modal details' },
+    const banner = g.hero || g.background;
+    // Titre : le logo du jeu quand il existe, sinon le nom (avec l'icône).
+    const titleEl = g.logo
+      ? h('h1', { class: 'details-logo' }, h('img', { src: api.mediaUrl(g.logo), alt: g.name, onerror: (e) => { e.target.replaceWith(document.createTextNode(g.name)); } }))
+      : h('h1', { class: g.icon ? 'with-icon' : null }, g.icon ? h('img', { class: 'title-icon', src: api.mediaUrl(g.icon), alt: '' }) : null, g.name);
+    openOverlay(h('div', { class: 'modal details' + (banner ? ' has-banner' : '') },
+      banner ? h('div', { class: 'details-banner' }, h('img', { src: api.mediaUrl(banner), alt: '' })) : null,
       art,
-      h('div', {},
+      h('div', { class: 'details-main' },
         h('div', { class: 'eyebrow' }, meta),
-        h('h1', { class: g.icon ? 'with-icon' : null }, g.icon ? h('img', { class: 'title-icon', src: api.mediaUrl(g.icon), alt: '' }) : null, g.name),
+        titleEl,
         facts.length ? h('div', { class: 'facts' }, facts.map(([k, v]) => h('div', { class: 'fact' }, h('span', {}, k), h('b', {}, v)))) : null,
         g.desc
           ? h('p', { class: 'desc' }, g.desc)
-          : h('p', { class: 'desc muted' }, 'Pas de description. Indique tes dossiers ES-DE dans les Réglages pour enrichir les fiches.'),
-        h('div', { class: 'actions' }, actionButton('▶ Jouer', () => { closeOverlay(true); launch(g); }, true), favBtn,
-          achInfo(g) ? actionButton(`🏆 Succès ${achInfo(g).unlocked} / ${achInfo(g).total}`, () => openAchievements(g)) : null),
+          : g.source === 'pc' || g.source === 'app' ? null
+            : h('p', { class: 'desc muted' }, 'Pas de description. Indique tes dossiers ES-DE dans les Réglages pour enrichir les fiches.'),
+        h('div', { class: 'actions' }, actionButton(g.installed === false ? '⬇ Installer' : '▶ Jouer', () => { closeOverlay(true); launch(g); }, true), favBtn,
+          achInfo(g) ? actionButton(`🏆 Succès ${achInfo(g).unlocked} / ${achInfo(g).total}`, () => openAchievements(g)) : null,
+          actionButton('⋯ Plus', () => { closeOverlay(true); const el = [...document.querySelectorAll('.tile')].find((t) => t._game === g); if (el) setFocus(el, { silent: true }); S.menuGame = g; openQuickMenu(); })),
         h('div', { class: 'file muted' }, g.source === 'romm' && !g.downloaded ? `RomM · ${g.rommFile}` : g.target || g.path))));
     sfx('select');
   }
@@ -2219,7 +2265,8 @@
   }
 
   function openQuickMenu() {
-    const g = S.focusEl && S.focusEl._game;
+    const g = S.menuGame || (S.focusEl && S.focusEl._game);
+    S.menuGame = null;
     const coll = S.focusEl && S.focusEl._collection;
     const sysCard = S.focusEl && S.focusEl._system;
     const items = [];
@@ -2473,7 +2520,7 @@
 
   // Configuration guidée en 4 étapes.
   function openWelcome(step = 0) {
-    const STEPS = 4;
+    const STEPS = 5;
     const dots = h('div', { class: 'steps-dots' }, Array.from({ length: STEPS }, (_v, i) => h('span', { class: i === step ? 'on' : i < step ? 'done' : '' })));
     const next = () => { closeOverlay(true); openWelcome(step + 1); };
     let body;
@@ -2481,7 +2528,7 @@
       body = [
         h('div', { class: 'logo-mark big' }),
         h('h1', {}, 'Bienvenue dans Lumen'),
-        h('p', { class: 'muted' }, 'Ta ludothèque rétro sur PC, à piloter à la manette. Lumen n’inclut ni jeux ni émulateurs : il range tes jeux et lance tes émulateurs. On règle tout en quelques étapes.'),
+        h('p', { class: 'muted' }, 'Tes ROMs, tes jeux Steam, Epic et GOG et tes applis au même endroit, à piloter à la manette. Lumen n’inclut ni jeux ni émulateurs : il range tes jeux et lance tes émulateurs et launchers. On règle tout en quelques étapes.'),
         h('div', { class: 'actions' }, actionButton('Commencer', next, true), actionButton('Plus tard', () => closeOverlay())),
       ];
     } else if (step === 1) {
@@ -2508,12 +2555,24 @@
       ];
     } else if (step === 3) {
       body = [
-        h('div', { class: 'eyebrow' }, 'Étape 3 · Jaquettes'),
-        h('h1', {}, 'Des jaquettes pour tous tes jeux'),
-        h('p', { class: 'muted' }, 'Lumen peut télécharger les jaquettes, captures et logos manquants depuis libretro-thumbnails. Tu pourras aussi ajouter tes propres assets (iiDB, ES-DE) dans les dossiers media.'),
+        h('div', { class: 'eyebrow' }, 'Étape 3 · Images'),
+        h('h1', {}, 'Des images pour tous tes jeux'),
+        h('p', { class: 'muted' }, 'Jaquettes iiSU, icônes, logos, bannières et soundbites depuis iiDB, pour tes jeux, tes consoles et tes dossiers. Tu pourras en choisir d’autres plus tard (clic droit → Changer les images).'),
         h('div', { class: 'actions' },
-          actionButton('Télécharger maintenant', () => { closeOverlay(true); openThumbs(); }, true),
-          actionButton('Plus tard', next)),
+          api.iidb ? actionButton('Télécharger les images iiDB', () => { closeOverlay(true); openIidb(); }, true) : null,
+          actionButton('Plus tard', next, !api.iidb)),
+      ];
+    } else if (step === 4) {
+      const pads = Input.getPads ? Input.getPads() : [];
+      const PAD = { ps4: 'PlayStation 4', ps5: 'PlayStation 5', xbox: 'Xbox', switch: 'Switch' };
+      body = [
+        h('div', { class: 'eyebrow' }, 'Étape 4 · À ton goût'),
+        h('h1', {}, 'Personnalise ton accueil'),
+        h('p', { class: 'muted' }, 'Fond d’écran (thème animé ou ton image), widgets (horloge, météo, musique en cours, rang, jeu surprise…) et blocs de l’accueil. Tout se change ensuite dans Réglages → Affichage.'),
+        h('div', { class: 'wiz-status' + (pads.length ? ' ok' : '') }, pads.length ? `Manette détectée : ${PAD[Input.padType] || 'manette'}` : 'Aucune manette pour l’instant : appuie sur un bouton, elle sera reconnue.'),
+        h('div', { class: 'actions' },
+          actionButton('Personnaliser', () => { closeOverlay(true); openHomeEditor(); }, true),
+          actionButton('Continuer', next)),
       ];
     } else {
       body = [
@@ -2521,8 +2580,9 @@
         h('h1', {}, 'C’est prêt !'),
         h('ul', { class: 'steps' },
           h('li', {}, 'LB / RB : changer d’onglet · LT / RT : sauter à la lettre suivante'),
-          h('li', {}, 'X : favori · Y : détails · Start : menu rapide (collections, tri…)'),
-          h('li', {}, 'Select + Start maintenus : quitter le jeu en cours')),
+          h('li', {}, 'X : favori · Y : détails · Start / clic droit : menu rapide (images, dossiers, profil manette…)'),
+          h('li', {}, 'Select + Start maintenus : quitter le jeu en cours · M : couper le son'),
+          h('li', {}, 'Onglet Succès : tes succès Steam et RetroAchievements, ton rang et ton XP')),
         h('div', { class: 'actions' }, actionButton('C’est parti', () => { closeOverlay(); S.trans = 'v-in'; openTab('home'); }, true)),
       ];
     }
@@ -2998,7 +3058,22 @@
     if (S.route.view === 'settings') rerender();
   }
 
-  async function editCommand(sys) {
+  // Choix de l'émulateur d'une console dans une liste ; la commande à la main reste possible.
+  function editCommand(sys) {
+    const current = S.cfg.commands[sys.id] || sys.command;
+    const items = (sys.alts || []).map((a) => [(a.command === current ? '✓ ' : '　 ') + a.label, async () => {
+      if (a.command === sys.command) delete S.cfg.commands[sys.id]; else S.cfg.commands[sys.id] = a.command;
+      await saveCfg();
+      closeOverlay(true);
+      toast(`${sys.name} : ${a.label}`);
+      rerender();
+    }]);
+    items.push(['✎ Commande personnalisée…', () => { closeOverlay(true); editCommandText(sys); }]);
+    if (S.cfg.commands[sys.id]) items.push(['Revenir à la commande par défaut', async () => { delete S.cfg.commands[sys.id]; await saveCfg(); closeOverlay(true); rerender(); }]);
+    openMenu(`Émulateur · ${sys.name}`, items);
+  }
+
+  async function editCommandText(sys) {
     const current = S.cfg.commands[sys.id] || sys.command;
     const v = await openPrompt({
       title: `Commande · ${sys.name}`,

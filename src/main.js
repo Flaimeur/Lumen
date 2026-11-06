@@ -40,7 +40,7 @@ function defaultConfig() {
     romsRoot: '',
     mediaRoot: path.join(home, 'ES-DE', 'downloaded_media'),
     gamelistsRoot: path.join(home, 'ES-DE', 'gamelists'),
-    emulators: { retroarch: '', dolphin: '', pcsx2: '', cemu: '', eden: '', switch2: '', azahar: '' },
+    emulators: { retroarch: '', dolphin: '', pcsx2: '', cemu: '', eden: '', switch2: '', azahar: '', duckstation: '', melonds: '', ppsspp: '' },
     commands: {},
     swapAB: false,
     fullscreen: true,

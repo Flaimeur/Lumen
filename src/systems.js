@@ -37,3 +37,57 @@ module.exports = [
   // Jeux PC : raccourcis .lnk / .url (Steam, GOG…) ou exécutables. Ouverts directement par Windows.
   { id: 'windows', name: 'Jeux PC', short: 'PC', color: '#0f766e', folders: ['windows', 'pc', 'steam'], ext: ['lnk', 'url', 'exe', 'bat'], command: '{open}' },
 ];
+
+// ---------- Fiches des consoles : fabricant, année de sortie, émulateurs au choix ----------
+const META = {
+  nes: ['Nintendo', 1983], snes: ['Nintendo', 1990], n64: ['Nintendo', 1996], gc: ['Nintendo', 2001], wii: ['Nintendo', 2006],
+  wiiu: ['Nintendo', 2012], switch2: ['Nintendo', 2025], switch: ['Nintendo', 2017], gb: ['Nintendo', 1989], gbc: ['Nintendo', 1998],
+  gba: ['Nintendo', 2001], nds: ['Nintendo', 2004], n3ds: ['Nintendo', 2011], psx: ['Sony', 1994], ps2: ['Sony', 2000], psp: ['Sony', 2004],
+  mastersystem: ['Sega', 1985], genesis: ['Sega', 1988], segacd: ['Sega', 1991], gamegear: ['Sega', 1990], saturn: ['Sega', 1994],
+  dreamcast: ['Sega', 1998], pcengine: ['NEC', 1987], neogeo: ['SNK', 1990], arcade: ['Arcade', null], atari2600: ['Atari', 1977],
+  ngp: ['SNK', 1998], wonderswan: ['Bandai', 1999], windows: ['PC', null],
+};
+// Cœurs RetroArch connus pour chaque console (le premier est celui par défaut), puis émulateurs autonomes.
+const CORES = {
+  nes: [['Mesen', 'mesen'], ['Nestopia', 'nestopia'], ['FCEUmm', 'fceumm']],
+  snes: [['Snes9x', 'snes9x'], ['bsnes', 'bsnes'], ['Mesen-S', 'mesen-s']],
+  n64: [['Mupen64Plus-Next', 'mupen64plus_next'], ['ParaLLEl N64', 'parallel_n64']],
+  gb: [['Gambatte', 'gambatte'], ['SameBoy', 'sameboy'], ['mGBA', 'mgba']],
+  gbc: [['Gambatte', 'gambatte'], ['SameBoy', 'sameboy'], ['mGBA', 'mgba']],
+  gba: [['mGBA', 'mgba'], ['VBA-M', 'vbam'], ['gpSP', 'gpsp']],
+  nds: [['melonDS DS', 'melondsds'], ['melonDS', 'melonds'], ['DeSmuME', 'desmume']],
+  psx: [['SwanStation', 'swanstation'], ['Beetle PSX HW', 'mednafen_psx_hw'], ['PCSX ReARMed', 'pcsx_rearmed']],
+  psp: [['PPSSPP', 'ppsspp']],
+  mastersystem: [['Genesis Plus GX', 'genesis_plus_gx'], ['PicoDrive', 'picodrive'], ['SMS Plus GX', 'smsplus']],
+  genesis: [['Genesis Plus GX', 'genesis_plus_gx'], ['PicoDrive', 'picodrive'], ['BlastEm', 'blastem']],
+  segacd: [['Genesis Plus GX', 'genesis_plus_gx'], ['PicoDrive', 'picodrive']],
+  gamegear: [['Genesis Plus GX', 'genesis_plus_gx'], ['SMS Plus GX', 'smsplus']],
+  saturn: [['Beetle Saturn', 'mednafen_saturn'], ['Yabause', 'yabause'], ['Kronos', 'kronos']],
+  dreamcast: [['Flycast', 'flycast']],
+  pcengine: [['Beetle PCE Fast', 'mednafen_pce_fast'], ['Beetle PCE', 'mednafen_pce']],
+  neogeo: [['FinalBurn Neo', 'fbneo'], ['MAME 2003-Plus', 'mame2003_plus']],
+  arcade: [['FinalBurn Neo', 'fbneo'], ['MAME', 'mame'], ['MAME 2003-Plus', 'mame2003_plus']],
+  atari2600: [['Stella', 'stella'], ['Stella 2014', 'stella2014']],
+  ngp: [['Beetle NeoPop', 'mednafen_ngp'], ['RACE', 'race']],
+  wonderswan: [['Beetle WonderSwan', 'mednafen_wswan']],
+};
+const STANDALONE = {
+  psx: [['DuckStation (autonome)', '"{duckstation}" -fullscreen -- "{rom}"']],
+  nds: [['melonDS (autonome)', '"{melonds}" -f "{rom}"']],
+  gc: [['Dolphin', '"{dolphin}" -b -e "{rom}"'], ['RetroArch · Dolphin', RA('dolphin')]],
+  wii: [['Dolphin', '"{dolphin}" -b -e "{rom}"'], ['RetroArch · Dolphin', RA('dolphin')]],
+  ps2: [['PCSX2', '"{pcsx2}" -batch -fullscreen -- "{rom}"'], ['RetroArch · LRPS2', RA('pcsx2')]],
+  psp: [['PPSSPP (autonome)', '"{ppsspp}" --fullscreen "{rom}"']],
+  n3ds: [['Azahar', '"{azahar}" "{rom}"'], ['Azahar (plein écran)', '"{azahar}" -f "{rom}"']],
+  switch: [['Eden / Ryujinx (plein écran)', '"{eden}" -f -g "{rom}"'], ['Eden / Ryujinx (fenêtre)', '"{eden}" -g "{rom}"']],
+  switch2: [['Lichii / Eden (plein écran)', '"{switch2}" -f -g "{rom}"'], ['Lichii / Eden (fenêtre)', '"{switch2}" -g "{rom}"']],
+  wiiu: [['Cemu (plein écran)', '"{cemu}" -f -g "{rom}"'], ['Cemu (fenêtre)', '"{cemu}" -g "{rom}"']],
+};
+for (const s of module.exports) {
+  const m = META[s.id];
+  if (m) { s.maker = m[0]; s.year = m[1]; }
+  s.alts = [
+    ...(CORES[s.id] || []).map(([label, core]) => ({ label: `RetroArch · ${label}`, command: RA(core) })),
+    ...(STANDALONE[s.id] || []).map(([label, command]) => ({ label, command })),
+  ].filter((a, i, all) => all.findIndex((b) => b.command === a.command) === i);
+}

@@ -1,6 +1,20 @@
 # Lumen
 
-Frontend d'émulation pour PC (Windows), pensé pour la manette. Lumen n'inclut ni jeux ni émulateurs : il range ta bibliothèque et lance tes émulateurs.
+Frontend de jeux pour Windows, pensé pour la manette : tes ROMs, tes jeux Steam, Epic et GOG et tes applications au même endroit. Lumen n'inclut ni jeux ni émulateurs : il range ta bibliothèque et lance tes émulateurs et launchers.
+
+**Télécharger :** [dernière version](https://github.com/Flaimeur/Lumen/releases/latest). Ensuite, les mises à jour s'installent toutes seules.
+
+## Fonctionnalités
+
+- **Bibliothèque** : ROMs (un dossier par console, noms ES-DE ou libres comme « Switch 2 game »), jeux Steam (installés ou non), Epic, GOG, applications (Word, Discord…), serveur RomM.
+- **Images** : iiDB (jaquettes iiSU de la bonne console, icônes, logos, héros, soundbites), SteamGridDB, libretro-thumbnails, ou tes propres images (clic droit → Changer les images).
+- **Tri et filtres** : genre, étiquettes Steam, NSFW, installés / non installés, temps de jeu, dernière session ; recherche par console.
+- **Succès** : Steam (lu en local) et RetroAchievements, avec XP, niveaux, rangs et coupe d'or pour les jeux à 100 %.
+- **Manettes** : PS4, PS5 (y compris DualSense en Bluetooth), Xbox, Switch, avec les bons symboles ; profils manette → clavier/souris pour les jeux qui ne gèrent pas la manette.
+- **Accueil personnalisable** : widgets (horloge, météo, lecture en cours Spotify/YouTube, rang, jeu surprise, favoris, mémo…), fond d'écran (thèmes animés ou ton image), roulette de jeu au hasard.
+- **Son** : sons d'interface et musique de fond (ton dossier), soundbites par jeu, touche M pour tout couper.
+- **Temps de jeu** : compté par Lumen et lu dans Steam.
+- **Sauvegarde** : export / import de la configuration ; mises à jour automatiques depuis GitHub.
 
 ## Lancer
 
@@ -89,7 +103,8 @@ npm run dist:portable   # version portable (.exe unique)
 | Détails | Y | I |
 | Onglet précédent / suivant | LB / RB | Q / E |
 | Lettre précédente / suivante | LT / RT | Page préc. / suiv. |
-| Menu rapide (collections, tri…) | Start / Select | Tab |
+| Menu rapide (images, dossiers, profil manette…) | Start / Select | Tab ou clic droit |
+| Couper / remettre le son | — | M |
 | Recherche | onglet Recherche | / puis taper |
 | Quitter le jeu en cours | Select + Start maintenus 1,5 s | Ctrl + Maj + Q |
 | Plein écran | — | F11 |
