@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' lumen-media: data:; media-src 'self' lumen-media: data: blob:; connect-src 'self' lumen-media:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <title>Lumen</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="no-cursor booting">
+  <div id="boot" aria-hidden="true">
+    <svg class="boot-mark" viewBox="0 0 120 120">
+      <mask id="boot-crescent"><circle cx="58" cy="60" r="32" fill="#fff"/><circle cx="74" cy="50" r="28" fill="#000"/></mask>
+      <g class="moon"><circle cx="58" cy="60" r="32" fill="#AFA9EC" mask="url(#boot-crescent)"/></g>
+      <circle class="star s1" cx="84" cy="80" r="6" fill="#5DCAA5"/>
+      <circle class="star s2" cx="96" cy="66" r="3.5" fill="#ED93B1"/>
+      <circle class="star s3" cx="30" cy="30" r="2.5" fill="#F1EFE8"/>
+    </svg>
+    <div class="boot-word">lumen</div>
+  </div>
+  <div id="bg" aria-hidden="true">
+    <div class="aurora a1"></div>
+    <div class="aurora a2"></div>
+    <div class="bg-layer"></div>
+    <div class="bg-layer"></div>
+    <div class="bg-shade"></div>
+    <div class="grain"></div>
+  </div>
+
+  <header id="topbar">
+    <div class="brand"><span class="logo-mark"></span><span>lumen</span></div>
+    <div id="title-pill" class="pill"></div>
+    <div class="status pill">
+      <svg class="st-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><span id="clock"></span><span class="sep"></span><svg class="st-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span id="date"></span><span id="battery"></span>
+    </div>
+  </header>
+
+  <main id="view"></main>
+
+  <footer id="bottombar">
+    <div class="hints" id="hints-left"></div>
+    <nav id="dock"></nav>
+    <div class="hints" id="hints-right"></div>
+  </footer>
+
+  <div id="overlay" hidden></div>
+  <div id="toast" hidden></div>
+
+  <script src="mock.js"></script>
+  <script src="input.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

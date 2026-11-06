@@ -1,0 +1,49 @@
+{
+  "name": "lumen-frontend",
+  "productName": "Lumen",
+  "version": "0.9.0",
+  "description": "Frontend d'émulation pour PC, pensé pour la manette.",
+  "author": "Lumen",
+  "main": "src/main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "windowed": "electron . --windowed",
+    "preview": "node scripts/preview-server.js",
+    "check": "node scripts/check.js",
+    "check:thumbnails": "node scripts/check-thumbnails.js",
+    "check:romm": "node scripts/check-romm.js",
+    "icon": "electron scripts/make-icon.js",
+    "dist": "electron-builder --win nsis",
+    "dist:portable": "electron-builder --win portable"
+  },
+  "build": {
+    "appId": "app.lumen.frontend",
+    "productName": "Lumen",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "build/icon.png",
+      "package.json"
+    ],
+    "win": {
+      "icon": "build/icon.png",
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Lumen"
+    }
+  },
+  "devDependencies": {
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0"
+  }
+}
