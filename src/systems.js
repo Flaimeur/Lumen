@@ -12,7 +12,7 @@ module.exports = [
   { id: 'gc', name: 'GameCube', short: 'GC', color: '#6d4fc2', folders: ['gc', 'gamecube', 'ngc'], ext: ['iso', 'gcm', 'gcz', 'rvz', 'ciso'], command: '"{dolphin}" -b -e "{rom}"' },
   { id: 'wii', name: 'Wii', short: 'Wii', color: '#4aa3df', folders: ['wii'], ext: ['iso', 'wbfs', 'rvz', 'wad', 'gcz'], command: '"{dolphin}" -b -e "{rom}"' },
   { id: 'wiiu', name: 'Wii U', short: 'Wii U', color: '#1f8fbf', folders: ['wiiu'], ext: ['wua', 'wud', 'wux', 'rpx'], command: '"{cemu}" -f -g "{rom}"' },
-  { id: 'switch2', name: 'Nintendo Switch 2', short: 'Switch 2', color: '#e11d48', folders: ['switch2', 'ns2', 'nx2', 'nintendoswitch2'], ext: ['nsp', 'xci', 'nca', 'nro'], command: '"{switch2}" -f -g "{rom}"', iidbQuery: 'Switch 2', iidbKey: 'switch2' },
+  { id: 'switch2', name: 'Nintendo Switch 2', short: 'Switch 2', color: '#e11d48', folders: ['switch2', 'ns2', 'nx2', 'nintendoswitch2'], ext: ['nup', 'nsp', 'xci', 'nca', 'nro'], command: '"{switch2}" -f -g "{rom}"', iidbQuery: 'Switch 2', iidbKey: 'switch2' },
   { id: 'switch', name: 'Nintendo Switch', short: 'Switch', color: '#e63946', folders: ['switch', 'nx'], ext: ['nsp', 'xci', 'nca', 'nro'], command: '"{eden}" -f -g "{rom}"' },
   { id: 'gb', name: 'Game Boy', short: 'GB', color: '#8a9a2c', folders: ['gb', 'gameboy'], ext: ['gb', 'zip', '7z'], command: RA('gambatte') },
   { id: 'gbc', name: 'Game Boy Color', short: 'GBC', color: '#c9a227', folders: ['gbc', 'gameboycolor'], ext: ['gbc', 'zip', '7z'], command: RA('gambatte') },

@@ -13,9 +13,17 @@ const MEDIA_KINDS = ['boxart', 'icons', 'covers', 'miximages', 'screenshots', 'f
 
 const norm = (s) => s.toLowerCase().replace(/[\s_\-.]/g, '');
 
+// Mots ajoutés autour du nom de console (« Switch 2 game », « ROMs PS2 », « Jeux GBA »…), ignorés à la reconnaissance.
+const FILLER = /^(roms?|games?|jeux|jeu)|(roms?|games?|jeux|jeu)$/g;
+
 function findSystem(folderName) {
   const key = norm(folderName);
-  return SYSTEMS.find((s) => s.folders.some((f) => norm(f) === key)) || null;
+  const exact = SYSTEMS.find((s) => s.folders.some((f) => norm(f) === key) || norm(s.name) === key);
+  if (exact) return exact;
+  let loose = key;
+  for (let i = 0; i < 2; i++) loose = loose.replace(FILLER, '');
+  if (!loose || loose === key) return null;
+  return SYSTEMS.find((s) => s.folders.some((f) => norm(f) === loose) || norm(s.name) === loose) || null;
 }
 
 async function listDir(dir) {
@@ -103,6 +111,17 @@ async function loadGamelists(files) {
   return map;
 }
 
+// Titre écrit par un outil de packaging à côté du jeu (« Jeu.nsp.report.json » avec un champ title).
+function reportTitle(rom) {
+  try {
+    const j = JSON.parse(fs.readFileSync(rom + '.report.json', 'utf8'));
+    const t = String(j.title || '').trim();
+    if (!t) return '';
+    // « Mario kart world » → « Mario Kart World » ; un titre déjà en majuscules est gardé tel quel.
+    return t === t.toLowerCase() || /^[A-Z][a-z]+( [a-z]+)+$/.test(t) ? t.replace(/(^|\s)(\p{Ll})/gu, (_m, s, c) => s + c.toUpperCase()) : t;
+  } catch { return ''; }
+}
+
 function cleanName(stem) {
   return stem
     .replace(/_/g, ' ')
@@ -154,7 +173,7 @@ async function scanSystemFolder(cfg, sys, folder) {
     return {
       path: rom,
       system: sys.id,
-      name: m.name || cleanName(stem),
+      name: m.name || reportTitle(rom) || cleanName(stem),
       cover,
       background,
       hero,

@@ -340,6 +340,9 @@ async function buildLibrary(cfg, opts = {}) {
   if (apps) lib.systems.push(apps);
   if ((pc.systems.length || apps) && lib.error && !cfg.romsRoot) delete lib.error;
   lib.platformArt = scanPlatformArt(cfg.platformDir);
+  // Noms choisis par l'utilisateur (menu rapide → Renommer), aussi utilisés pour chercher les images.
+  const renames = cfg.renames || {};
+  for (const s of lib.systems) for (const g of s.games) if (renames[g.path]) g.name = renames[g.path];
   return lib;
 }
 

@@ -1846,6 +1846,17 @@
       if (api.mapper) items.push([profileOf(g) ? `🎮 Profil manette → clavier (${profileOf(g).enabled ? 'actif' : 'inactif'})` : '🎮 Profil manette → clavier…', () => { closeOverlay(true); openProfileEditor(g); }]);
       if (api.pickAudio) items.push([g.customSound ? 'Changer mon son pour ce jeu…' : 'Choisir un son pour ce jeu…', () => { closeOverlay(true); pickGameSound(g); }]);
       if (g.customSound) items.push(['Retirer mon son', () => { closeOverlay(true); clearGameSound(g); }]);
+      if (g.source !== 'app') items.push(['Renommer le jeu…', async () => {
+        closeOverlay(true);
+        const v = await openPrompt({ title: 'Nom du jeu', value: g.name, help: 'Le nom affiché, aussi utilisé pour chercher les images iiDB (ex. « Mario Kart World » plutôt que « MKW »). Vide = nom d’origine.' });
+        if (v === null) return;
+        const renames = S.cfg.renames || (S.cfg.renames = {});
+        if (v.trim()) renames[g.path] = v.trim(); else delete renames[g.path];
+        await saveCfg();
+        applyLib(await api.scan({ romm: false }));
+        rerender();
+        toast(v.trim() ? 'Jeu renommé · relance « Images iiDB » pour ses images' : 'Nom d’origine rétabli');
+      }]);
       items.push(['Masquer ce jeu', () => { closeOverlay(true); hideGame(g); }]);
       if (g.source === 'romm' && !g.downloaded) items.push([`Télécharger sans lancer (${fmtSize(g.size) || 'RomM'})`, () => { closeOverlay(true); downloadOnly(g); }]);
       if (g.source === 'romm' && g.downloaded) items.push(['Supprimer la copie locale', () => { closeOverlay(true); deleteRommCopy(g); }]);
