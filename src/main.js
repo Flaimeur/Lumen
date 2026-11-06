@@ -621,6 +621,29 @@ app.whenReady().then(() => nativepad.start((ev) => { if (win && !win.isDestroyed
 app.on('will-quit', () => nativepad.stop());
 
 // Journal de diagnostic des manettes (limité à ~200 Ko, remis à zéro au-delà).
+// Météo du widget d'accueil : Open-Meteo (gratuit, sans clé), gardée 20 minutes.
+const weatherCache = new Map();
+ipcMain.handle('weather:get', async (_e, city) => {
+  const q = String(city || '').trim();
+  if (!q) return { error: 'Aucune ville' };
+  const hit = weatherCache.get(q.toLowerCase());
+  if (hit && Date.now() - hit.at < 20 * 60 * 1000) return hit.data;
+  try {
+    const geo = await (await net.fetch(`https://geocoding-api.open-meteo.com/v1/search?count=1&language=fr&name=${encodeURIComponent(q)}`, { signal: AbortSignal.timeout(10000) })).json();
+    const place = geo && geo.results && geo.results[0];
+    if (!place) return { error: `Ville introuvable : ${q}` };
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}`
+      + '&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min&forecast_days=1&timezone=auto';
+    const w = await (await net.fetch(url, { signal: AbortSignal.timeout(10000) })).json();
+    const data = {
+      city: place.name, temp: Math.round(w.current.temperature_2m), code: w.current.weather_code, day: !!w.current.is_day,
+      max: Math.round(w.daily.temperature_2m_max[0]), min: Math.round(w.daily.temperature_2m_min[0]),
+    };
+    weatherCache.set(q.toLowerCase(), { at: Date.now(), data });
+    return data;
+  } catch (err) { return { error: 'Météo indisponible' }; }
+});
+
 ipcMain.on('pad:log', (_e, msg) => {
   try {
     const file = path.join(app.getPath('userData'), 'pad-diagnostic.log');

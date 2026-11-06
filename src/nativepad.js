@@ -43,12 +43,14 @@ public static class LumenPad {
   }
 
   // Décodage → "S id type b0..b17 lx ly rx ry"
-  static string Decode(byte[] r, int n, bool ds5) {
+  // Windows renvoie chaque paquet à la taille maximale : la longueur ne distingue pas USB et Bluetooth,
+  // c'est le chemin du périphérique (service HID Bluetooth 00001124) qui le fait.
+  static string Decode(byte[] r, int n, bool ds5, bool bt) {
     int o;
     if (ds5) {
       if (r[0] == 0x31 && n >= 12) o = 2;          // Bluetooth étendu
-      else if (r[0] == 0x01 && n >= 64) o = 1;     // USB
-      else if (r[0] == 0x01 && n >= 10) return Simple(r);
+      else if (r[0] == 0x01 && bt && n >= 10) return Simple(r); // Bluetooth simple
+      else if (r[0] == 0x01 && n >= 12) o = 1;     // USB
       else return null;
       byte b0 = r[o + 7], b1 = r[o + 8], b2 = r[o + 9];
       return Pack(r[o], r[o + 1], r[o + 2], r[o + 3], b0, b1, b2, r[o + 4], r[o + 5]);
@@ -73,16 +75,17 @@ public static class LumenPad {
   }
 
   static void Reader(string path, int id, string type, bool ds5) {
+    bool bt = path.ToLowerInvariant().Contains("00001124");
     try {
       var h = CreateFile(path, 0x80000000, 3, IntPtr.Zero, 3, 0, IntPtr.Zero);
-      if (h.IsInvalid) { lock (Open) Open.Remove(path); return; }
+      if (h.IsInvalid) { Emit("E " + id + " " + Marshal.GetLastWin32Error()); lock (Open) Open.Remove(path); return; }
       using (var fs = new FileStream(h, FileAccess.Read, 1, false)) {
         Emit("C " + id + " " + type);
         var buf = new byte[600]; string last = null;
         while (true) {
           int n = fs.Read(buf, 0, buf.Length);
           if (n <= 0) break;
-          string s = Decode(buf, n, ds5);
+          string s = Decode(buf, n, ds5, bt);
           if (s != null && s != last) { last = s; Emit("S " + id + " " + type + " " + s); }
         }
       }

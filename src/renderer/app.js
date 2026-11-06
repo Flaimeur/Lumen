@@ -765,6 +765,7 @@
   let bgFront = 0;
   function setBackground(file, color) {
     clearTimeout(bgTimer);
+    if (document.body.classList.contains('wp-fixed')) { document.documentElement.style.setProperty('--ambient', color || 'var(--accent)'); return; }
     bgTimer = setTimeout(() => {
       const key = file || color || 'none';
       document.documentElement.style.setProperty('--ambient', color || 'var(--accent)');
@@ -1247,12 +1248,14 @@
       S.featured = src[Math.floor(Math.random() * src.length)].path;
     }
     const featured = recent[0] || S.byPath.get(S.featured);
+    const home = homeCfg();
     const shelves = [];
-    if (recent.length > 1) shelves.push(['Joués récemment', recent.slice(1).map(gameTile)]);
-    shelves.push(['Consoles', S.lib.systems.map(systemCard)]);
+    if (home.blocks.recent && recent.length > 1) shelves.push(['Joués récemment', recent.slice(1).map(gameTile)]);
+    if (home.blocks.favorites && favs.length) shelves.push(['Favoris', favs.map(gameTile)]);
+    if (home.blocks.systems) shelves.push(['Consoles', S.lib.systems.map(systemCard)]);
     const folders = collectionsList().filter((c) => c.id !== '★' || favs.length);
-    if (folders.length) shelves.push(['Dossiers', folders.map(folderTile)]);
-    if (!recent.length) {
+    if (home.blocks.folders && folders.length) shelves.push(['Dossiers', folders.map(folderTile)]);
+    if (home.blocks.discover && (!recent.length || home.blocks.discoverAlways)) {
       const picks = [];
       const seen = new Set([featured.path]);
       while (picks.length < Math.min(12, all.length - 1)) {
@@ -1261,10 +1264,210 @@
       }
       shelves.push(['À découvrir', picks.map(gameTile)]);
     }
-    return h('div', {},
-      heroCard(featured, recent.length ? 'Reprendre' : 'À la une'),
+    const widgets = home.widgets.filter((w) => WIDGETS[w]);
+    return h('div', { class: 'home' },
+      widgets.length ? h('section', { class: 'widgets' }, widgets.map((w) => widgetCard(w))) : null,
+      home.blocks.hero ? heroCard(featured, recent.length ? 'Reprendre' : 'À la une') : null,
       shelves.map(([title, items]) =>
         h('section', { class: 'shelf' }, h('div', { class: 'shelf-title' }, title), h('div', { class: 'row' }, items))));
+  }
+
+  // ---------- Accueil : widgets et blocs (Réglages → Affichage → Personnaliser l'accueil) ----------
+  const HOME_DEFAULT = {
+    widgets: ['clock', 'achievements', 'music'],
+    blocks: { hero: true, recent: true, favorites: false, systems: true, folders: true, discover: true, discoverAlways: false },
+  };
+  function homeCfg() {
+    const c = S.cfg.home || (S.cfg.home = JSON.parse(JSON.stringify(HOME_DEFAULT)));
+    c.widgets = Array.isArray(c.widgets) ? c.widgets : HOME_DEFAULT.widgets.slice();
+    c.blocks = { ...HOME_DEFAULT.blocks, ...(c.blocks || {}) };
+    return c;
+  }
+  const HOME_BLOCKS = [
+    ['hero', 'Bandeau « Reprendre »'], ['recent', 'Joués récemment'], ['favorites', 'Favoris'], ['systems', 'Consoles'],
+    ['folders', 'Dossiers'], ['discover', 'À découvrir'], ['discoverAlways', 'À découvrir, même avec des jeux récents'],
+  ];
+  const WEATHER_ICONS = (code, day) => (code === 0 ? (day ? '☀️' : '🌙') : code <= 2 ? (day ? '🌤️' : '☁️') : code === 3 ? '☁️' : code <= 48 ? '🌫️'
+    : code <= 57 ? '🌦️' : code <= 67 ? '🌧️' : code <= 77 ? '🌨️' : code <= 82 ? '🌧️' : code <= 86 ? '🌨️' : '⛈️');
+
+  // Chaque widget : nom, puis rendu (contenu) et action (bouton A).
+  const WIDGETS = {
+    clock: { name: 'Horloge', render: () => {
+      const now = new Date();
+      const hh = now.getHours();
+      const hello = hh < 6 ? 'Bonne nuit' : hh < 12 ? 'Bonjour' : hh < 18 ? 'Bon après-midi' : 'Bonsoir';
+      return [h('div', { class: 'w-big', 'data-clock': '1' }, now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })),
+        h('div', { class: 'w-sub' }, `${hello} · ${now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}`)];
+    } },
+    weather: { name: 'Météo', render: () => {
+      const w = S.weather;
+      const city = (S.cfg.weatherCity || '').trim();
+      if (!city) return [h('div', { class: 'w-big' }, '🌤️'), h('div', { class: 'w-sub' }, 'Choisis ta ville (bouton A)')];
+      if (!w) { loadWeather(); return [h('div', { class: 'w-big' }, '…'), h('div', { class: 'w-sub' }, city)]; }
+      if (w.error) return [h('div', { class: 'w-big' }, '⚠️'), h('div', { class: 'w-sub' }, w.error)];
+      return [h('div', { class: 'w-big' }, `${WEATHER_ICONS(w.code, w.day)} ${w.temp}°`), h('div', { class: 'w-sub' }, `${w.city} · ${w.min}° / ${w.max}°`)];
+    }, act: async () => {
+      const v = await openPrompt({ title: 'Ville pour la météo', value: S.cfg.weatherCity || '', help: 'Par exemple Paris, Lyon, Bruxelles, Montréal…' });
+      if (v === null) return;
+      S.cfg.weatherCity = v.trim();
+      S.weather = null;
+      await saveCfg();
+      rerender();
+    } },
+    achievements: { name: 'Rang et XP', render: () => {
+      if (!S.ach) return [h('div', { class: 'w-big' }, '🏆'), h('div', { class: 'w-sub' }, 'Lecture des succès…')];
+      const st = achStats(S.ach);
+      return [h('div', { class: 'w-rank', '--rc': st.rank.color }, rankEmblem(st), h('div', {}, h('b', {}, `Rang ${st.rank.name}`), h('div', { class: 'w-sub' }, `Niveau ${st.lvl} · ${st.unlocked} succès`))),
+        h('div', { class: 'xp-bar', '--rc': st.rank.color }, h('div', { class: 'xp-fill', style: `width:${Math.round((st.into / st.need) * 100)}%` }))];
+    }, act: () => openTab('achievements') },
+    playtime: { name: 'Temps de jeu', render: () => {
+      const pt = S.cfg.playtime || {};
+      const total = Object.values(pt).reduce((n, v) => n + v, 0);
+      const best = Object.entries(pt).sort((a, b) => b[1] - a[1]).map(([p]) => S.byPath.get(p)).find(Boolean);
+      return [h('div', { class: 'w-big' }, total ? formatTime(total) : '0 min'), h('div', { class: 'w-sub' }, best ? `Le plus joué : ${best.name}` : 'Temps passé en jeu depuis Lumen')];
+    } },
+    music: { name: 'Musique', render: () => {
+      const m = musicCfg();
+      if (!m.enabled || !musicList.length) return [h('div', { class: 'w-big' }, '🎵'), h('div', { class: 'w-sub' }, 'Musique de fond désactivée')];
+      const name = (musicList[musicIdx] || '').split(/[\\/]/).pop().replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ');
+      return [h('div', { class: 'w-music' }, h('span', { class: 'w-eq' }, h('i'), h('i'), h('i')), h('b', {}, name)), h('div', { class: 'w-sub' }, 'A : morceau suivant')];
+    }, act: () => { if (musicList.length) { nextTrack(); setTimeout(rerender, 100); } else openTab('settings'); } },
+    surprise: { name: 'Jeu surprise', render: () => {
+      const all = S.lib.systems.flatMap((x) => x.games).filter((g) => g.cover);
+      if (!S.surprise || !S.byPath.has(S.surprise)) S.surprise = all.length ? all[Math.floor(Math.random() * all.length)].path : null;
+      const g = S.surprise && S.byPath.get(S.surprise);
+      if (!g) return [h('div', { class: 'w-big' }, '🎲'), h('div', { class: 'w-sub' }, 'Aucun jeu')];
+      return [h('div', { class: 'w-surprise' }, h('img', { src: api.mediaUrl(g.cover), alt: '' }), h('div', {}, h('b', {}, g.name), h('div', { class: 'w-sub' }, 'A : voir · X : un autre')))];
+    }, act: () => { const g = S.byPath.get(S.surprise); if (g) openDetails(g); }, x: () => { S.surprise = null; rerender(); } },
+    note: { name: 'Mémo', render: () => [h('div', { class: 'w-note' }, (S.cfg.homeNote || '').trim() || 'Écris un petit mot ici (bouton A)')], act: async () => {
+      const v = await openPrompt({ title: 'Mémo', value: S.cfg.homeNote || '', help: 'Un rappel, une liste de jeux à finir…' });
+      if (v === null) return;
+      S.cfg.homeNote = v;
+      await saveCfg();
+      rerender();
+    } },
+    stats: { name: 'Bibliothèque', render: () => {
+      const n = totalGames();
+      return [h('div', { class: 'w-big' }, String(n)), h('div', { class: 'w-sub' }, `${plural(n, 'jeu', 'jeux')} · ${plural(S.lib.systems.length, 'console', 'consoles')} · ${plural((S.cfg.favorites || []).length, 'favori', 'favoris')}`)];
+    }, act: () => openTab('systems') },
+  };
+
+  function widgetCard(id) {
+    const w = WIDGETS[id];
+    let body;
+    try { body = w.render(); } catch { body = [h('div', { class: 'w-sub' }, 'Indisponible')]; }
+    return focusable(h('div', { class: 'widget w-' + id }, h('div', { class: 'w-title' }, w.name), ...body), {
+      a: w.act || (() => openHomeEditor()),
+      x: w.x,
+      focus: () => { setTitle(w.name, 'Widget'); setHints('action'); },
+    });
+  }
+
+  async function loadWeather() {
+    if (S.weatherLoading || !api.weather) return;
+    S.weatherLoading = true;
+    S.weather = await api.weather(S.cfg.weatherCity);
+    S.weatherLoading = false;
+    if (S.route.view === 'home' && !S.overlay) rerender();
+  }
+  // L'horloge du widget suit l'heure sans redessiner l'accueil.
+  setInterval(() => {
+    const el = document.querySelector('[data-clock]');
+    if (el) el.textContent = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  }, 15000);
+  setInterval(() => { S.weather = null; }, 20 * 60 * 1000);
+
+  // ---------- Fond d'écran ----------
+  const WALL_THEMES = {
+    aurore: { name: 'Aurore', css: 'linear-gradient(125deg, #0f1b4d, #0d7a7a 30%, #5b2bb5 60%, #1e3a8a 85%, #0f766e)' },
+    coucher: { name: 'Coucher de soleil', css: 'linear-gradient(160deg, #2e1065, #9d174d 40%, #ea580c 75%, #fbbf24)' },
+    ocean: { name: 'Océan', css: 'linear-gradient(170deg, #0c1e5b, #1d4ed8 40%, #0891b2 75%, #67e8f9)' },
+    foret: { name: 'Forêt', css: 'linear-gradient(160deg, #052e16, #166534 40%, #15803d 70%, #a3e635)' },
+    nuit: { name: 'Nuit étoilée', css: 'radial-gradient(circle at 20% 20%, rgba(255,255,255,0.9) 0 1px, transparent 2px) 0 0 / 140px 140px, radial-gradient(circle at 70% 60%, rgba(255,255,255,0.7) 0 1px, transparent 2px) 0 0 / 220px 220px, linear-gradient(180deg, #05060f, #111a3b)' },
+    synthwave: { name: 'Synthwave', css: 'linear-gradient(transparent 62%, rgba(236,72,153,0.35) 62.3%, transparent 63%), repeating-linear-gradient(90deg, rgba(236,72,153,0.28) 0 1px, transparent 1px 70px), linear-gradient(180deg, #120428, #3b0764 55%, #9d174d 62%, #1e0336 63%)' },
+    sakura: { name: 'Sakura', css: 'linear-gradient(150deg, #4a044e, #be185d 45%, #f472b6 80%, #fbcfe8)' },
+  };
+  const wallCfg = () => S.cfg.wallpaper || (S.cfg.wallpaper = { mode: 'auto', theme: 'aurore', image: '', dim: 0.25, gameArt: false });
+  function applyWallpaper() {
+    const w = wallCfg();
+    let el = document.getElementById('wallpaper');
+    if (!el) { el = h('div', { id: 'wallpaper' }); const bg = document.getElementById('bg'); if (bg) bg.prepend(el); }
+    document.body.classList.toggle('wp-on', w.mode !== 'auto');
+    // « Images des jeux par-dessus » : le fond perso reste visible quand rien n'est sélectionné.
+    document.body.classList.toggle('wp-fixed', w.mode !== 'auto' && !w.gameArt);
+    document.documentElement.style.setProperty('--wp-dim', String(w.dim ?? 0.25));
+    if (w.mode === 'image' && w.image) el.style.background = `center / cover no-repeat url("${api.mediaUrl(w.image)}")`;
+    else if (w.mode === 'theme') el.style.background = (WALL_THEMES[w.theme] || WALL_THEMES.aurore).css;
+    else el.style.background = '';
+    el.dataset.theme = w.mode === 'theme' ? w.theme : '';
+  }
+
+  function openHomeEditor(focusLabel) {
+    const home = homeCfg();
+    const w = wallCfg();
+    const rows = [];
+    const add = (label, value, act, desc, extra = {}) => rows.push(focusable(h('div', { class: 'set-row' },
+      h('div', { class: 'set-text' }, h('div', { class: 'set-label' }, label), desc ? h('div', { class: 'set-desc' }, desc) : null),
+      h('div', { class: 'set-value' }, value)), { a: act, x: extra.x, y: extra.y, focus: () => setHints('settings') }));
+    const reopen = async (label) => { await saveCfg(); applyWallpaper(); S.dirty = true; openHomeEditor(label); };
+    const tog = (on) => h('span', { class: 'toggle' + (on ? ' on' : '') });
+    const section = (t) => rows.push(h('div', { class: 'set-section' }, t));
+
+    section('Fond d’écran');
+    const MODES = { auto: 'Automatique (image du jeu)', theme: 'Thème animé', image: 'Mon image' };
+    add('Type de fond', MODES[w.mode] || MODES.auto, () => openMenu('Type de fond', Object.entries(MODES).map(([id, label]) => [label, async () => {
+      if (id === 'image' && !w.image) {
+        const file = api.pickImage && await api.pickImage('Image de fond');
+        if (!file) return openHomeEditor('Type de fond');
+        w.image = file;
+      }
+      w.mode = id;
+      reopen('Type de fond');
+    }])));
+    if (w.mode === 'theme') add('Thème', (WALL_THEMES[w.theme] || WALL_THEMES.aurore).name, () => openMenu('Thème', Object.entries(WALL_THEMES).map(([id, t]) => [t.name, () => { w.theme = id; reopen('Thème'); }])));
+    if (w.mode === 'image') add('Image', w.image ? w.image.split(/[\\/]/).pop() : 'Aucune', async () => {
+      const file = api.pickImage && await api.pickImage('Image de fond');
+      if (!file) return;
+      w.image = file;
+      reopen('Image');
+    });
+    if (w.mode !== 'auto') {
+      add('Images des jeux par-dessus', tog(w.gameArt), () => { w.gameArt = !w.gameArt; reopen('Images des jeux par-dessus'); }, 'Le fond change selon le jeu sélectionné, et ton fond revient ailleurs.');
+      add('Assombrir le fond', `${Math.round((w.dim ?? 0.25) * 100)} %`, () => {
+        const steps = [0, 0.15, 0.25, 0.4, 0.55, 0.7];
+        w.dim = steps[(steps.indexOf(w.dim ?? 0.25) + 1) % steps.length];
+        reopen('Assombrir le fond');
+      }, 'Pour garder le texte lisible.');
+    }
+
+    section('Widgets');
+    rows.push(h('p', { class: 'muted small', style: 'margin: 0 6px 6px' }, 'A : activer ou retirer · X : monter · Y : descendre'));
+    const ordered = [...home.widgets.filter((id) => WIDGETS[id]), ...Object.keys(WIDGETS).filter((id) => !home.widgets.includes(id))];
+    for (const id of ordered) {
+      const on = home.widgets.includes(id);
+      const move = (d) => {
+        const i = home.widgets.indexOf(id);
+        if (i < 0) return;
+        const j = i + d;
+        if (j < 0 || j >= home.widgets.length) return;
+        [home.widgets[i], home.widgets[j]] = [home.widgets[j], home.widgets[i]];
+        reopen(WIDGETS[id].name);
+      };
+      add(WIDGETS[id].name, on ? h('span', {}, `n°${home.widgets.indexOf(id) + 1} `, tog(true)) : tog(false), () => {
+        if (on) home.widgets = home.widgets.filter((x) => x !== id); else home.widgets.push(id);
+        reopen(WIDGETS[id].name);
+      }, null, { x: () => move(-1), y: () => move(1) });
+    }
+
+    section('Blocs de l’accueil');
+    for (const [id, label] of HOME_BLOCKS) add(label, tog(home.blocks[id]), () => { home.blocks[id] = !home.blocks[id]; reopen(label); });
+
+    openOverlay(h('div', { class: 'modal art-editor profile-editor' },
+      h('div', { class: 'eyebrow' }, 'Personnaliser'), h('h2', {}, 'Accueil et fond d’écran'), ...rows));
+    if (focusLabel) {
+      const el = rows.find((r) => r.querySelector && r.querySelector('.set-label') && r.querySelector('.set-label').textContent === focusLabel);
+      if (el) setFocus(el, { silent: true });
+    }
   }
 
   function viewSystems() {
@@ -1700,6 +1903,8 @@
     row('Profils manette → clavier', `${plural(Object.keys(c.padProfiles || {}).length, 'profil', 'profils')}`, () => openProfilesList(),
       'Pour les jeux PC ou les applications qui ne gèrent pas la manette : Lumen la transforme en clavier et souris pendant que le jeu tourne. Un profil par jeu, depuis son menu rapide.');
     cat('display');
+    section('Personnalisation');
+    row('Personnaliser l’accueil', 'Widgets, fond, blocs', () => openHomeEditor(), 'Horloge, météo, rang, musique, jeu surprise, mémo… et ton fond d’écran (image ou thème animé).');
     section('Affichage');
     row('Démarrer en plein écran', toggle(c.fullscreen), () => { c.fullscreen = !c.fullscreen; saveCfg(); rerender(); }, 'F11 bascule à tout moment.');
     cat('sound');
@@ -1917,6 +2122,7 @@
       if (cur && cur.pc && !cur.apps) items.push(['Images SteamGridDB', () => { closeOverlay(true); openSgdb(); }]);
       else items.push(['Jaquettes de cette console', () => { closeOverlay(true); openThumbs(sysId); }]);
     }
+    if (S.route.view === 'home') items.push(['🎨 Personnaliser l’accueil', () => { closeOverlay(true); openHomeEditor(); }]);
     if (S.route.view !== 'search') items.push(['Rechercher un jeu', () => { closeOverlay(true); openTab('search'); }]);
     items.push(
       ['Télécharger les jaquettes manquantes', () => { closeOverlay(true); openThumbs(); }],
@@ -2212,7 +2418,7 @@
     S.ach = out;
     S.achLoading = false;
     announceProgress(out);
-    if ((S.route.view === 'achievements' || (first && out.games.some((x) => x.unlocked === x.total))) && !S.overlay && !S.inGame) { S.keepAnim = true; render(indexOfFocus()); }
+    if ((S.route.view === 'achievements' || (first && (S.route.view === 'home' || out.games.some((x) => x.unlocked === x.total)))) && !S.overlay && !S.inGame) { S.keepAnim = true; render(indexOfFocus()); }
   }
 
   // XP : 10 par succès + 100 par jeu terminé à 100 %. Chaque niveau demande 25 XP de plus que le précédent.
@@ -2886,6 +3092,7 @@
     if (api.sgdb) S.sgdbStatus = await api.sgdb.status();
     if (api.ra) S.raStatus = await api.ra.status();
     renderMuteIndicator();
+    applyWallpaper();
     loadMusic();
     loadUiSounds();
     // Les succès sont lus en arrière-plan pour pouvoir les afficher dans les fiches.
