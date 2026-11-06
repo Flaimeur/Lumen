@@ -86,6 +86,47 @@
     if ([5, 6, 7].includes(steps)) out.add('left');
   }
 
+  // Manettes lues directement par Lumen (PlayStation en HID), au format d'un Gamepad « standard ».
+  const nativePads = new Map();
+  const NATIVE_NAMES = { ps5: 'DualSense Wireless Controller (Vendor: 054c Product: 0ce6)', ps4: 'Wireless Controller (Vendor: 054c Product: 05c4)' };
+  function onNative(e) {
+    if (e.kind === 'disconnect') {
+      const p = nativePads.get(e.id);
+      nativePads.delete(e.id);
+      if (p) window.dispatchEvent(new CustomEvent('lumen:pad', { detail: { connected: false, id: p.id, type: p.type } }));
+      return;
+    }
+    let p = nativePads.get(e.id);
+    if (!p) {
+      p = { index: 100 + e.id, id: NATIVE_NAMES[e.type] || 'Manette PlayStation', type: e.type, mapping: 'standard', connected: true, native: true,
+        buttons: Array.from({ length: 18 }, () => ({ pressed: false, value: 0 })), axes: [0, 0, 0, 0], announced: false };
+      nativePads.set(e.id, p);
+    }
+    if (e.kind === 'state') {
+      e.buttons.forEach((v, i) => { p.buttons[i] = { pressed: v, value: v ? 1 : 0 }; });
+      if (e.triggers) { p.buttons[6].value = e.triggers[0]; p.buttons[7].value = e.triggers[1]; }
+      p.axes = e.axes;
+      // Annoncée au premier état reçu (comme Chromium, qui attend un premier appui).
+      if (!p.announced) {
+        p.announced = true;
+        notePad(p);
+        setDevice('gamepad');
+        window.dispatchEvent(new CustomEvent('lumen:pad', { detail: { connected: true, id: p.id, type: p.type } }));
+        diagNative('manette native : ' + p.id);
+      }
+    }
+  }
+  const diagNative = (m) => { try { window.lumen && window.lumen.padLog && window.lumen.padLog(m); } catch { /* facultatif */ } };
+  if (window.lumen && window.lumen.onNativePad) window.lumen.onNativePad(onNative);
+
+  // Toutes les manettes : celles de Chromium, sauf une PlayStation déjà lue en natif (pas de doublon).
+  Input.getPads = () => {
+    const web = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : [];
+    const native = [...nativePads.values()].filter((p) => p.announced);
+    const hasNativeSony = native.length > 0;
+    return [...web.filter((p) => !(hasNativeSony && /054c|dualsense|wireless controller/i.test(p.id))), ...native];
+  };
+
   // Disposition Nintendo : sur une Switch, valider se fait avec A (à droite) et non avec le bouton du bas.
   Input.nintendoConfirm = true;
   Input.padType = 'generic';
@@ -94,14 +135,14 @@
 
   // Vibration courte, si la manette la gère.
   Input.rumble = (strength = 0.4, ms = 60) => {
-    for (const p of navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : []) {
+    for (const p of Input.getPads()) {
       const act = p.vibrationActuator;
       if (act && act.playEffect) act.playEffect('dual-rumble', { duration: ms, strongMagnitude: strength, weakMagnitude: strength }).catch(() => {});
     }
   };
 
   // Manettes connectées, pour l'écran de réglages : [{ index, name, type, mapping, buttons, axes }]
-  Input.pads = () => (navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : [])
+  Input.pads = () => Input.getPads()
     .map((p) => ({ index: p.index, name: p.id, type: padType(p.id), mapping: p.mapping || 'aucune', buttons: p.buttons.length, axes: p.axes.length, rumble: !!(p.vibrationActuator && p.vibrationActuator.playEffect) }));
 
   function notePad(p) {
@@ -115,7 +156,7 @@
   function poll(now) {
     requestAnimationFrame(poll);
     if (!document.hasFocus() || Input.paused) { held.clear(); return; }
-    const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : [];
+    const pads = Input.getPads();
     if (!pads.length) return;
     const active = new Set();
     for (const p of pads) {
@@ -162,10 +203,10 @@
   let diagChanges = 0;
   let diagLast = '';
   diag('démarrage · manettes visibles : ' + (navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean).length : 'API absente'));
-  window.addEventListener('focus', () => diag('focus · manettes visibles : ' + Array.from(navigator.getGamepads()).filter(Boolean).map((p) => p.id + ' [' + p.mapping + ']').join(' ; ')));
+  window.addEventListener('focus', () => diag('focus · manettes visibles : ' + Input.getPads().map((p) => p.id + ' [' + p.mapping + ']').join(' ; ')));
   setInterval(() => {
     if (diagChanges > 40) return;
-    const p = Array.from(navigator.getGamepads ? navigator.getGamepads() : []).filter(Boolean)[0];
+    const p = Input.getPads()[0];
     if (!p) return;
     const s = 'boutons ' + p.buttons.map((b, i) => (b.pressed ? i : null)).filter((x) => x !== null).join(',') + ' · axes ' + p.axes.map((a) => a.toFixed(1)).join(' ');
     if (s !== diagLast) { diagLast = s; diagChanges++; diag(s + ' · focus=' + document.hasFocus()); }

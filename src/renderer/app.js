@@ -344,7 +344,10 @@
     const all = S.cfg.artOverrides || {};
     S.lib.platformArt = S.lib.platformArt || {};
     S.lib.collectionArt = S.lib.collectionArt || {};
-    for (const [key, art] of Object.entries(all)) {
+    // « none » = image retirée volontairement (ex. pas de logo sur la carte d'une console).
+    const clean = (art) => Object.fromEntries(Object.entries(art).map(([k, v]) => [k, v === 'none' ? null : v]));
+    for (const [key, raw] of Object.entries(all)) {
+      const art = clean(raw);
       if (key.startsWith('sys:')) { S.lib.platformArt[key.slice(4)] = { ...(S.lib.platformArt[key.slice(4)] || {}), ...art }; continue; }
       if (key.startsWith('col:')) { S.lib.collectionArt[key.slice(4)] = { ...(S.lib.collectionArt[key.slice(4)] || {}), ...art }; continue; }
       const g = S.byPath.get(key);
@@ -396,7 +399,7 @@
           artThumb(cur[kind], kind),
           h('div', { class: 'ach-text' },
             h('b', {}, ART_KINDS[kind]),
-            h('span', { class: 'muted small' }, [custom[kind] ? 'Choisie par toi' : 'Automatique', n ? `${n} sur iiDB` : 'rien sur iiDB'].join(' · ')))), {
+            h('span', { class: 'muted small' }, [custom[kind] === 'none' ? 'Masquée' : custom[kind] ? 'Choisie par toi' : 'Automatique', n ? `${n} sur iiDB` : 'rien sur iiDB'].join(' · ')))), {
           a: () => openArtKindMenu(t, kind),
           focus: () => setHints('action'),
         });
@@ -432,6 +435,7 @@
       toast(`${ART_KINDS[kind]} changée`);
       openArtEditor(t);
     }]);
+    if (custom !== 'none') items.push(['🚫 Ne pas afficher', async () => { await setArt(t, kind, 'none'); toast(`${ART_KINDS[kind]} retirée`); openArtEditor(t); }]);
     if (custom) items.push(['Revenir à l’image automatique', async () => { await setArt(t, kind, null); toast('Image d’origine rétablie'); openArtEditor(t); }]);
     items.push(['← Retour', () => openArtEditor(t)]);
     openMenu(ART_KINDS[kind], items);
@@ -621,7 +625,7 @@
       if (x > 0.4) out.add(keys[3]);
     };
     mapperTimer = setInterval(() => {
-      const pad = (navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : [])[0];
+      const pad = Input.getPads()[0];
       if (!pad) return;
       const events = [];
       const now = new Set();
@@ -672,9 +676,9 @@
     openOverlay(box);
     const timer = setInterval(() => {
       if (!box.isConnected) { clearInterval(timer); return; }
-      const pads = Array.from(navigator.getGamepads ? navigator.getGamepads() : []).filter(Boolean);
+      const pads = Input.getPads();
       out.textContent = pads.length
-        ? pads.map((p) => `Manette n°${p.index + 1} : ${p.id}\nType détecté : ${Input.padType} · disposition : ${p.mapping || 'non standard'}\n`
+        ? pads.map((p) => `Manette n°${p.native ? 'PS (lue par Lumen)' : p.index + 1} : ${p.id}\nType détecté : ${Input.padType} · disposition : ${p.mapping || 'non standard'}\n`
           + `Boutons pressés : ${p.buttons.map((b, i) => (b.pressed ? i : null)).filter((x) => x !== null).join(', ') || 'aucun'}\n`
           + `Sticks : ${p.axes.map((a) => a.toFixed(2)).join('  ')}`).join('\n\n')
         : `Aucune manette visible par Lumen.\nFenêtre au premier plan : ${document.hasFocus() ? 'oui' : 'non'}\n\nAppuie sur un bouton de la manette. Si rien ne change, Windows ne la transmet pas à Lumen (Bluetooth, pilote ou logiciel qui la capture).`;
@@ -2730,7 +2734,7 @@
     let heldSince = 0;
     gameWatch = setInterval(() => {
       if (!S.inGame) { clearInterval(gameWatch); return; }
-      const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : [];
+      const pads = Input.getPads();
       const combo = pads.some((p) => p.buttons[8] && p.buttons[9] && p.buttons[8].pressed && p.buttons[9].pressed);
       if (!combo) { heldSince = 0; return; }
       if (!heldSince) heldSince = performance.now();

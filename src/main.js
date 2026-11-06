@@ -615,6 +615,11 @@ ipcMain.handle('sgdb:cancel', () => { if (sgdbAbort) sgdbAbort.abort(); });
 
 ipcMain.handle('app:quit', () => app.quit());
 ipcMain.on('app:version', (e) => { e.returnValue = app.getVersion(); });
+// Manettes PlayStation lues en HID par Lumen (voir nativepad.js), transmises au rendu.
+const nativepad = require('./nativepad');
+app.whenReady().then(() => nativepad.start((ev) => { if (win && !win.isDestroyed()) win.webContents.send('pad:native', ev); }));
+app.on('will-quit', () => nativepad.stop());
+
 // Journal de diagnostic des manettes (limité à ~200 Ko, remis à zéro au-delà).
 ipcMain.on('pad:log', (_e, msg) => {
   try {
