@@ -57,6 +57,12 @@ contextBridge.exposeInMainWorld('lumen', {
   listMusic: (dir) => ipcRenderer.invoke('music:list', dir),
   readSound: (file) => ipcRenderer.invoke('sound:read', file),
   quit: () => ipcRenderer.invoke('app:quit'),
+  version: ipcRenderer.sendSync('app:version'),
+  mapper: {
+    start: () => ipcRenderer.invoke('mapper:start'),
+    send: (events) => ipcRenderer.send('mapper:send', events),
+    stop: () => ipcRenderer.invoke('mapper:stop'),
+  },
   openPlatformDir: () => ipcRenderer.invoke('app:openPlatformDir'),
   toggleFullscreen: () => ipcRenderer.invoke('app:fullscreen'),
   onGameExit: (cb) => ipcRenderer.on('game:exit', (_e, data) => cb(data)),

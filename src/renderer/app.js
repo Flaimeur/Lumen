@@ -445,6 +445,208 @@
     openQuickMenu();
   });
 
+  // ---------- Profils manette → clavier/souris (jeux sans prise en charge de la manette) ----------
+  // S.cfg.padProfiles[chemin du jeu] = { enabled, preset, map: { a: 'Space', … }, lstick, rstick, sens }
+  // Les boutons sont désignés par leur position physique (disposition standard) : a = bas, b = droite, x = gauche, y = haut.
+  const PAD_SLOTS = [
+    ['a', 0], ['b', 1], ['x', 2], ['y', 3], ['lb', 4], ['rb', 5], ['lt', 6], ['rt', 7],
+    ['back', 8], ['start', 9], ['l3', 10], ['r3', 11], ['up', 12], ['down', 13], ['left', 14], ['right', 15],
+  ];
+  const SLOT_NAMES = {
+    xbox: { a: 'A', b: 'B', x: 'X', y: 'Y', lb: 'LB', rb: 'RB', lt: 'LT', rt: 'RT', back: 'View', start: 'Menu', l3: 'L3', r3: 'R3' },
+    playstation: { a: '✕', b: '○', x: '□', y: '△', lb: 'L1', rb: 'R1', lt: 'L2', rt: 'R2', back: 'Share / Create', start: 'Options', l3: 'L3', r3: 'R3' },
+    switch: { a: 'B', b: 'A', x: 'Y', y: 'X', lb: 'L', rb: 'R', lt: 'ZL', rt: 'ZR', back: '−', start: '+', l3: 'L3', r3: 'R3' },
+  };
+  const DPAD_NAMES = { up: 'Croix ↑', down: 'Croix ↓', left: 'Croix ←', right: 'Croix →' };
+  const slotName = (slot) => {
+    if (DPAD_NAMES[slot]) return DPAD_NAMES[slot];
+    const t = Input.padType;
+    return SLOT_NAMES[t === 'ps4' || t === 'ps5' ? 'playstation' : t === 'switch' ? 'switch' : 'xbox'][slot];
+  };
+  const STICK_MODES = { wasd: 'ZQSD / WASD', arrows: 'Flèches', mouse: 'Souris', wheel: 'Molette', none: 'Rien' };
+  const PROFILE_PRESETS = {
+    fps: { label: 'Action / FPS (ZQSD + souris)', lstick: 'wasd', rstick: 'mouse', map: {
+      a: 'Space', b: 'ControlLeft', x: 'KeyR', y: 'KeyE', lb: 'KeyQ', rb: 'KeyF', lt: 'MouseRight', rt: 'MouseLeft',
+      back: 'Tab', start: 'Escape', l3: 'ShiftLeft', r3: 'KeyV', up: 'Digit1', down: 'Digit2', left: 'Digit3', right: 'Digit4' } },
+    retro: { label: 'Jeu 2D / rétro (flèches)', lstick: 'arrows', rstick: 'none', map: {
+      a: 'Space', b: 'ShiftLeft', x: 'KeyX', y: 'KeyC', lb: 'KeyA', rb: 'KeyS', lt: 'KeyQ', rt: 'KeyW',
+      back: 'Escape', start: 'Enter', l3: '', r3: '', up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' } },
+    mouse: { label: 'Souris (point & click, visual novel)', lstick: 'mouse', rstick: 'wheel', map: {
+      a: 'MouseLeft', b: 'MouseRight', x: 'Space', y: 'Enter', lb: 'PageUp', rb: 'PageDown', lt: 'ControlLeft', rt: 'MouseMiddle',
+      back: 'Tab', start: 'Escape', l3: '', r3: '', up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' } },
+  };
+  const KEY_CODES = [
+    'Space', 'Enter', 'Escape', 'Tab', 'Backspace', 'ShiftLeft', 'ControlLeft', 'AltLeft', 'CapsLock',
+    'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End', 'Insert', 'Delete',
+    ...'QWERTYUIOPASDFGHJKLZXCVBNM'.split('').map((c) => 'Key' + c),
+    ...'1234567890'.split('').map((d) => 'Digit' + d),
+    ...Array.from({ length: 12 }, (_v, i) => 'F' + (i + 1)),
+    'Minus', 'Equal', 'BracketLeft', 'BracketRight', 'Semicolon', 'Quote', 'Backquote', 'Backslash', 'Comma', 'Period', 'Slash', 'IntlBackslash',
+    'ShiftRight', 'ControlRight', 'AltRight',
+    ...'0123456789'.split('').map((d) => 'Numpad' + d),
+  ];
+  const MOUSE_KEYS = { MouseLeft: 'Clic gauche', MouseRight: 'Clic droit', MouseMiddle: 'Clic molette', WheelUp: 'Molette ↑', WheelDown: 'Molette ↓' };
+  const KEY_NAMES = {
+    Space: 'Espace', Enter: 'Entrée', Escape: 'Échap', Tab: 'Tab', Backspace: 'Retour arrière', ShiftLeft: 'Maj', ShiftRight: 'Maj droite',
+    ControlLeft: 'Ctrl', ControlRight: 'Ctrl droit', AltLeft: 'Alt', AltRight: 'Alt Gr', CapsLock: 'Verr. maj',
+    ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', PageUp: 'Page ↑', PageDown: 'Page ↓', Home: 'Début', End: 'Fin', Insert: 'Inser', Delete: 'Suppr',
+  };
+  // Nom affiché selon la disposition réelle du clavier (KeyQ s'affiche « A » en AZERTY).
+  S.kbLayout = null;
+  if (navigator.keyboard && navigator.keyboard.getLayoutMap) navigator.keyboard.getLayoutMap().then((m) => { S.kbLayout = m; }).catch(() => {});
+  function keyLabel(code) {
+    if (!code) return 'Rien';
+    if (MOUSE_KEYS[code]) return MOUSE_KEYS[code];
+    if (KEY_NAMES[code]) return KEY_NAMES[code];
+    // Rangée des chiffres : on affiche le chiffre (sur AZERTY la touche donne « & » sans Maj).
+    if (code.startsWith('Digit')) return code.slice(5);
+    const ch = S.kbLayout && S.kbLayout.get(code);
+    if (ch) return code.startsWith('Numpad') ? 'Pavé ' + ch : ch.toUpperCase();
+    return code.replace(/^Key|^Digit/, '');
+  }
+
+  const profileOf = (g) => (S.cfg.padProfiles || {})[g.path] || null;
+  async function saveProfile(g, p) {
+    (S.cfg.padProfiles || (S.cfg.padProfiles = {}))[g.path] = p;
+    await saveCfg();
+  }
+  function newProfile(preset = 'fps') {
+    const pr = PROFILE_PRESETS[preset];
+    return { enabled: true, preset, map: { ...pr.map }, lstick: pr.lstick, rstick: pr.rstick, sens: 1 };
+  }
+
+  function openProfileEditor(g, focusLabel) {
+    const p = profileOf(g) || newProfile('fps');
+    const rows = [];
+    const add = (label, value, act, desc) => rows.push(focusable(h('div', { class: 'set-row' },
+      h('div', { class: 'set-text' }, h('div', { class: 'set-label' }, label), desc ? h('div', { class: 'set-desc' }, desc) : null),
+      h('div', { class: 'set-value' }, value)), { a: act, focus: () => setHints('settings') }));
+    const reopen = async (label) => { await saveProfile(g, p); openProfileEditor(g, label); };
+    const cycle = (list, v) => list[(list.indexOf(v) + 1) % list.length];
+
+    add('Profil actif', h('span', { class: 'toggle' + (p.enabled ? ' on' : '') }), () => { p.enabled = !p.enabled; reopen('Profil actif'); },
+      'Pendant que ce jeu tourne, la manette tape au clavier et bouge la souris. Select + Start maintenus 1,5 s : désactiver jusqu’au prochain lancement.');
+    add('Modèle', (PROFILE_PRESETS[p.preset] || {}).label || 'Personnalisé', () => openMenu('Modèle de profil', Object.entries(PROFILE_PRESETS).map(([id, pr]) => [pr.label, () => {
+      Object.assign(p, newProfile(id), { enabled: p.enabled });
+      reopen('Modèle');
+    }])), 'Remplace toutes les touches par celles du modèle.');
+    add('Stick gauche', STICK_MODES[p.lstick], () => { p.lstick = cycle(['wasd', 'arrows', 'mouse', 'none'], p.lstick); p.preset = 'custom'; reopen('Stick gauche'); });
+    add('Stick droit', STICK_MODES[p.rstick], () => { p.rstick = cycle(['mouse', 'wheel', 'wasd', 'arrows', 'none'], p.rstick); p.preset = 'custom'; reopen('Stick droit'); });
+    add('Sensibilité de la souris', `× ${p.sens}`, () => { p.sens = cycle([0.5, 0.75, 1, 1.5, 2, 3], p.sens); reopen('Sensibilité de la souris'); });
+    for (const [slot] of PAD_SLOTS) {
+      add(slotName(slot), keyLabel(p.map[slot]), () => openKeyPicker(g, p, slot));
+    }
+    add('Supprimer ce profil', '', async () => { delete S.cfg.padProfiles[g.path]; await saveCfg(); closeOverlay(); toast('Profil supprimé'); });
+    openOverlay(h('div', { class: 'modal art-editor profile-editor' },
+      h('div', { class: 'eyebrow' }, 'Profil manette → clavier'),
+      h('h2', {}, g.name),
+      ...rows));
+    if (!profileOf(g)) saveProfile(g, p);
+    if (focusLabel) {
+      const el = rows.find((r) => r.querySelector('.set-label').textContent === focusLabel);
+      if (el) setFocus(el, { silent: true });
+    }
+  }
+
+  function openKeyPicker(g, p, slot) {
+    const set = async (code) => { p.map[slot] = code; p.preset = 'custom'; await saveProfile(g, p); openProfileEditor(g, slotName(slot)); };
+    const items = [
+      ['⌨ Appuyer sur une touche du clavier…', () => captureKey((code) => set(code), () => openProfileEditor(g, slotName(slot)))],
+      ...Object.entries(MOUSE_KEYS).map(([code, label]) => [`🖱 ${label}`, () => set(code)]),
+      ...KEY_CODES.map((code) => [keyLabel(code), () => set(code)]),
+      ['Rien', () => set('')],
+    ];
+    openMenu(`${slotName(slot)} →`, items);
+  }
+
+  function captureKey(done, cancel) {
+    const box = h('div', { class: 'modal prompt' }, h('div', { class: 'eyebrow' }, 'Profil manette'), h('h2', {}, 'Appuie sur une touche…'),
+      h('p', { class: 'muted small' }, 'La touche du clavier à envoyer quand ce bouton de la manette est pressé. Bouton B / ○ de la manette pour annuler.'));
+    const onKey = (ev) => {
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+      if (!KEY_CODES.includes(ev.code)) { toast(`Touche non prise en charge : ${ev.code}`, 'error'); return; }
+      window.removeEventListener('keydown', onKey, true);
+      done(ev.code);
+    };
+    window.addEventListener('keydown', onKey, true);
+    openOverlay(box, { onBack: () => { window.removeEventListener('keydown', onKey, true); cancel(); } });
+  }
+
+  function openProfilesList() {
+    const entries = Object.keys(S.cfg.padProfiles || {}).map((p) => S.byPath.get(p)).filter(Boolean);
+    if (!entries.length) {
+      toast('Aucun profil : ouvre le menu rapide d’un jeu (clic droit, Tab ou Start) → « Profil manette → clavier ».', 'info', 6000);
+      return;
+    }
+    openMenu('Profils manette → clavier', entries.map((g) => [`${profileOf(g).enabled ? '●' : '○'} ${g.name}`, () => openProfileEditor(g)]));
+  }
+
+  // Boucle active pendant le jeu : lit la manette et envoie les différences au processus d'aide.
+  let mapperTimer = 0;
+  let mapperPrev = new Set();
+  let mapperWheelAt = 0;
+  let mapperSeenBlur = false;
+  let mapperCombo = 0;
+  function startMapper(p) {
+    if (!api.mapper) return;
+    stopMapper();
+    api.mapper.start();
+    mapperPrev = new Set();
+    mapperSeenBlur = false;
+    mapperCombo = 0;
+    S.mapper = p;
+    const stickKeys = (mode, x, y, out) => {
+      const keys = mode === 'wasd' ? ['KeyW', 'KeyS', 'KeyA', 'KeyD'] : mode === 'arrows' ? ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'] : null;
+      if (!keys) return;
+      if (y < -0.4) out.add(keys[0]);
+      if (y > 0.4) out.add(keys[1]);
+      if (x < -0.4) out.add(keys[2]);
+      if (x > 0.4) out.add(keys[3]);
+    };
+    mapperTimer = setInterval(() => {
+      const pad = (navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : [])[0];
+      if (!pad) return;
+      const events = [];
+      const now = new Set();
+      for (const [slot, i] of PAD_SLOTS) {
+        const b = pad.buttons[i];
+        const code = p.map[slot];
+        if (code && b && (b.pressed || b.value > 0.5)) now.add(code);
+      }
+      const ax = (i) => { const v = pad.axes[i] || 0; return Math.abs(v) < 0.15 ? 0 : v; };
+      stickKeys(p.lstick, ax(0), ax(1), now);
+      stickKeys(p.rstick, ax(2), ax(3), now);
+      // Souris : vitesse progressive (petits gestes précis, grands gestes rapides).
+      const mouseFrom = (x, y) => { const k = 22 * (p.sens || 1); events.push({ t: 'move', dx: Math.sign(x) * x * x * k, dy: Math.sign(y) * y * y * k }); };
+      if (p.lstick === 'mouse') mouseFrom(ax(0), ax(1));
+      if (p.rstick === 'mouse') mouseFrom(ax(2), ax(3));
+      const wheelY = p.lstick === 'wheel' ? ax(1) : p.rstick === 'wheel' ? ax(3) : 0;
+      if (Math.abs(wheelY) > 0.5 && performance.now() - mapperWheelAt > 120) { mapperWheelAt = performance.now(); events.push({ t: 'wheel', d: wheelY < 0 ? 120 : -120 }); }
+      for (const code of now) if (!mapperPrev.has(code)) events.push({ t: 'down', key: code });
+      for (const code of mapperPrev) if (!now.has(code)) events.push({ t: 'up', key: code });
+      mapperPrev = now;
+      if (events.length) api.mapper.send(events);
+      // Select + Start maintenus 1,5 s : on coupe le profil.
+      const combo = pad.buttons[8] && pad.buttons[9] && pad.buttons[8].pressed && pad.buttons[9].pressed;
+      if (!combo) mapperCombo = 0;
+      else if (!mapperCombo) mapperCombo = performance.now();
+      else if (performance.now() - mapperCombo > 1500) { stopMapper(); toast('Profil manette désactivé'); }
+    }, 10);
+  }
+  function stopMapper() {
+    if (!mapperTimer) return;
+    clearInterval(mapperTimer);
+    mapperTimer = 0;
+    if (mapperPrev.size && api.mapper) api.mapper.send([...mapperPrev].map((key) => ({ t: 'up', key })));
+    mapperPrev = new Set();
+    S.mapper = null;
+    if (api.mapper) api.mapper.stop();
+  }
+  // Retour dans Lumen après être passé dans le jeu : le profil s'arrête.
+  window.addEventListener('blur', () => { if (mapperTimer) mapperSeenBlur = true; });
+  window.addEventListener('focus', () => { if (mapperTimer && mapperSeenBlur) stopMapper(); });
+
   // ---------- Sons perso par jeu ----------
   async function pickGameSound(g) {
     const file = api.pickAudio && await api.pickAudio(`Son pour ${g.name}`);
@@ -1250,11 +1452,29 @@
     letterTimer = setTimeout(() => el.classList.remove('show'), 650);
   }
 
+  const SET_CATS = [
+    ['library', 'Bibliothèque', 'Dossiers, scan, jeux masqués'],
+    ['pc', 'Jeux PC', 'Steam, Epic, GOG'],
+    ['images', 'Images', 'iiDB, SteamGridDB, consoles'],
+    ['sound', 'Son et musique', 'Volume, musique, sons'],
+    ['controls', 'Manettes', 'PS4, PS5, Xbox, Switch'],
+    ['emus', 'Émulateurs', 'Chemins et commandes'],
+    ['accounts', 'Comptes', 'RomM, RetroAchievements'],
+    ['apps', 'Applications', 'Programmes hors jeux'],
+    ['display', 'Affichage', 'Plein écran, couleur, tri'],
+    ['about', 'Lumen', 'Aide et sortie'],
+  ];
+
   function viewSettings() {
     const c = S.cfg;
+    S.setCat = S.setCat || 'library';
     const list = h('div', { class: 'settings' });
-    const section = (title) => list.append(h('div', { class: 'set-section' }, title));
+    let cur = null;
+    const cat = (id) => { cur = id; };
+    const on = () => cur === S.setCat;
+    const section = (title) => { if (on()) list.append(h('div', { class: 'set-section' }, title)); };
     const row = (label, value, action, desc, warn) => {
+      if (!on()) return;
       const el = h('div', { class: 'set-row' },
         h('div', { class: 'set-text' }, h('div', { class: 'set-label' }, label), desc ? h('div', { class: 'set-desc' }, desc) : null),
         h('div', { class: 'set-value' + (warn ? ' warn' : '') }, value));
@@ -1263,14 +1483,19 @@
         focus: () => { setTitle('Réglages', label); setHints('settings'); setBackground(null); },
       }));
     };
-    const toggle = (on) => h('span', { class: 'toggle' + (on ? ' on' : '') });
+    const toggle = (v) => h('span', { class: 'toggle' + (v ? ' on' : '') });
 
+    const fill = () => {
+    list.replaceChildren();
+    cat('library');
     section('Bibliothèque');
     row('Dossier des ROMs', c.romsRoot || 'Non défini', pickRoms, 'Un sous-dossier par console : snes, gba, psx, ps2, gc…', !c.romsRoot);
     row('Médias ES-DE', c.mediaRoot || 'Non défini', () => pickPath('mediaRoot', 'Dossier downloaded_media d’ES-DE'), 'Jaquettes, captures et fonds (dossier downloaded_media).');
     row('Gamelists ES-DE', c.gamelistsRoot || 'Non défini', () => pickPath('gamelistsRoot', 'Dossier gamelists d’ES-DE'), 'Noms, descriptions, années et notes.');
     row('Rescanner la bibliothèque', plural(totalGames(), 'jeu', 'jeux'), () => rescan());
     row('Télécharger les jaquettes manquantes', 'libretro-thumbnails', () => openThumbs(), 'Jaquettes, captures, écrans-titres et logos, rangés dans <console>/media.');
+    cat('images');
+    section('iiDB');
     if (api.iidb) {
       const ii = c.iidb || (c.iidb = { enabled: true, priority: true });
       row('Images iiDB', toggle(ii.enabled !== false), async () => { ii.enabled = ii.enabled === false; await saveCfg(); rescan(); },
@@ -1282,6 +1507,8 @@
         row('Rechercher à nouveau les introuvables', '', () => openIidb({ retry: true }), 'Utile quand de nouvelles images ont été ajoutées sur iiDB.');
       }
     }
+    cat('pc');
+    section('Launchers');
     const stores = c.pcStores || (c.pcStores = { steam: true, epic: true, gog: true, steamUninstalled: true });
     for (const [id, label] of [['steam', 'Jeux Steam'], ['epic', 'Jeux Epic Games'], ['gog', 'Jeux GOG Galaxy']]) {
       row(label, toggle(stores[id] !== false), async () => { stores[id] = stores[id] === false; await saveCfg(); rescan(); },
@@ -1291,6 +1518,8 @@
           'Affiche aussi les jeux du dossier stplug-in pas encore installés (badge ⬇) ; les lancer ouvre l’installation Steam.');
       }
     }
+    cat('images');
+    section('SteamGridDB et consoles');
     if (api.sgdb) {
       const sg = S.sgdbStatus || {};
       row('Clé SteamGridDB', sg.hasKey ? '•••••••• enregistrée' : 'Non définie', async () => {
@@ -1304,6 +1533,8 @@
     }
     row('Visuels des consoles', 'Ouvrir le dossier', () => api.openPlatformDir && api.openPlatformDir(),
       `Dépose des images dans ${c.platformDir || 'Documents\\Lumen\\Plateformes'} : icons\\, logos\\ ou heroes\\, nommées par console (snes.png, gba.png, psx.png, steam.png…). Puis « Rescanner ».`);
+    cat('library');
+    section('Affichage des jeux');
     row('Masquer les jeux NSFW', toggle(!!c.hideNsfw), async () => { c.hideNsfw = !c.hideNsfw; await saveCfg(); rescan(); },
       'Retire partout les jeux Steam signalés pour nudité ou contenu sexuel. Sinon, filtre-les console par console avec « Afficher ».');
     row('Jeux masqués', (c.hidden || []).length ? `${(c.hidden || []).length} · tout réafficher` : 'Aucun', async () => {
@@ -1317,6 +1548,7 @@
     if (api.ra) {
       const ra = c.retroachievements || (c.retroachievements = { username: '' });
       const st = S.raStatus || {};
+      cat('accounts');
       section('RetroAchievements');
       row('Pseudo RetroAchievements', ra.username || 'Non défini', async () => {
         const v = await openPrompt({ title: 'Pseudo RetroAchievements', value: ra.username || '', keyboard: 'url' });
@@ -1338,6 +1570,7 @@
     }
 
     if (api.apps) {
+      cat('apps');
       section('Applications');
       row('Ajouter une application', '＋', () => addApp(), 'Word, navigateur, Discord… : un programme (.exe) ou un raccourci du menu Démarrer. Elles apparaissent dans Consoles → Applications.');
       for (const a of c.apps || []) {
@@ -1348,6 +1581,7 @@
     if (api.romm) {
       const r = c.romm || (c.romm = {});
       const st = S.rommStatus || {};
+      cat('accounts');
       section('RomM');
       row('Utiliser mon serveur RomM', toggle(r.enabled), async () => {
         r.enabled = !r.enabled;
@@ -1397,6 +1631,7 @@
       }
     }
 
+    cat('emus');
     section('Émulateurs');
     for (const emu of EMULATORS) {
       row(emu.name, c.emulators[emu.id] || 'Non défini', () => pickEmulator(emu.id), emu.desc, emu.id === 'retroarch' && !c.emulators.retroarch);
@@ -1408,12 +1643,28 @@
       row(sys.name, custom ? 'Personnalisée' : 'Par défaut', () => editCommand(sys));
     }
 
-    section('Affichage et contrôles');
+    cat('controls');
+    section('Manettes connectées');
+    const pads = Input.pads ? Input.pads() : [];
+    const PAD_LABEL = { ps4: 'PlayStation 4', ps5: 'PlayStation 5', xbox: 'Xbox', switch: 'Nintendo Switch', generic: 'Manette' };
+    if (!pads.length) row('Aucune manette détectée', '', null, 'Branche-la ou connecte-la en Bluetooth, puis appuie sur un bouton : Lumen la reconnaît tout seul.');
+    for (const p of pads) {
+      row(`${PAD_LABEL[p.type] || 'Manette'} · n°${p.index + 1}`, p.rumble ? 'Tester la vibration' : '', p.rumble ? () => Input.rumble(0.8, 400) : null,
+        `${p.name.replace(/\s*\(.*$/, '')} · disposition ${p.mapping === 'standard' ? 'standard' : 'non standard (corrigée par Lumen)'} · ${p.buttons} boutons`);
+    }
+    section('Boutons');
     row('Inverser A/B et X/Y', toggle(c.swapAB), () => { c.swapAB = !c.swapAB; Input.swapAB = c.swapAB; saveCfg(); rerender(); }, 'Pour toutes les manettes.');
     row('Manette Switch : valider avec A', toggle(c.nintendoConfirm !== false), () => {
       c.nintendoConfirm = c.nintendoConfirm === false; Input.nintendoConfirm = c.nintendoConfirm; saveCfg(); rerender();
     }, 'A (à droite) valide et B (en bas) revient, comme sur la Switch. Automatique dès qu’une manette Nintendo est utilisée.');
+    section('Jeux sans prise en charge de la manette');
+    row('Profils manette → clavier', `${plural(Object.keys(c.padProfiles || {}).length, 'profil', 'profils')}`, () => openProfilesList(),
+      'Pour les jeux PC ou les applications qui ne gèrent pas la manette : Lumen la transforme en clavier et souris pendant que le jeu tourne. Un profil par jeu, depuis son menu rapide.');
+    cat('display');
+    section('Affichage');
     row('Démarrer en plein écran', toggle(c.fullscreen), () => { c.fullscreen = !c.fullscreen; saveCfg(); rerender(); }, 'F11 bascule à tout moment.');
+    cat('sound');
+    section('Son');
     row('Sons de navigation', toggle(c.sounds), () => { c.sounds = !c.sounds; saveCfg(); rerender(); });
     row('Volume', `${Math.round((c.volume ?? 0.7) * 100)} %`, () => {
       c.volume = VOLUMES[(VOLUMES.indexOf(c.volume ?? 0.7) + 1) % VOLUMES.length];
@@ -1456,6 +1707,7 @@
       });
       if (m.enabled && musicList.length > 1) row('Morceau suivant', '⏭', () => { nextTrack(); toast('Morceau suivant'); });
     }
+    cat('display');
     row('Vidéos d’aperçu', toggle(c.videos), () => { c.videos = !c.videos; saveCfg(); rerender(); },
       'Lit la vidéo du jeu dans sa tuile après un instant (dossier videos d’ES-DE ou <console>/media/videos).');
     row('Tri des jeux', sortLabel(), () => { cycleSort(); openTab('settings'); });
@@ -1464,11 +1716,34 @@
       applyCfg(); saveCfg(); rerender();
     });
 
+    cat('about');
     section('Lumen');
+    row('Version', api.version || '', null, 'Frontend de jeux pour Windows : ROMs, jeux PC et applications.');
     row('Quitter un jeu en cours', 'Select + Start (2 s)', null, 'Ou Ctrl + Maj + Q au clavier. Ferme l’émulateur et revient dans Lumen.');
     row('Configuration guidée', '', () => openWelcome());
     row('Quitter Lumen', '', () => api.quit());
-    return list;
+    };
+    fill();
+
+    // Colonne des catégories : se déplacer dessus change le panneau de droite.
+    const nav = h('div', { class: 'set-nav' }, SET_CATS.map(([id, label, sub]) => {
+      const el = h('div', { class: 'set-cat' + (id === S.setCat ? ' current' : '') },
+        h('b', {}, label), h('span', { class: 'muted small' }, sub));
+      el._setCat = id;
+      return focusable(el, {
+        a: () => { const first = list.querySelector('.f'); if (first) setFocus(first); },
+        focus: () => {
+          setTitle('Réglages', label); setHints('settings'); setBackground(null);
+          if (S.setCat === id) return;
+          S.setCat = id;
+          nav.querySelectorAll('.set-cat').forEach((x) => x.classList.toggle('current', x._setCat === id));
+          fill();
+          const scroller = document.querySelector('#view .view-inner');
+          if (scroller) scroller.scrollTop = 0;
+        },
+      });
+    }));
+    return h('div', { class: 'settings-layout' }, nav, list);
   }
 
   // ---------- Modales ----------
@@ -1568,6 +1843,7 @@
       if (g.source === 'app') items.push(...appMenuItems(g.path.slice(4)));
       else items.push(['Détails du jeu', () => { closeOverlay(true); openDetails(g); }]);
       if (achInfo(g) || (/^steam:/.test(g.path) && api.achievements)) items.push(['Succès', () => { closeOverlay(true); openAchievements(g); }]);
+      if (api.mapper) items.push([profileOf(g) ? `🎮 Profil manette → clavier (${profileOf(g).enabled ? 'actif' : 'inactif'})` : '🎮 Profil manette → clavier…', () => { closeOverlay(true); openProfileEditor(g); }]);
       if (api.pickAudio) items.push([g.customSound ? 'Changer mon son pour ce jeu…' : 'Choisir un son pour ce jeu…', () => { closeOverlay(true); pickGameSound(g); }]);
       if (g.customSound) items.push(['Retirer mon son', () => { closeOverlay(true); clearGameSound(g); }]);
       items.push(['Masquer ce jeu', () => { closeOverlay(true); hideGame(g); }]);
@@ -2441,6 +2717,8 @@
     S.cfg.lastPlayed[g.path] = Date.now();
     saveCfg();
     S.launchFx = fx;
+    const prof = profileOf(g);
+    if (prof && prof.enabled) { startMapper(prof); toast('🎮 Profil manette → clavier actif (Select + Start pour le couper)', 'info', 4000); }
     // Pas d'événement de fin pour un jeu PC ouvert par Windows : on referme l'écran après un moment.
     if (res.detached) { setTimeout(() => { if (S.launchFx === fx) { fx.close(); S.launchFx = null; } }, 3000); return; }
     S.inGame = true;
@@ -2451,6 +2729,7 @@
   }
 
   function onGameExit(d) {
+    stopMapper();
     S.inGame = false;
     updateMusic();
     Input.paused = false;

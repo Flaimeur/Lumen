@@ -609,6 +609,14 @@ ipcMain.handle('sgdb:fetch', async () => {
 ipcMain.handle('sgdb:cancel', () => { if (sgdbAbort) sgdbAbort.abort(); });
 
 ipcMain.handle('app:quit', () => app.quit());
+ipcMain.on('app:version', (e) => { e.returnValue = app.getVersion(); });
+
+// Manette → clavier/souris (profils par jeu) : le rendu lit la manette, le processus d'aide tape.
+const padmapper = require('./padmapper');
+ipcMain.handle('mapper:start', () => { padmapper.start(); return true; });
+ipcMain.on('mapper:send', (_e, events) => padmapper.send(events));
+ipcMain.handle('mapper:stop', () => { padmapper.stop(); return true; });
+app.on('will-quit', () => padmapper.stop());
 // Ouvre uniquement le dossier des visuels de consoles dans l'Explorateur.
 ipcMain.handle('app:openPlatformDir', async () => {
   const dir = loadConfig().platformDir;

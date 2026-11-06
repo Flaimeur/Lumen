@@ -25,13 +25,25 @@ function client({ signal, fetchImpl = fetch }) {
   };
 }
 
-// Premier asset de chaque type, en préférant les plus aimés.
-function pickAssets(items, types) {
+// Clés de console iiDB acceptées pour la jaquette iiSU d'un jeu de cette console Lumen.
+// La jaquette iiSU porte le bandeau de sa console : un jeu Steam ne doit pas recevoir celle de la Switch.
+function consoleKeysFor(s) {
+  if (!s) return null;
+  if (s.apps) return [];
+  const store = /^pc-(\w+)$/.exec(s.id || '');
+  if (store) return { steam: ['steam'], epic: ['epic', 'epicgames', 'egs'], gog: ['gog', 'goggalaxy'] }[store[1]] || [];
+  return [s.id, ...(s.folders || []), s.iidbKey].filter(Boolean).map((k) => String(k).toLowerCase());
+}
+
+// Premier asset de chaque type, en préférant les plus aimés. keys : consoles acceptées pour la
+// jaquette iiSU (null = toutes) ; sans jaquette iiSU de la bonne console, on prend la boxart simple.
+function pickAssets(items, types, keys = null) {
   const out = {};
   const sorted = [...(items || [])].filter((a) => !a.is_deleted).sort((a, b) => (b.like_count || 0) - (a.like_count || 0));
+  const allowed = (x) => x.type !== 'iisu_boxart' || !keys || keys.includes(String(x.console_key || '').toLowerCase());
   for (const [type, field] of types) {
     if (out[field]) continue;
-    const a = sorted.find((x) => x.type === type && (x.raw_url || x.filename));
+    const a = sorted.find((x) => x.type === type && (x.raw_url || x.filename) && allowed(x));
     if (a) out[field] = a.raw_url ? `web-cover:${a.raw_url}` : file(a.filename);
   }
   return out;
@@ -77,7 +89,16 @@ async function fetchIidb({ systems, collections = [], cache, signal, onProgress,
   const platformName = {};
   const sysJobs = systems.filter((s) => !s.apps);
   const gameJobs = [];
-  for (const s of sysJobs) for (const g of s.games) if (!(g.path in cache.games)) gameJobs.push({ s, g });
+  // Version 2 du cache : jaquettes choisies selon la console. Les jeux déjà trouvés sont rafraîchis
+  // à partir de leur identifiant iiDB connu (une seule requête), sans refaire la recherche.
+  if (cache.v !== 2) {
+    for (const v of Object.values(cache.games)) if (v && v.id) v.stale = true;
+    cache.v = 2;
+  }
+  for (const s of sysJobs) for (const g of s.games) {
+    const e = cache.games[g.path];
+    if (e === undefined || (e && e.stale)) gameJobs.push({ s, g });
+  }
   const colJobs = collections.filter((n) => !(n in cache.collections));
   stats.total = sysJobs.filter((s) => !(s.id in cache.platforms)).length + gameJobs.length + (colJobs.length ? 1 : 0);
 
@@ -111,10 +132,11 @@ async function fetchIidb({ systems, collections = [], cache, signal, onProgress,
       const { s, g } = gameJobs[next++];
       try {
         const plat = s.pc ? 'PC' : platformName[s.id];
-        const hit = await findGame(call, g.name, plat);
+        const known = cache.games[g.path];
+        const hit = known && known.stale ? { id: known.id } : await findGame(call, g.name, plat);
         if (hit) {
           const res = await call(`/assets/browse/enriched?skip=0&limit=50&parent_id=${hit.id}`);
-          const art = pickAssets((res && res.items) || [], GAME_TYPES);
+          const art = pickAssets((res && res.items) || [], GAME_TYPES, consoleKeysFor(s));
           if (!art.cover && hit.boxart_filename) art.cover = file(hit.boxart_filename);
           cache.games[g.path] = { id: hit.id, ...art };
           if (Object.keys(art).length) stats.found++; else stats.notFound++;
@@ -156,6 +178,8 @@ function applyIidb(lib, cache, { priority = true } = {}) {
       const a = games[g.path];
       if (!a) continue;
       for (const k of ['cover', 'hero', 'logo', 'icon', 'soundbite']) {
+        // Ancien cache pas encore rafraîchi : sa jaquette iiSU peut être celle d'une autre console.
+        if (k === 'cover' && a.stale && /\/iisu_boxart\//.test(a.cover || '')) continue;
         if (a[k] && (priority || !g[k])) g[k] = a[k];
       }
       const bg = a.background || a.hero;
@@ -206,6 +230,7 @@ async function iidbOptions(target, { signal, fetchImpl } = {}) {
     if (id) query = `collection_id=${id}`;
   }
   const out = { cover: [], icon: [], logo: [], hero: [] };
+  const keys = target.type === 'game' ? consoleKeysFor(target.sys) : null;
   if (!query) return out;
   for (let skip = 0; skip < 200; skip += 50) {
     const r = await call(`/assets/browse/enriched?skip=${skip}&limit=50&${query}`);
@@ -216,11 +241,13 @@ async function iidbOptions(target, { signal, fetchImpl } = {}) {
       if (!field || a.is_deleted || (target.type === 'platform' && !/^platform_/.test(a.type))) continue;
       const url = a.raw_url ? `web-cover:${a.raw_url}` : file(a.filename);
       if (!url) continue;
-      out[field].push({ url, thumb: a.preview_url ? `web-cover:${a.preview_url}` : url, label: [a.type.replace(/_/g, ' '), a.credits || a.username].filter(Boolean).join(' · '), likes: a.like_count || 0 });
+      out[field].push({ url, thumb: a.preview_url ? `web-cover:${a.preview_url}` : url, label: [a.type.replace(/_/g, ' '), a.platform_name, a.credits || a.username].filter(Boolean).join(' · '), likes: a.like_count || 0,
+        // Rang : jaquette iiSU de la bonne console, puis images sans bandeau, puis les autres consoles.
+        rank: a.type !== 'iisu_boxart' ? 1 : keys && keys.includes(String(a.console_key || '').toLowerCase()) ? 0 : 2 });
     }
     if (items.length < 50) break;
   }
-  for (const k of Object.keys(out)) out[k].sort((a, b) => b.likes - a.likes);
+  for (const k of Object.keys(out)) out[k].sort((a, b) => a.rank - b.rank || b.likes - a.likes);
   return out;
 }
 

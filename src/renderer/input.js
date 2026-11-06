@@ -28,7 +28,7 @@
   const KEYS = {
     ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
     Enter: 'a', ' ': 'a', Escape: 'b', Backspace: 'b',
-    f: 'x', i: 'y', q: 'lb', e: 'rb', Tab: 'menu', m: 'menu',
+    f: 'x', i: 'y', q: 'lb', e: 'rb', Tab: 'menu', // M est réservée au son (couper / remettre)
     PageUp: 'lt', PageDown: 'rt', '/': 'search',
   };
   window.addEventListener('keydown', (ev) => {

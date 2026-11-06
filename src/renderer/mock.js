@@ -71,6 +71,7 @@
       return { ok: true, cover: opt(8, 'iisu boxart'), icon: opt(3, 'icon'), logo: opt(2, 'logo'), hero: opt(4, 'hero') };
     },
     pickImage: async () => null,
+    mapper: { start: async () => true, send: () => {}, stop: async () => true },
     achievements: {
       summary: async () => ({
         games: systems.find((s) => s.id === 'pc-steam').games.slice(0, 6).map((g, i) => ({ path: g.path, total: 20 + i * 5, unlocked: i === 0 ? 20 : i * 3, last: Date.now() - i * 864e5 })),
