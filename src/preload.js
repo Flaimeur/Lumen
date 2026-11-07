@@ -71,6 +71,7 @@ contextBridge.exposeInMainWorld('lumen', {
     state: () => ipcRenderer.invoke('update:state'),
     check: () => ipcRenderer.invoke('update:check'),
     install: () => ipcRenderer.invoke('update:install'),
+    notes: () => ipcRenderer.invoke('update:notes'),
     onState: (cb) => ipcRenderer.on('update:state', (_e, s) => cb(s)),
   },
   importConfig: () => ipcRenderer.invoke('config:import'),

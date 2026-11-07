@@ -123,6 +123,8 @@
       return !!document.fullscreenElement;
     },
     onGameExit: () => {},
+    // Mises à jour (démo) : window.__lumenUpdate({ status: 'ready', version: '9.9.9', notes: [...] }) simule une version prête.
+    update: { state: async () => ({ status: 'uptodate', current: '0.19.0', packaged: false }), check: async () => ({ status: 'dev' }), install: async () => true, notes: async () => null, onState: (cb) => { window.__lumenUpdate = (st) => cb({ current: '0.19.0', ...st }); } },
     _thumbCb: null,
     _thumbStop: false,
     onThumbProgress(cb) { this._thumbCb = cb; },

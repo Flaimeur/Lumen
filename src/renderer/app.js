@@ -3847,6 +3847,57 @@
     watchQuitCombo();
   }
 
+  // ---------- Mises à jour ----------
+  // Petit bouton en haut tant qu'une mise à jour attend (visible partout, cliquable à la souris).
+  function renderUpdatePill() {
+    const el = document.getElementById('update-pill');
+    if (!el) return;
+    const u = S.update || {};
+    el.hidden = u.status !== 'ready' && u.status !== 'downloading';
+    el.classList.toggle('ready', u.status === 'ready');
+    el.textContent = u.status === 'ready' ? '⬆ Mise à jour prête · Redémarrer' : `⬇ Mise à jour · ${u.progress || 0} %`;
+    el.title = u.status === 'ready' ? `Lumen ${u.version} est téléchargée` : `Téléchargement de Lumen ${u.version || ''}`;
+    el.onclick = u.status === 'ready' ? () => offerUpdate(true) : null;
+  }
+  // Fenêtre « Mise à jour prête » : une fois par version (ou sur demande), jamais pendant un jeu.
+  function offerUpdate(force) {
+    const u = S.update || {};
+    if (u.status !== 'ready' || S.inGame) return;
+    if (!force && S.updateOffered === u.version) return;
+    S.updateOffered = u.version;
+    const notes = (u.notes || []).filter((l) => !/^##/.test(l) && !/Windows a protégé|Informations complémentaires|n'est pas signé/i.test(l)).slice(0, 6);
+    if (S.overlay) closeOverlay(true);
+    openOverlay(h('div', { class: 'modal update-modal' },
+      h('div', { class: 'eyebrow' }, '⬆ Mise à jour prête'),
+      h('h2', {}, `Lumen ${u.version}`),
+      notes.length ? h('ul', { class: 'upd-notes' }, notes.map((l) => h('li', {}, l))) : h('p', { class: 'muted' }, 'Une nouvelle version est téléchargée.'),
+      h('p', { class: 'muted upd-hint' }, 'Le redémarrage prend quelques secondes. « Plus tard » : elle s’installera quand tu fermeras Lumen.'),
+      h('div', { class: 'actions' },
+        actionButton('⟳ Redémarrer maintenant', () => { toast('Installation de la mise à jour…'); api.update.install(); }, true),
+        actionButton('Plus tard', () => closeOverlay()))));
+    sfx('select');
+  }
+  // Au lancement qui suit une mise à jour : ce qui a changé.
+  async function showWhatsNew() {
+    const cur = (S.update && S.update.current) || (api.update ? (await api.update.state()).current : null);
+    if (!cur) return;
+    const last = S.cfg.lastVersion;
+    S.cfg.lastVersion = cur;
+    if (last === cur) return;
+    await saveCfg();
+    if (!last) return; // première installation : l'assistant s'en charge
+    const d = api.update && api.update.notes ? await api.update.notes() : null;
+    const notes = ((d && d.notes) || []).filter((l) => !/^##/.test(l) && !/Windows a protégé|Informations complémentaires|n'est pas signé|certificat/i.test(l)).slice(0, 8);
+    setTimeout(() => {
+      if (S.overlay || S.inGame) return;
+      openOverlay(h('div', { class: 'modal update-modal' },
+        h('div', { class: 'eyebrow' }, '✓ Mise à jour installée'),
+        h('h2', {}, `Nouveautés de Lumen ${cur}`),
+        notes.length ? h('ul', { class: 'upd-notes' }, notes.map((l) => h('li', {}, l))) : h('p', { class: 'muted' }, `Tu es passé de la version ${last} à la ${cur}.`),
+        h('div', { class: 'actions' }, actionButton('Super', () => closeOverlay(), true))));
+    }, 1600);
+  }
+
   function onGameExit(d) {
     stopMapper();
     S.inGame = false;
@@ -3863,6 +3914,7 @@
       saveCfg();
     }
     if (!S.overlay && (S.route.view === 'home' || S.dirty)) { S.dirty = false; rerender(); }
+    if (S.updatePending) { S.updatePending = false; setTimeout(() => offerUpdate(), 1500); }
   }
 
   function applyCfg() {
@@ -3965,10 +4017,12 @@
       api.update.onState((st) => {
         const was = S.update && S.update.status;
         S.update = st;
-        if (st.status === 'ready' && was !== 'ready') toast(`⬆ Lumen ${st.version} est prête : elle s’installera à la fermeture (ou Réglages → Lumen → Mises à jour).`, 'info', 8000);
+        renderUpdatePill();
+        if (st.status === 'ready' && was !== 'ready') { if (S.inGame) S.updatePending = true; else offerUpdate(); }
         if (S.route.view === 'settings' && S.setCat === 'about' && !S.overlay) rerender();
       });
     }
+    showWhatsNew();
     loadMusic();
     loadUiSounds();
     // Les succès sont lus en arrière-plan pour pouvoir les afficher dans les fiches.

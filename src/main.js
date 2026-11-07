@@ -730,7 +730,8 @@ app.on('will-quit', () => nativepad.stop());
 
 // Journal de diagnostic des manettes (limité à ~200 Ko, remis à zéro au-delà).
 // ---------- Mises à jour automatiques (releases GitHub de Flaimeur/Lumen) ----------
-// Lumen vérifie au démarrage puis toutes les 6 h, télécharge en arrière-plan et propose de redémarrer.
+// Lumen vérifie au démarrage, toutes les heures et quand on revient sur sa fenêtre ; il télécharge en arrière-plan,
+// propose de redémarrer, et montre les nouveautés au lancement suivant.
 let updater = null;
 const updateState = { status: 'idle', version: null, progress: 0, error: null };
 function sendUpdate() { if (win && !win.isDestroyed()) win.webContents.send('update:state', updateState); }
@@ -743,12 +744,38 @@ function setupUpdater() {
   updater.on('update-available', (i) => { Object.assign(updateState, { status: 'downloading', version: i.version, progress: 0 }); sendUpdate(); });
   updater.on('update-not-available', () => { Object.assign(updateState, { status: 'uptodate' }); sendUpdate(); });
   updater.on('download-progress', (p) => { updateState.progress = Math.round(p.percent || 0); sendUpdate(); });
-  updater.on('update-downloaded', (i) => { Object.assign(updateState, { status: 'ready', version: i.version, progress: 100 }); sendUpdate(); });
+  updater.on('update-downloaded', (i) => {
+    Object.assign(updateState, { status: 'ready', version: i.version, progress: 100, notes: notesText(i.releaseNotes) });
+    // Notes gardées pour la fenêtre « Nouveautés » du prochain lancement.
+    try { fs.writeFileSync(path.join(app.getPath('userData'), 'update-notes.json'), JSON.stringify({ version: i.version, notes: updateState.notes })); } catch { /* facultatif */ }
+    sendUpdate();
+  });
   updater.on('error', (err) => { Object.assign(updateState, { status: 'error', error: String(err && err.message || err).slice(0, 200) }); sendUpdate(); });
-  const check = () => updater.checkForUpdates().catch(() => {});
-  setTimeout(check, 15000);
-  setInterval(check, 6 * 60 * 60 * 1000);
+  let lastCheck = 0;
+  const check = () => {
+    if (updateState.status === 'downloading' || updateState.status === 'ready') return;
+    lastCheck = Date.now();
+    updater.checkForUpdates().catch(() => {});
+  };
+  setTimeout(check, 10000);
+  setInterval(check, 60 * 60 * 1000);
+  // Retour sur Lumen (après un jeu, une autre appli…) : nouvelle vérification si la dernière date de plus de 20 min.
+  app.on('browser-window-focus', () => { if (Date.now() - lastCheck > 20 * 60 * 1000) check(); });
 }
+// Notes de version GitHub (HTML ou liste) → lignes de texte simples.
+function notesText(n) {
+  const raw = Array.isArray(n) ? n.map((x) => x && x.note).join('\n') : String(n || '');
+  return raw
+    .replace(/<\/(li|p|h\d)>/gi, '\n').replace(/<br\s*\/?>/gi, '\n').replace(/<h\d[^>]*>/gi, '## ')
+    .replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
+    .split('\n').map((l) => l.replace(/^\s*[-*]\s*/, '').replace(/\*\*/g, '').trim()).filter(Boolean).slice(0, 30);
+}
+ipcMain.handle('update:notes', () => {
+  try {
+    const d = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'update-notes.json'), 'utf8'));
+    return d.version === app.getVersion() ? d : null;
+  } catch { return null; }
+});
 app.whenReady().then(setupUpdater);
 ipcMain.handle('update:state', () => ({ ...updateState, current: app.getVersion(), packaged: app.isPackaged }));
 ipcMain.handle('update:check', async () => {
