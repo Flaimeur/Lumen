@@ -1559,7 +1559,7 @@
     const rc = rollCfg();
     if (systemId === undefined) systemId = rc.systemId || null;
     const pool = S.lib.systems.filter((x) => !x.apps && (!systemId || x.id === systemId)).flatMap((x) => x.games)
-      .filter((g) => g.cover && (rc.scope === 'all' || (rc.scope === 'missing' ? g.installed === false : g.installed !== false)) && (rc.nsfw || !g.adult));
+      .filter((g) => g.cover && (rc.scope === 'all' || (rc.scope === 'missing' ? g.installed === false : g.installed !== false)) && (rc.nsfw || !g.adult) && (rc.perfect !== false || !isPerfect(g)));
     // Options en haut de la roulette.
     const SCOPES = { installed: 'Installés', missing: 'À télécharger', all: 'Tous les jeux' };
     const reroll = async () => { await saveCfg(); closeOverlay(true); openRoll(rc.systemId || null); };
@@ -1567,6 +1567,7 @@
     const options = h('div', { class: 'roll-options' },
       opt(`📦 ${SCOPES[rc.scope] || SCOPES.installed}`, () => { const k = Object.keys(SCOPES); rc.scope = k[(k.indexOf(rc.scope) + 1) % k.length]; reroll(); }),
       opt(rc.nsfw ? '🔞 NSFW inclus' : '🚫 Sans NSFW', () => { rc.nsfw = !rc.nsfw; reroll(); }),
+      opt(rc.perfect === false ? '🏆 Sans les 100 %' : '🏆 100 % inclus', () => { rc.perfect = rc.perfect === false; reroll(); }),
       opt(`🎮 ${systemId ? (S.lib.systems.find((x) => x.id === systemId) || {}).name || 'Console' : 'Toutes les consoles'}`, () => openMenu('Roulette sur', [
         ['Toutes les consoles', () => { rc.systemId = null; reroll(); }],
         ...S.lib.systems.filter((x) => !x.apps).map((x) => [x.name, () => { rc.systemId = x.id; reroll(); }])])));
@@ -2917,6 +2918,7 @@
   // ---------- Succès (Steam en local, RetroAchievements en ligne) ----------
   // Chaque entrée : { key, path?, raId?, title, icon, total, unlocked, last, source } ; key sert à ouvrir la liste.
   const achInfo = (g) => (S.ach && S.ach.byPath && S.ach.byPath.get(g.path)) || null;
+  const isPerfect = (g) => { const a = achInfo(g); return !!(a && a.total && a.unlocked === a.total); };
   const fmtDay = (t) => new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
   const achFold = (x) => fold(String(x || '').replace(/~[^~]*~/g, ' ').replace(/\s*[([].*?[)\]]\s*/g, ' '));
 
