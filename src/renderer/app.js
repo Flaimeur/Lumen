@@ -1142,7 +1142,7 @@
     } else {
       tile.append(fallbackArt(g.name, sys && sys.color, sys && sys.short));
     }
-    if (isFav(g)) tile.append(starIcon());
+    if (isFav(g) && !myRating(g)) tile.append(starIcon());
     if (g.soundbite || g.video) tile.append(h('span', { class: 'badge-media' }, g.video ? '▶' : '♪'));
     if (g.source === 'romm' && !g.downloaded) tile.append(h('span', { class: 'badge-cloud', title: 'Sur ton serveur RomM' }, '☁'));
     if (g.appIcon) tile.classList.add('app-tile');
@@ -1150,7 +1150,7 @@
     if (g.source === 'app' && g.cover) tile.append(h('div', { class: 'app-name' }, g.name));
     const ai = achInfo(g);
     if (ai && ai.total && ai.unlocked === ai.total) tile.append(trophyIcon('on-tile'));
-    if (myRating(g)) tile.append(h('div', { class: 'tile-rating' }, '★ ' + myRating(g)));
+    if (myRating(g)) tile.append(h('div', { class: 'tile-rating' + (isFav(g) ? ' is-fav' : ''), title: isFav(g) ? 'Favori · ma note' : 'Ma note' }, h('b', {}, '★'), String(myRating(g))));
     if (g.installed === false) { tile.classList.add('not-installed'); tile.append(h('span', { class: 'badge-cloud badge-dl', title: 'Non installé' }, '⬇')); }
     tile._game = g;
     return focusable(tile, {

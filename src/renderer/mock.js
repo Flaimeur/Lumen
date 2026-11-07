@@ -61,7 +61,7 @@
     // Démo : du temps de jeu et des sessions pour la page Statistiques.
     playtime: Object.fromEntries(systems.slice(0, 5).flatMap((x, i) => x.games.slice(0, 3).map((g, j) => [g.path, (i * 3 + j + 1) * 5400 + j * 900]))),
     sessions: Array.from({ length: 40 }, (_, i) => ({ p: systems[i % 4].games[i % 3].path, t: Date.now() - i * 2.1 * 864e5, s: 1200 + ((i * 2731) % 9000) })),
-    ratings: { [systems[0].games[0].path]: 5, [systems[1].games[1].path]: 3 },
+    ratings: { [systems[0].games[0].path]: 5, [systems[0].games[2].path]: 4, [systems[1].games[1].path]: 3 },
   };
 
   window.LumenMock = {
