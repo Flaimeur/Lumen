@@ -812,7 +812,7 @@ body.wp-on:not(.wp-fixed) .bg-layer.on { opacity: 0.7; }
 .w-title { position: absolute; top: 12px; left: 18px; font-size: 11px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
 .w-big { font-size: 34px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .w-sub { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.w-clock .w-big { font-size: 44px; }
+.wg-clock .w-big { font-size: 44px; }
 .w-rank { display: flex; align-items: center; gap: 12px; }
 .w-rank b { color: var(--rc); }
 .widget .xp-bar { margin: 6px 0 0; height: 8px; }
@@ -853,7 +853,7 @@ body.wp-on .bg-shade { opacity: 0.3; }
 .ach-game.perfect { box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.5), 0 0 24px rgba(251, 191, 36, 0.12); }
 
 /* ---------- Widgets : lecture en cours, favoris ---------- */
-.w-nowplaying { min-height: 150px; }
+.wg-nowplaying { min-height: 150px; }
 .w-np { display: flex; align-items: center; gap: 12px; min-width: 0; margin-top: 14px; }
 .w-np-cover { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; flex: none; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45); }
 .w-np-cover.empty { display: grid; place-items: center; font-size: 26px; background: rgba(255, 255, 255, 0.08); }
@@ -900,7 +900,7 @@ body.wp-on .bg-shade { opacity: 0.3; }
 .w-title { position: static; font-size: 11px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
 .w-body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
 .w-big { font-size: 30px; }
-.w-clock .w-big { font-size: 48px; letter-spacing: -0.03em; line-height: 1; }
+.wg-clock .w-big { font-size: 48px; letter-spacing: -0.03em; line-height: 1; }
 .w-hint { font-size: 11px; color: var(--muted); opacity: 0.8; margin-top: 2px; }
 
 /* Lecture en cours */
@@ -962,7 +962,7 @@ body.wp-on .bg-shade { opacity: 0.3; }
 .widgets { grid-auto-rows: clamp(150px, 9.5vw, 210px); }
 .widget.wide { grid-column: span 2; }
 .w-big { font-size: clamp(30px, 2.3vw, 46px); }
-.w-clock .w-big { font-size: clamp(46px, 3.6vw, 76px); }
+.wg-clock .w-big { font-size: clamp(46px, 3.6vw, 76px); }
 .w-np-cover, .w-surprise img { width: clamp(76px, 6.2vw, 128px); height: clamp(76px, 6.2vw, 128px); }
 .w-np-text b, .w-surprise-text b, .w-rank-text b { font-size: clamp(15px, 1.15vw, 21px); }
 .w-sub { font-size: clamp(13px, 0.85vw, 16px); }
@@ -987,8 +987,8 @@ body.home-clock #topbar .status { visibility: hidden; }
 .roll-options { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin: 6px 0 4px; }
 /* La pochette et la jaquette suivent la hauteur disponible du widget (plus de débordement en bas). */
 .w-body { overflow: hidden; }
-.w-np, .w-surprise { height: 100%; min-height: 0; }
-.w-np-cover, .w-surprise img { height: min(100%, clamp(76px, 6.2vw, 128px)); width: auto; aspect-ratio: 1; flex: none; }
+.w-np, .w-surprise { height: auto; min-height: 0; }
+.w-np-cover, .w-surprise img { width: clamp(70px, 5.4vw, 112px); height: clamp(70px, 5.4vw, 112px); flex: none; }
 
 /* ---------- Badge de plateforme (page Succès) ---------- */
 .ach-cover-wrap, .ach-icon-wrap { position: relative; flex: none; }

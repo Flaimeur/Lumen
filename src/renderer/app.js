@@ -1502,7 +1502,13 @@
   // ---------- Lecture en cours (Spotify, YouTube…) ----------
   const APP_NAMES = [[/spotify/i, 'Spotify'], [/chrome/i, 'Chrome'], [/msedge|edge/i, 'Edge'], [/firefox/i, 'Firefox'], [/opera/i, 'Opera'], [/brave/i, 'Brave'],
     [/deezer/i, 'Deezer'], [/vlc/i, 'VLC'], [/zunemusic|music\.ui/i, 'Lecteur multimédia'], [/discord/i, 'Discord'], [/apple/i, 'Apple Music'], [/tidal/i, 'Tidal']];
-  const appName = (id) => { const hit = APP_NAMES.find(([re]) => re.test(id || '')); return hit ? hit[1] : String(id || '').split(/[!\\.]/)[0] || 'Lecteur'; };
+  const appName = (id) => {
+    const hit = APP_NAMES.find(([re]) => re.test(id || ''));
+    if (hit) return hit[1];
+    const raw = String(id || '');
+    const part = raw.includes('!') ? raw.split('!').pop() : raw.split(/[\\/]/).pop().replace(/\.exe$/i, '');
+    return part.replace(/_[a-z0-9]{8,}$/i, '').replace(/^App$/i, 'Lecteur') || 'Lecteur';
+  };
   function mediaBody() {
     const m = S.media;
     if (!api.media) return [h('div', { class: 'w-big' }, '🎧'), h('div', { class: 'w-sub' }, 'Disponible dans l’application')];
@@ -1518,7 +1524,7 @@
         h('div', { class: 'w-np-ctrl' }, btn('⏮', 'prev'), btn(playing ? '⏸' : '▶', 'toggle', 'main'), btn('⏭', 'next'))))];
   }
   function refreshMediaWidget() {
-    const el = document.querySelector('.widget.w-nowplaying .w-body');
+    const el = document.querySelector('.widget.wg-nowplaying .w-body');
     if (!el) return;
     el.replaceChildren(...mediaBody());
   }
@@ -1604,7 +1610,7 @@
     const w = WIDGETS[id];
     let body;
     try { body = w.render(); } catch { body = [h('div', { class: 'w-sub' }, 'Indisponible')]; }
-    const card = focusable(h('div', { class: 'widget w-' + id + (homeCfg().wide[id] ? ' wide' : '') },
+    const card = focusable(h('div', { class: 'widget wg-' + id + (homeCfg().wide[id] ? ' wide' : '') },
       h('div', { class: 'w-head' }, h('span', { class: 'w-ico' }, WIDGET_ICONS[id] || '•'), h('span', { class: 'w-title' }, w.name)),
       h('div', { class: 'w-body' }, ...body)), {
       a: w.act || (() => openHomeEditor()),
@@ -1795,6 +1801,19 @@
     if (mode === 'year') list.sort((a, b) => (meta(a).year || 9999) - (meta(b).year || 9999));
     if (mode === 'count') list.sort((a, b) => b.games.length - a.games.length);
     return list;
+  }
+
+  async function renameSystem(s) {
+    const names = S.cfg.sysNames || (S.cfg.sysNames = {});
+    const v = await openPrompt({ title: 'Nom de la console', value: s.name, help: `Par exemple « Switch » au lieu de « Nintendo Switch ». Vide = nom d’origine${s.origName ? ' (' + s.origName + ')' : ''}.` });
+    if (v === null) return;
+    const short = await openPrompt({ title: 'Nom court (badge)', value: s.short, help: 'Le petit nom sur les jaquettes et les cartes : NS, 3DS, PS1… Vide = celui d’origine.' });
+    if (v.trim() || (short && short.trim())) names[s.id] = { name: v.trim() || undefined, short: short && short.trim() ? short.trim() : undefined };
+    else delete names[s.id];
+    await saveCfg();
+    applyLib(await api.scan({ romm: false }));
+    rerender();
+    toast('Console renommée');
   }
 
   function viewSystems() {
@@ -2452,6 +2471,7 @@
       if (s) {
         items.push(['🖼 Changer les images de la console…', () => { closeOverlay(true); openArtEditor(artTarget('platform', s)); }]);
         items.push([`Ouvrir ${s.name}`, () => { closeOverlay(true); go({ view: 'games', systemId: s.id }); }]);
+        items.push(['✎ Renommer la console…', () => { closeOverlay(true); renameSystem(s); }]);
       }
     }
     if (g) {
@@ -3224,6 +3244,10 @@
     }
     S.byPath = new Map();
     for (const s of S.lib.systems) for (const g of s.games) S.byPath.set(g.path, g);
+    for (const s of S.lib.systems) {
+      const n = (S.cfg.sysNames || {})[s.id];
+      if (n) { s.origName = s.origName || s.name; s.name = n.name || s.name; if (n.short) s.short = n.short; }
+    }
     applyArtOverrides();
     for (const [p, file] of Object.entries(S.cfg.customSounds || {})) {
       const g = S.byPath.get(p);
