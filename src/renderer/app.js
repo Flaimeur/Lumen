@@ -2619,7 +2619,7 @@
         extra.sub ? h('span', { class: 'mi-arrow' }, '›') : null), { a: fn, focus: extra.focus }));
     }
     const bar = opts.bar && opts.bar.length
-      ? h('div', { class: 'menu-bar' }, opts.bar.map(([icon, label, fn]) => focusable(h('div', { class: 'menu-chip', title: label }, h('span', { class: 'mc-icon' }, icon), h('span', { class: 'mc-label' }, label)), { a: fn })))
+      ? h('div', { class: 'menu-bar', style: `grid-template-columns: repeat(${opts.bar.length}, minmax(0, 1fr))` }, opts.bar.map(([icon, label, fn]) => focusable(h('div', { class: 'menu-chip', title: label }, h('span', { class: 'mc-icon' }, icon), h('span', { class: 'mc-label' }, label)), { a: fn })))
       : null;
     openOverlay(h('div', { class: 'modal menu' },
       opts.subtitle ? h('div', { class: 'menu-sub' }, opts.subtitle) : null,
@@ -2729,11 +2729,11 @@
     if (!g && !sysCard && !folder) items.push(['Bibliothèque…', () => openSubMenu('Bibliothèque', library, reopen), { icon: '📚', sub: true }]);
 
     const bar = [];
-    if (S.route.view !== 'search') bar.push(['🔍', 'Rechercher', run(() => openTab('search'))]);
-    bar.push(['🎲', 'Au hasard', run(() => openRoll(sysId || undefined))]);
+    if (S.route.view !== 'search') bar.push(['🔍', 'Chercher', run(() => openTab('search'))]);
+    bar.push(['🎲', 'Hasard', run(() => openRoll(sysId || undefined))]);
     if (S.route.view !== 'stats') bar.push(['📊', 'Stats', run(() => go({ view: 'stats' }))]);
     bar.push([S.cfg.muted ? '🔇' : '🔊', S.cfg.muted ? 'Son coupé' : 'Son', run(toggleMute)]);
-    bar.push(['⛶', 'Plein écran', run(() => api.toggleFullscreen())]);
+    bar.push(['⛶', 'Écran', run(() => api.toggleFullscreen())]);
     bar.push(['⚙', 'Réglages', run(() => openTab('settings'))]);
     bar.push(['⏻', 'Quitter', () => api.quit()]);
     openMenu(g ? g.name : sysCard ? ((S.lib.systems.find((x) => x.id === sysCard) || {}).name || 'Menu') : folder ? folderName(folder) : sysId ? ((S.lib.systems.find((x) => x.id === sysId) || {}).name || 'Menu') : 'Menu', items, 'menu', { subtitle, bar });
