@@ -250,7 +250,35 @@ function onGameEnded(gamePath, code, started) {
 // ---------- IPC ----------
 ipcMain.handle('config:get', () => loadConfig());
 ipcMain.handle('config:set', (_e, cfg) => { saveConfig(cfg); return cfg; });
-ipcMain.handle('systems', () => SYSTEMS);
+ipcMain.handle('systems', () => [...SYSTEMS, ...customSystems(loadConfig())]);
+
+// ---------- Consoles personnalisées ----------
+// cfg.customSystems = [{ id, name, short, color, dir, ext: ['iso', …], command }]
+function customSystems(cfg) {
+  return (cfg.customSystems || []).filter((c) => c && c.id && c.dir).map((c) => ({
+    id: c.id, name: c.name || 'Ma console', short: c.short || (c.name || 'MC').slice(0, 4), color: c.color || '#64748b',
+    folders: [], ext: (c.ext || []).map((e) => String(e).toLowerCase().replace(/^\./, '')).filter(Boolean), command: c.command || '{open}', dir: c.dir, custom: true,
+  }));
+}
+async function scanCustomSystem(cs) {
+  const { cleanName } = require('./scanner');
+  const games = [];
+  const walk = async (dir, depth) => {
+    let entries = [];
+    try { entries = await fs.promises.readdir(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) { if (depth < 3 && !/^(media|images|videos|saves?)$/i.test(e.name)) await walk(full, depth + 1); continue; }
+      const ext = path.extname(e.name).slice(1).toLowerCase();
+      if (cs.ext.length ? !cs.ext.includes(ext) : !ext) continue;
+      games.push({ path: full, system: cs.id, name: cleanName(path.parse(e.name).name), cover: null, background: null, desc: '', developer: '', publisher: '', genre: '', players: '', year: '', rating: null });
+      if (games.length > 5000) return;
+    }
+  };
+  await walk(cs.dir, 0);
+  games.sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }));
+  return { id: cs.id, name: cs.name, short: cs.short, color: cs.color, folder: cs.dir, custom: true, games };
+}
 
 ipcMain.handle('library:cached', () => {
   try { return JSON.parse(fs.readFileSync(libraryCachePath(), 'utf8')); } catch { return null; }
@@ -340,6 +368,11 @@ async function buildLibrary(cfg, opts = {}) {
   pcLaunchers = pc.launchers;
   lib.systems.push(...pc.systems);
   await ensureAppIcons(cfg);
+  // Consoles ajoutées par l'utilisateur (plateformes non prévues) : un dossier, des extensions, un émulateur.
+  for (const cs of customSystems(cfg)) {
+    const sysObj = await scanCustomSystem(cs);
+    if (sysObj.games.length) lib.systems.push(sysObj);
+  }
   const apps = appsSystem(cfg);
   if (apps) lib.systems.push(apps);
   if ((pc.systems.length || apps) && lib.error && !cfg.romsRoot) delete lib.error;
@@ -822,9 +855,9 @@ ipcMain.handle('game:launch', async (_e, game) => {
       return { ok: false, error: `Impossible de lancer le jeu : ${err.message}` };
     }
   }
-  const sys = SYSTEMS.find((s) => s.id === game?.system);
+  const sys = SYSTEMS.find((s) => s.id === game?.system) || customSystems(cfg).find((s) => s.id === game?.system);
   if (!sys) return { ok: false, error: 'Console inconnue.' };
-  if (!isInside(game.path, cfg.romsRoot) && !isInside(game.path, cfg.romm.downloadDir)) {
+  if (!isInside(game.path, cfg.romsRoot) && !isInside(game.path, cfg.romm.downloadDir) && !(sys.custom && isInside(game.path, sys.dir))) {
     return { ok: false, error: 'Ce fichier n’est ni dans ton dossier de ROMs ni dans les téléchargements RomM.' };
   }
   if (!fs.existsSync(game.path)) return { ok: false, error: 'Fichier introuvable. Rescanne la bibliothèque.' };

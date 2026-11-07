@@ -1471,14 +1471,14 @@
       const name = (musicList[musicIdx] || '').split(/[\\/]/).pop().replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ');
       return [h('div', { class: 'w-music' }, h('span', { class: 'w-eq' }, h('i'), h('i'), h('i')), h('b', {}, name)), h('div', { class: 'w-sub' }, 'A : morceau suivant')];
     }, act: () => { if (musicList.length) { nextTrack(); setTimeout(rerender, 100); } else openTab('settings'); } },
-    nowplaying: { name: 'Lecture en cours', render: () => mediaBody(), act: () => mediaCmd('toggle'), x: () => mediaCmd('next'), y: () => mediaCmd('prev') },
+    nowplaying: { name: 'Lecture en cours', render: () => mediaBody(), bg: () => (S.media && S.media.active && S.media.thumb) || null, act: () => mediaCmd('toggle'), x: () => mediaCmd('next'), y: () => mediaCmd('prev') },
     favorites: { name: 'Favoris', render: () => {
       const favs = (S.cfg.favorites || []).map((p) => S.byPath.get(p)).filter(Boolean);
       if (!favs.length) return [h('div', { class: 'w-big' }, '☆'), h('div', { class: 'w-sub' }, 'X sur un jeu pour l’ajouter')];
       return [h('div', { class: 'w-favs' }, favs.slice(0, 4).map((g) => g.cover ? h('img', { src: api.mediaUrl(g.cover), alt: '' }) : h('div', { class: 'w-fav-empty' }, g.name.slice(0, 2)))),
         h('div', { class: 'w-sub' }, plural(favs.length, 'favori', 'favoris'))];
     }, act: () => go({ view: 'folder', id: '★' }) },
-    surprise: { name: 'Jeu surprise', render: () => {
+    surprise: { name: 'Jeu surprise', bg: () => { const g = S.surprise && S.byPath.get(S.surprise); return g ? g.hero || g.background || g.cover : null; }, render: () => {
       const all = S.lib.systems.flatMap((x) => x.games).filter((g) => g.cover);
       if (!S.surprise || !S.byPath.has(S.surprise)) S.surprise = all.length ? all[Math.floor(Math.random() * all.length)].path : null;
       const g = S.surprise && S.byPath.get(S.surprise);
@@ -1524,9 +1524,17 @@
         h('div', { class: 'w-np-ctrl' }, btn('⏮', 'prev'), btn(playing ? '⏸' : '▶', 'toggle', 'main'), btn('⏭', 'next'))))];
   }
   function refreshMediaWidget() {
-    const el = document.querySelector('.widget.wg-nowplaying .w-body');
-    if (!el) return;
-    el.replaceChildren(...mediaBody());
+    const card = document.querySelector('.widget.wg-nowplaying');
+    if (!card) return;
+    const bg = card.querySelector('.w-bgimg img');
+    const thumb = S.media && S.media.active && S.media.thumb ? api.mediaUrl(S.media.thumb) : null;
+    if ((bg ? bg.getAttribute('src') : null) !== thumb) {
+      if (bg && thumb) bg.setAttribute('src', thumb);
+      else if (!bg && thumb) { card.classList.add('has-bg'); card.prepend(h('div', { class: 'w-bgimg' }, h('img', { src: thumb, alt: '' }))); }
+      else if (bg && !thumb) { bg.parentElement.remove(); card.classList.remove('has-bg'); }
+    }
+    const el = card.querySelector('.w-body');
+    if (el) el.replaceChildren(...mediaBody());
   }
   async function pollMedia() {
     if (!api.media || S.mediaBusy) return;
@@ -1610,7 +1618,10 @@
     const w = WIDGETS[id];
     let body;
     try { body = w.render(); } catch { body = [h('div', { class: 'w-sub' }, 'Indisponible')]; }
-    const card = focusable(h('div', { class: 'widget wg-' + id + (homeCfg().wide[id] ? ' wide' : '') },
+    let bgSrc = null;
+    try { bgSrc = w.bg ? w.bg() : null; } catch { bgSrc = null; }
+    const card = focusable(h('div', { class: 'widget wg-' + id + (homeCfg().wide[id] ? ' wide' : '') + (bgSrc ? ' has-bg' : '') },
+      bgSrc ? h('div', { class: 'w-bgimg' }, h('img', { src: api.mediaUrl(bgSrc), alt: '' })) : null,
       h('div', { class: 'w-head' }, h('span', { class: 'w-ico' }, WIDGET_ICONS[id] || '•'), h('span', { class: 'w-title' }, w.name)),
       h('div', { class: 'w-body' }, ...body)), {
       a: w.act || (() => openHomeEditor()),
@@ -1803,6 +1814,53 @@
     return list;
   }
 
+  function addSystemCard() {
+    return focusable(h('div', { class: 'syscard add-sys' }, h('div', { class: 'folder-plus' }, '＋'), h('div', { class: 'sys-name' }, 'Ajouter une console', h('span', { class: 'sys-meta' }, 'PS3, Xbox, Amiga, DOS…'))), {
+      a: () => addCustomSystem(),
+      focus: () => { setTitle('Ajouter une console', 'Une plateforme que Lumen ne connaît pas'); setHints('action'); setBackground(null); },
+    });
+  }
+
+  // Assistant : nom, dossier des jeux, extensions, émulateur.
+  async function addCustomSystem(existing) {
+    const c = existing ? { ...existing } : { id: 'custom-' + Date.now().toString(36), color: ACCENTS[Math.floor(Math.random() * ACCENTS.length)] };
+    const name = await openPrompt({ title: 'Nom de la console', value: c.name || '', help: 'Par exemple PlayStation 3, Xbox 360, Amiga, MS-DOS…' });
+    if (name === null || !name.trim()) return;
+    c.name = name.trim();
+    const short = await openPrompt({ title: 'Nom court', value: c.short || c.name.replace(/[^A-Za-z0-9 ]/g, '').split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 4) || c.name.slice(0, 4), help: 'Le badge sur les jaquettes : PS3, X360, AMI…' });
+    if (short === null) return;
+    c.short = short.trim() || c.name.slice(0, 4);
+    const dir = await api.pickFolder(`Dossier des jeux · ${c.name}`, c.dir);
+    if (!dir) { if (!existing) return; } else c.dir = dir;
+    const ext = await openPrompt({ title: 'Extensions des jeux', value: (c.ext || []).join(', '), help: 'Séparées par des virgules : iso, chd, pkg, adf, exe… Vide = tous les fichiers.' });
+    if (ext === null) return;
+    c.ext = ext.split(/[,\s;]+/).map((x) => x.trim().replace(/^\./, '').toLowerCase()).filter(Boolean);
+    const exe = await api.pickFile(`Émulateur pour ${c.name} (Annuler = ouvrir avec Windows)`, '');
+    if (exe) {
+      const args = await openPrompt({ title: 'Options de lancement', value: c.args || '"{rom}"', help: 'Ce qui suit l’émulateur. {rom} = le jeu. Exemples : "{rom}" · -f "{rom}" · -L "C:\\cores\\core.dll" "{rom}"' });
+      if (args === null) return;
+      c.args = args.trim() || '"{rom}"';
+      c.command = `"${exe}" ${c.args}`;
+    } else if (!c.command) c.command = '{open}';
+    const list = (S.cfg.customSystems || (S.cfg.customSystems = [])).filter((x) => x.id !== c.id);
+    list.push(c);
+    S.cfg.customSystems = list;
+    await saveCfg();
+    S.defs = await api.systems();
+    applyLib(await api.scan({ romm: false }));
+    const n = ((S.lib.systems.find((x) => x.id === c.id) || {}).games || []).length;
+    toast(n ? `${c.name} : ${plural(n, 'jeu trouvé', 'jeux trouvés')}` : `${c.name} ajoutée, mais aucun jeu trouvé avec ces extensions`, n ? 'info' : 'error', 5000);
+    rerender();
+  }
+  async function removeCustomSystem(id) {
+    S.cfg.customSystems = (S.cfg.customSystems || []).filter((x) => x.id !== id);
+    await saveCfg();
+    S.defs = await api.systems();
+    applyLib(await api.scan({ romm: false }));
+    toast('Console retirée (tes fichiers ne sont pas touchés)');
+    rerender();
+  }
+
   async function renameSystem(s) {
     const names = S.cfg.sysNames || (S.cfg.sysNames = {});
     const v = await openPrompt({ title: 'Nom de la console', value: s.name, help: `Par exemple « Switch » au lieu de « Nintendo Switch ». Vide = nom d’origine${s.origName ? ' (' + s.origName + ')' : ''}.` });
@@ -1826,7 +1884,7 @@
           a: () => { const i = SYS_SORTS.findIndex(([id]) => id === (S.cfg.sysSort || 'default')); S.cfg.sysSort = SYS_SORTS[(i + 1) % SYS_SORTS.length][0]; saveCfg(); S.keepAnim = true; render(indexOfFocus()); },
           focus: () => { setTitle('Trier les consoles', ''); setHints('action'); },
         })),
-      h('div', { class: 'grid systems' }, sortedSystems().map(systemCard)));
+      h('div', { class: 'grid systems' }, sortedSystems().map(systemCard), addSystemCard()));
   }
 
   function sortChip() {
@@ -2471,7 +2529,11 @@
       if (s) {
         items.push(['🖼 Changer les images de la console…', () => { closeOverlay(true); openArtEditor(artTarget('platform', s)); }]);
         items.push([`Ouvrir ${s.name}`, () => { closeOverlay(true); go({ view: 'games', systemId: s.id }); }]);
-        items.push(['✎ Renommer la console…', () => { closeOverlay(true); renameSystem(s); }]);
+        const custom = (S.cfg.customSystems || []).find((x) => x.id === s.id);
+        if (custom) {
+          items.push(['✎ Modifier la console (nom, dossier, émulateur)…', () => { closeOverlay(true); addCustomSystem(custom); }]);
+          items.push(['Retirer cette console', () => { closeOverlay(true); removeCustomSystem(s.id); }]);
+        } else items.push(['✎ Renommer la console…', () => { closeOverlay(true); renameSystem(s); }]);
       }
     }
     if (g) {
