@@ -989,3 +989,29 @@ body.home-clock #topbar .status { visibility: hidden; }
 .w-body { overflow: hidden; }
 .w-np, .w-surprise { height: 100%; min-height: 0; }
 .w-np-cover, .w-surprise img { height: min(100%, clamp(76px, 6.2vw, 128px)); width: auto; aspect-ratio: 1; flex: none; }
+
+/* ---------- Badge de plateforme (page Succès) ---------- */
+.ach-cover-wrap, .ach-icon-wrap { position: relative; flex: none; }
+.src-badge {
+  position: absolute; right: -6px; bottom: -6px; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+  box-shadow: 0 0 0 2px var(--panel-strong, #0b0e17), 0 3px 8px rgba(0, 0, 0, 0.5); font-size: 9px; letter-spacing: -0.02em;
+}
+.src-badge svg { width: 15px; height: 15px; }
+.src-badge.steam { background: linear-gradient(135deg, #1b2838, #2a475e); color: #c7d5e0; }
+.src-badge.ra { background: linear-gradient(135deg, #fcd34d, #d97706); color: #1a1300; }
+.src-badge.inline { position: static; display: inline-grid; width: 18px; height: 18px; vertical-align: -4px; box-shadow: none; }
+.src-badge.inline svg { width: 12px; height: 12px; }
+
+/* ---------- Fenêtre « Progression » ---------- */
+.progress-modal { max-width: 760px; }
+.prog-head { display: flex; align-items: center; gap: 18px; margin: 6px 0 14px; }
+.prog-head h2 { margin: 0 0 4px; color: var(--rc); }
+.prog-head .xp-bar { height: 12px; margin: 6px 0; }
+.prog-ranks { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; margin: 8px 0 12px; }
+.prog-rank { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 16px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--line); opacity: 0.55; }
+.prog-rank .rank-emblem { width: 44px; height: 44px; }
+.prog-rank .rank-lvl { font-size: 15px; }
+.prog-rank.reached { opacity: 1; }
+.prog-rank.current { border-color: var(--rc); box-shadow: 0 0 18px color-mix(in srgb, var(--rc) 35%, transparent); }
+.prog-rank b { color: var(--rc); }
+.prog-rank .ach-text span, .prog-rank .ach-text b { white-space: normal; overflow: visible; }

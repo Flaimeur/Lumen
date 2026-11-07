@@ -2773,6 +2773,16 @@
   const fmtDay = (t) => new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
   const achFold = (x) => fold(String(x || '').replace(/~[^~]*~/g, ' ').replace(/\s*[([].*?[)\]]\s*/g, ' '));
 
+  // Petit badge de plateforme sur la jaquette : Steam (bleu), RetroAchievements (doré).
+  function sourceBadge(source, extra = '') {
+    const ra = /retro/i.test(source || '');
+    const el = h('span', { class: `src-badge ${ra ? 'ra' : 'steam'} ${extra}`, title: source || '' });
+    el.innerHTML = ra
+      ? '<b>RA</b>'
+      : '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a10 10 0 0 0-9.96 9.04l5.35 2.21a2.83 2.83 0 0 1 1.6-.49l2.38-3.45v-.05a3.77 3.77 0 1 1 3.77 3.77h-.09l-3.4 2.43a2.84 2.84 0 0 1-5.62.6L2.2 14.5A10 10 0 1 0 12 2Zm-4.7 15.17-1.23-.51a2.13 2.13 0 1 0 1.16-2.9l1.27.53a1.57 1.57 0 1 1-1.2 2.88Zm9.2-7.47a2.51 2.51 0 1 0-2.51 2.51 2.51 2.51 0 0 0 2.51-2.51Zm-4.4 0a1.89 1.89 0 1 1 1.89 1.89 1.89 1.89 0 0 1-1.89-1.89Z"/></svg>';
+    return el;
+  }
+
   async function loadAchievements(force) {
     if (S.achLoading) return;
     if (!force && S.ach && Date.now() - S.ach.at < 60000) return;
@@ -2840,6 +2850,44 @@
       h('span', { class: 'rank-lvl' }, String(st.lvl)));
   }
 
+  // XP totale nécessaire pour atteindre un niveau (niveau 1 = 0 XP).
+  const xpForLevel = (lvl) => { let t = 0; for (let l = 1; l < lvl; l++) t += 100 + 25 * (l - 1); return t; };
+  const fmtXp = (n) => n.toLocaleString('fr-FR');
+
+  // Fenêtre « Progression » : prochain niveau, rangs à venir, détail de l'XP.
+  function openProgress(st) {
+    const toNext = st.need - st.into;
+    const achNeeded = Math.ceil(toNext / XP_PER_ACH);
+    const ranks = RANKS.map((r) => {
+      const reached = st.lvl >= r.min;
+      const missing = Math.max(0, xpForLevel(r.min) - st.xp);
+      return h('div', { class: 'prog-rank' + (reached ? ' reached' : '') + (r === st.rank ? ' current' : ''), '--rc': r.color },
+        h('div', { class: 'rank-emblem' }, h('span', { class: 'rank-lvl' }, String(r.min))),
+        h('div', { class: 'ach-text' },
+          h('b', {}, r.name + (r === st.rank ? ' · ton rang' : '')),
+          h('span', { class: 'muted small' }, reached ? `Atteint (niveau ${r.min})`
+            : `Niveau ${r.min} · encore ${fmtXp(missing)} XP (≈ ${fmtXp(Math.ceil(missing / XP_PER_ACH))} succès)`)));
+    });
+    const pct = Math.round((st.into / st.need) * 100);
+    openOverlay(h('div', { class: 'modal progress-modal', '--rc': st.rank.color },
+      h('div', { class: 'eyebrow' }, 'Progression'),
+      h('div', { class: 'prog-head' }, rankEmblem(st, 'big'),
+        h('div', { class: 'ach-text' },
+          h('h2', {}, `Niveau ${st.lvl} · Rang ${st.rank.name}`),
+          h('div', { class: 'xp-bar' }, h('div', { class: 'xp-fill', style: `width:${pct}%` })),
+          h('span', { class: 'muted' }, `${fmtXp(st.into)} / ${fmtXp(st.need)} XP · niveau ${st.lvl + 1} dans ${fmtXp(toNext)} XP (≈ ${achNeeded} succès, ou 1 jeu à 100 %${toNext > XP_PERFECT ? ' et ' + Math.ceil((toNext - XP_PERFECT) / XP_PER_ACH) + ' succès' : ''})`))),
+      h('div', { class: 'facts' },
+        h('div', { class: 'fact' }, h('span', {}, 'XP totale'), h('b', {}, fmtXp(st.xp))),
+        h('div', { class: 'fact' }, h('span', {}, 'Succès'), h('b', {}, `${fmtXp(st.unlocked)} × ${XP_PER_ACH} = ${fmtXp(st.unlocked * XP_PER_ACH)} XP`)),
+        h('div', { class: 'fact' }, h('span', {}, 'Jeux à 100 %'), h('b', {}, `${st.perfect} × ${XP_PERFECT} = ${fmtXp(st.perfect * XP_PERFECT)} XP`)),
+        st.next ? h('div', { class: 'fact' }, h('span', {}, 'Prochain rang'), h('b', {}, `${st.next.name} au niveau ${st.next.min}`)) : null),
+      h('div', { class: 'set-section' }, 'Les rangs'),
+      h('div', { class: 'prog-ranks' }, ranks),
+      h('p', { class: 'muted small' }, `${XP_PER_ACH} XP par succès débloqué, ${XP_PERFECT} XP par jeu terminé à 100 %. Chaque niveau demande 25 XP de plus que le précédent.`),
+      h('div', { class: 'actions' }, actionButton('Fermer', () => closeOverlay(), true))));
+    sfx('select');
+  }
+
   function profileCard(st) {
     const pct = Math.round((st.into / st.need) * 100);
     return focusable(h('div', { class: 'ach-profile', '--rc': st.rank.color },
@@ -2851,7 +2899,7 @@
       h('div', { class: 'ach-profile-stats' },
         h('div', {}, h('b', {}, String(st.unlocked)), h('span', { class: 'muted small' }, 'succès')),
         h('div', {}, h('b', { class: 'gg-text' }, trophyIcon('inline small'), String(st.perfect)), h('span', { class: 'muted small' }, 'jeux à 100 %')))), {
-      a: () => toast(`${XP_PER_ACH} XP par succès · ${XP_PERFECT} XP par jeu terminé à 100 %`, 'info', 4000),
+      a: () => openProgress(st),
       focus: () => { setTitle(`Niveau ${st.lvl}`, `Rang ${st.rank.name}`); setHints('action'); },
     });
   }
@@ -2887,16 +2935,19 @@
       h('div', { class: 'vh-badge ach-badge' }, icon('achievements')),
       h('div', { class: 'vh-text' }, h('h1', {}, 'Succès'), h('p', { class: 'muted' }, sub)), ...chips);
     if (!S.ach) return h('div', {}, head('Lecture des succès…'));
-    const games = S.ach.games;
+    // Filtre par plateforme (Steam, RetroAchievements).
+    const SOURCES = [...new Set(S.ach.games.map((x) => x.source))];
+    const src = S.achSource && SOURCES.includes(S.achSource) ? S.achSource : null;
+    const games = S.ach.games.filter((x) => !src || x.source === src);
     const started = games.filter((x) => x.unlocked);
     const total = games.reduce((n, x) => n + x.unlocked, 0);
     const perfect = started.filter((x) => x.unlocked === x.total).length;
     const shown = [...(S.achAll ? games : started)].sort((a, b) => (b.last - a.last) || (b.unlocked / b.total - a.unlocked / a.total));
 
-    const recent = S.ach.recent.slice(0, 16).map((r) => {
+    const recent = S.ach.recent.filter((r) => !src || r.source === src).slice(0, 16).map((r) => {
       const g = achGame(r);
       return focusable(h('div', { class: 'ach-card' },
-        r.icon ? h('img', { class: 'ach-icon', src: api.mediaUrl(r.icon), alt: '', loading: 'lazy' }) : h('div', { class: 'ach-icon' }),
+        h('div', { class: 'ach-icon-wrap' }, r.icon ? h('img', { class: 'ach-icon', src: api.mediaUrl(r.icon), alt: '', loading: 'lazy' }) : h('div', { class: 'ach-icon' }), sourceBadge(r.source)),
         h('div', { class: 'ach-text' }, h('b', {}, r.name), h('span', { class: 'muted' }, g.name), h('span', { class: 'muted small' }, `${r.source} · ${fmtDay(r.time)}`))), {
         a: () => openAchievements(r.key),
         focus: () => { setTitle(r.name, g.name); setBackground(g.background || g.cover, null); setHints('action'); },
@@ -2907,7 +2958,7 @@
       const g = achGame(x);
       return focusable(h('div', { class: 'ach-game' + (x.unlocked === x.total ? ' perfect' : '') },
         x.unlocked === x.total ? trophyIcon('on-card') : null,
-        g.cover ? h('img', { class: 'ach-cover', src: api.mediaUrl(g.cover), alt: '', loading: 'lazy' }) : h('div', { class: 'ach-cover' }),
+        h('div', { class: 'ach-cover-wrap' }, g.cover ? h('img', { class: 'ach-cover', src: api.mediaUrl(g.cover), alt: '', loading: 'lazy' }) : h('div', { class: 'ach-cover' }), sourceBadge(x.source)),
         h('div', { class: 'ach-text' },
           h('b', {}, g.name),
           progressBar(x.unlocked, x.total),
@@ -2931,7 +2982,10 @@
       focus: () => { setTitle('RetroAchievements', 'À connecter dans les Réglages'); setHints('action'); },
     }) : null;
     return h('div', {},
-      head(`${plural(total, 'succès débloqué', 'succès débloqués')} · ${plural(started.length, 'jeu commencé', 'jeux commencés')}${perfect ? ' · ' + plural(perfect, 'jeu à 100 %', 'jeux à 100 %') : ''}`, toggleAll, refresh, raChip),
+      head(`${src ? src + ' · ' : ''}${plural(total, 'succès débloqué', 'succès débloqués')} · ${plural(started.length, 'jeu commencé', 'jeux commencés')}${perfect ? ' · ' + plural(perfect, 'jeu à 100 %', 'jeux à 100 %') : ''}`, SOURCES.length > 1 || src ? focusable(h('div', { class: 'chip' + (src ? ' active' : '') }, src ? sourceBadge(src, 'inline') : '🎮', ' ', src || 'Toutes les plateformes'), {
+        a: () => { const list = [null, ...SOURCES]; S.achSource = list[(list.indexOf(src) + 1) % list.length]; S.keepAnim = true; render(0); },
+        focus: () => { setTitle('Plateforme', src || 'Toutes'); setHints('action'); },
+      }) : null, toggleAll, refresh, raChip),
       S.ach.errors.length ? h('p', { class: 'muted small error-text', style: 'margin: 0 10px 8px' }, S.ach.errors.join(' · ')) : null,
       profileCard(achStats(S.ach)),
       recent.length ? h('section', { class: 'shelf' }, h('div', { class: 'shelf-title' }, 'Débloqués récemment'), h('div', { class: 'row' }, recent)) : null,
