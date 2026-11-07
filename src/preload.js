@@ -10,6 +10,13 @@ contextBridge.exposeInMainWorld('lumen', {
   onLibraryChanged: (cb) => ipcRenderer.on('library:changed', () => cb()),
   onAchievementsChanged: (cb) => ipcRenderer.on('achievements:changed', () => cb()),
   testAchNotify: () => ipcRenderer.invoke('achnotify:test'),
+  capture: {
+    arm: (game) => ipcRenderer.invoke('capture:arm', game || null),
+    take: () => ipcRenderer.invoke('capture:take'),
+    list: (name) => ipcRenderer.invoke('capture:list', name),
+    open: (name) => ipcRenderer.invoke('capture:open', name || ''),
+    onTaken: (cb) => ipcRenderer.on('capture:taken', (_e, d) => cb(d)),
+  },
   romm: {
     status: () => ipcRenderer.invoke('romm:status'),
     setSecret: (kind, value) => ipcRenderer.invoke('romm:setSecret', kind, value),

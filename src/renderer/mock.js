@@ -123,6 +123,7 @@
       return !!document.fullscreenElement;
     },
     onGameExit: () => {},
+    capture: { arm: async () => true, take: async () => ({ ok: true }), list: async (name) => (/Ember|Echo/.test(name) ? [{ path: 'demo-cover', time: Date.now() - 36e5 }, { path: 'demo-cover', time: Date.now() - 864e5 }] : []), open: async () => '', onTaken: () => {} },
     // Mises à jour (démo) : window.__lumenUpdate({ status: 'ready', version: '9.9.9', notes: [...] }) simule une version prête.
     update: { state: async () => ({ status: 'uptodate', current: '0.19.0', packaged: false }), check: async () => ({ status: 'dev' }), install: async () => true, notes: async () => null, onState: (cb) => { window.__lumenUpdate = (st) => cb({ current: '0.19.0', ...st }); } },
     _thumbCb: null,

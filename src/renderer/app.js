@@ -2328,6 +2328,12 @@
       row('Bannière pendant le jeu', toggle(c.achNotify !== false), () => { c.achNotify = c.achNotify === false; saveCfg(); rerender(); },
         'Affiche « Succès débloqué » par-dessus le jeu (Steam, RetroAchievements). Marche en plein écran fenêtré / sans bordure.');
       row('Voir un exemple', 'Afficher', () => api.testAchNotify());
+      if (api.capture) {
+        section('Captures d’écran en jeu');
+        row('Clavier : Ctrl + Maj + S', toggle(c.captureKey !== false), () => { c.captureKey = c.captureKey === false; saveCfg(); rerender(); }, 'Capture l’écran pendant un jeu lancé depuis Lumen.');
+        row('Manette : Select + R1', toggle(c.capturePad !== false), () => { c.capturePad = c.capturePad === false; saveCfg(); rerender(); }, 'Même chose à la manette (Share + R1 sur PlayStation, Vue + RB sur Xbox).');
+        row('Dossier des captures', 'Ouvrir', () => api.capture.open(''), 'Images › Lumen › un dossier par jeu. Elles apparaissent aussi dans la fiche de chaque jeu.');
+      }
     }
     if (api.ra) {
       const ra = c.retroachievements || (c.retroachievements = { username: '' });
@@ -2634,8 +2640,70 @@
         h('div', { class: 'actions' }, actionButton(g.installed === false ? '⬇ Installer' : '▶ Jouer', () => { closeOverlay(true); launch(g); }, true), favBtn,
           achInfo(g) ? actionButton(`🏆 Succès ${achInfo(g).unlocked} / ${achInfo(g).total}`, () => openAchievements(g)) : null,
           actionButton('⋯ Plus', () => { closeOverlay(true); const el = [...document.querySelectorAll('.tile')].find((t) => t._game === g); if (el) setFocus(el, { silent: true }); S.menuGame = g; openQuickMenu(); })),
+        capturesStrip(g),
         h('div', { class: 'file muted' }, g.source === 'romm' && !g.downloaded ? `RomM · ${g.rommFile}` : g.target || g.path))));
     sfx('select');
+  }
+
+  // ---------- Captures d'écran en jeu ----------
+  // Au lancement : Ctrl+Maj+S (raccourci global) et Select + R1 à la manette capturent l'écran pour ce jeu.
+  let captureWatch = 0;
+  function armCapture(g) {
+    if (!api.capture) return;
+    api.capture.arm({ name: g.name, path: g.path });
+    S.captureFor = { g, at: Date.now() };
+    clearInterval(captureWatch);
+    let was = false;
+    captureWatch = setInterval(() => {
+      if (!S.captureFor) { clearInterval(captureWatch); return; }
+      if (!S.inGame && document.hasFocus()) { was = false; return; }
+      const pads = Input.getPads ? Input.getPads() : [];
+      const on = S.cfg.capturePad !== false && pads.some((p) => p.buttons[8] && p.buttons[5] && p.buttons[8].pressed && p.buttons[5].pressed);
+      if (on && !was) api.capture.take();
+      was = on;
+    }, 80);
+  }
+  function disarmCapture() {
+    S.captureFor = null;
+    clearInterval(captureWatch);
+    if (api.capture) api.capture.arm(null);
+  }
+  // Jeu PC ouvert par Windows : pas d'événement de fin ; on désarme quand on revient vraiment sur Lumen.
+  window.addEventListener('focus', () => {
+    if (S.captureFor && !S.inGame && Date.now() - S.captureFor.at > 8000) disarmCapture();
+  });
+  // Bandeau de vignettes dans la fiche du jeu (rempli dès que la liste arrive).
+  function capturesStrip(g) {
+    const box = h('div', { class: 'cap-strip', hidden: true });
+    if (!api.capture) return box;
+    api.capture.list(g.name).then((list) => {
+      if (!list.length || !box.isConnected) return;
+      box.hidden = false;
+      box.append(h('div', { class: 'cap-head' }, h('span', {}, `Captures · ${list.length}`)));
+      const row = h('div', { class: 'cap-row' });
+      list.slice(0, 8).forEach((c, i) => row.append(focusable(h('div', { class: 'cap-thumb' }, h('img', { src: api.mediaUrl(c.path), alt: '', loading: 'lazy' })), {
+        a: () => openCaptureViewer(g, list, i), focus: () => setHints('overlay'),
+      })));
+      if (list.length > 8) row.append(focusable(h('div', { class: 'cap-thumb more' }, `+${list.length - 8}`), { a: () => openCaptureViewer(g, list, 8) }));
+      box.append(row);
+    });
+    return box;
+  }
+  // Visionneuse : grande image, précédente / suivante, dossier.
+  function openCaptureViewer(g, list, i) {
+    const c = list[i];
+    if (!c) return;
+    const when = new Date(c.time).toLocaleString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const go = (j) => { closeOverlay(true); openCaptureViewer(g, list, (j + list.length) % list.length); };
+    openOverlay(h('div', { class: 'modal cap-viewer' },
+      h('img', { class: 'cap-big', src: api.mediaUrl(c.path), alt: '' }),
+      h('div', { class: 'cap-bar' },
+        h('div', { class: 'cap-info' }, h('b', {}, g.name), h('span', { class: 'muted' }, `${when} · ${i + 1} / ${list.length}`)),
+        h('div', { class: 'actions' },
+          list.length > 1 ? actionButton('‹ Précédente', () => go(i - 1)) : null,
+          list.length > 1 ? actionButton('Suivante', () => go(i + 1)) : null,
+          actionButton('📁 Ouvrir le dossier', () => api.capture.open(g.name)),
+          actionButton('Fermer', () => { closeOverlay(true); openDetails(g); })))));
   }
 
   // Menu : une liste courte d'actions ; { section } = titre de groupe ; opts.bar = rangée d'icônes en bas.
@@ -2699,6 +2767,7 @@
       if (g.source === 'app') items.push(...appMenuItems(g.path.slice(4)));
       else items.push(['Détails', run(() => openDetails(g)), { icon: 'ℹ' }]);
       if (achInfo(g) || (/^steam:/.test(g.path) && api.achievements)) items.push(['Succès', run(() => openAchievements(g)), { icon: '🏆' }]);
+      if (api.capture) items.push(['Mes captures', run(async () => { const l = await api.capture.list(g.name); if (l.length) openCaptureViewer(g, l, 0); else toast('Pas encore de capture : Ctrl+Maj+S ou Select + R1 pendant le jeu'); }), { icon: '🖼' }]);
       // Tout le reste : dans « Personnaliser… ».
       const custom = [];
       custom.push(['Changer les images', run(() => openArtEditor(artTarget('game', g))), { icon: '🖼' }]);
@@ -3831,6 +3900,7 @@
     try { res = await api.launch(g); } catch (err) { res = { ok: false, error: err.message }; }
     S.launching = false;
     if (!res.ok) { fx.close(); toast(res.error, 'error', 6000); return; }
+    armCapture(g);
     S.cfg.recent = [g.path, ...S.cfg.recent.filter((p) => p !== g.path)].slice(0, 30);
     S.cfg.lastPlayed = S.cfg.lastPlayed || {};
     S.cfg.lastPlayed[g.path] = Date.now();
@@ -3915,6 +3985,7 @@
     }
     if (!S.overlay && (S.route.view === 'home' || S.dirty)) { S.dirty = false; rerender(); }
     if (S.updatePending) { S.updatePending = false; setTimeout(() => offerUpdate(), 1500); }
+    disarmCapture();
   }
 
   function applyCfg() {

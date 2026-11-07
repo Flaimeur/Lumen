@@ -8,7 +8,8 @@ let busy = false;
 
 const esc = (s) => String(s || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-function page({ game, name, desc, icon, source, accent }) {
+function page({ game, name, desc, icon, source, accent, kicker, kind }) {
+  const ring = kind === 'capture' ? (accent || '#5eead4') : 'rgba(250,204,21,.6)';
   // L'image couvre le trophée ; si elle ne charge pas, le trophée reste visible (pas de JavaScript dans la bannière).
   const img = `<div class="ph"${icon ? ` style="background-image:url('${esc(icon).replace(/'/g, '%27')}');font-size:0"` : ''}>🏆</div>`;
   return `<!doctype html><html><head><meta charset="utf-8"><style>
@@ -18,7 +19,7 @@ function page({ game, name, desc, icon, source, accent }) {
     box-shadow:0 12px 34px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.08);
     animation:in .55s cubic-bezier(.2,1.3,.4,1) both, out .4s ease-in 5.6s forwards}
   .n::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:4px;border-radius:0 4px 4px 0;background:${esc(accent || '#5eead4')}}
-  img,.ph{width:62px;height:62px;border-radius:12px;object-fit:cover;flex:none;box-shadow:0 0 0 2px rgba(250,204,21,.6),0 0 22px rgba(250,204,21,.35)}
+  img,.ph{width:62px;height:62px;border-radius:12px;object-fit:cover;flex:none;box-shadow:0 0 0 2px ${esc(ring)},0 0 22px rgba(0,0,0,.35)}
   .ph{display:grid;place-items:center;font-size:30px;background:rgba(250,204,21,.15) center/cover no-repeat}
   .t{min-width:0;display:flex;flex-direction:column;gap:2px}
   .k{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#facc15}
@@ -27,7 +28,7 @@ function page({ game, name, desc, icon, source, accent }) {
   .g{font-size:11px;color:rgba(255,255,255,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   @keyframes in{from{opacity:0;transform:translateX(40px) scale(.96)}to{opacity:1;transform:none}}
   @keyframes out{to{opacity:0;transform:translateX(30px)}}
-  </style></head><body><div class="n">${img}<div class="t"><div class="k">🏆 Succès débloqué · ${esc(source)}</div>
+  </style></head><body><div class="n">${img}<div class="t"><div class="k"${kind === 'capture' ? ` style="color:${esc(accent || '#5eead4')}"` : ''}>${esc(kicker || '🏆 Succès débloqué · ' + source)}</div>
   <div class="a">${esc(name)}</div>${desc ? `<div class="d">${esc(desc)}</div>` : ''}<div class="g">${esc(game)}</div></div></div></body></html>`;
 }
 

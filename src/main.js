@@ -542,6 +542,34 @@ function stopRaWatch() { if (raWatch) clearInterval(raWatch); raWatch = null; }
 // Aperçu depuis les Réglages.
 ipcMain.handle('achnotify:test', () => { achNotify({ game: 'Lumen', name: 'Premier pas', desc: 'Voici à quoi ressemble la bannière pendant un jeu.', icon: null, source: 'Test', accent: loadConfig().accent }); return true; });
 
+// ---------- Captures d'écran en jeu ----------
+// Le rendu « arme » la capture au lancement d'un jeu (nom du jeu) ; Ctrl+Maj+S capture tant qu'elle est armée.
+const capture = require('./capture');
+const CAPTURE_SHORTCUT = 'CommandOrControl+Shift+S';
+let captureGame = null;
+let captureBusy = false;
+async function doCapture() {
+  if (!captureGame || captureBusy) return { ok: false };
+  captureBusy = true;
+  try {
+    const r = await capture.take(captureGame.name);
+    achNotify({ kind: 'capture', kicker: '📸 Capture enregistrée', name: captureGame.name, desc: 'Images › Lumen › ' + path.basename(path.dirname(r.file)), icon: r.thumb, accent: loadConfig().accent, game: '' });
+    if (win && !win.isDestroyed()) win.webContents.send('capture:taken', { path: captureGame.path, file: r.file });
+    return { ok: true, file: r.file };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  } finally { setTimeout(() => { captureBusy = false; }, 800); }
+}
+ipcMain.handle('capture:arm', (_e, game) => {
+  captureGame = game && game.name ? { name: String(game.name), path: String(game.path || '') } : null;
+  try { globalShortcut.unregister(CAPTURE_SHORTCUT); } catch { /* pas enregistré */ }
+  if (captureGame && loadConfig().captureKey !== false) { try { globalShortcut.register(CAPTURE_SHORTCUT, () => { doCapture(); }); } catch { /* raccourci pris */ } }
+  return true;
+});
+ipcMain.handle('capture:take', () => doCapture());
+ipcMain.handle('capture:list', (_e, name) => capture.list(String(name || '')));
+ipcMain.handle('capture:open', (_e, name) => { const d = name ? capture.gameDir(String(name)) : capture.root(); fs.mkdirSync(d, { recursive: true }); return shell.openPath(d); });
+
 // ---------- RetroAchievements (pseudo + clé Web API de l'utilisateur) ----------
 const raKeyPath = () => path.join(app.getPath('userData'), 'retroachievements-key.bin');
 function readRaKey() {
