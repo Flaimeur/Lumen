@@ -1188,8 +1188,8 @@
   }
   function sortGamesBy(games) {
     const mode = S.cfg.sort || 'name';
-    if (mode === 'name') return games;
     const list = [...games];
+    if (mode === 'name') return list.sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base', numeric: true }));
     const seen = S.cfg.firstSeen || {};
     if (mode === 'added') list.sort((a, b) => (seen[b.path] || 0) - (seen[a.path] || 0) || a.name.localeCompare(b.name));
     const prog = (g) => { const a = achInfo(g); return a && a.total ? a.unlocked / a.total : -1; };
@@ -1917,7 +1917,7 @@
 
   function sortChip() {
     return focusable(h('div', { class: 'chip' }, '⇅ ', sortLabel()), {
-      a: () => cycleSort(),
+      a: () => openSortMenu(null),
       focus: () => { setTitle('Trier par', sortLabel()); setHints('action'); },
     });
   }
@@ -1999,7 +1999,8 @@
     const color = folderColor(id);
     const head = h('div', { class: 'view-head' },
       h('div', { class: 'vh-folder', '--fc': color }, h('span', {}, id === '★' ? '★' : (id[0] || '?').toUpperCase())),
-      h('div', { class: 'vh-text' }, h('h1', {}, folderName(id)), h('p', { class: 'muted' }, plural(games.length, 'jeu', 'jeux'))));
+      h('div', { class: 'vh-text' }, h('h1', {}, folderName(id)), h('p', { class: 'muted' }, plural(games.length, 'jeu', 'jeux'))),
+      games.length > 1 ? sortChip() : null);
     if (!games.length) {
       return h('div', {}, head, h('div', { class: 'empty' },
         h('h2', {}, 'Dossier vide'),
@@ -2825,7 +2826,7 @@
   }
   function openSortMenu(back) {
     const cur = S.cfg.sort || 'name';
-    openSubMenu('Trier par', [
+    (back ? (t, it) => openSubMenu(t, it, back) : (t, it) => openMenu(t, it))('Trier par', [
       ...SORTS.map((o) => [o.label, () => { closeOverlay(true); setSort(o.id); }, { icon: o.id === cur ? '✓' : '' }]),
       [S.cfg.sortDesc ? 'Ordre inversé : oui' : 'Ordre inversé : non', () => { closeOverlay(true); S.cfg.sortDesc = !S.cfg.sortDesc; setSort(cur); }, { icon: '⇵' }],
     ], back);
