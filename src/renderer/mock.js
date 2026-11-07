@@ -84,7 +84,7 @@
         { name: 'Secret', desc: '', hidden: true, unlocked: false, time: 0 },
         { name: 'Maître', desc: 'Tout finir.', unlocked: false, time: 0 }] }),
     },
-    scan: async () => ({ systems }),
+    scan: async () => ({ systems, collectionArt: { RPG: { icon: 'demo-cover' } } }),
     cachedLibrary: async () => null,
     romm: {
       _cb: null,

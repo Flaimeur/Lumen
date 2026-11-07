@@ -1015,3 +1015,14 @@ body.home-clock #topbar .status { visibility: hidden; }
 .prog-rank.current { border-color: var(--rc); box-shadow: 0 0 18px color-mix(in srgb, var(--rc) 35%, transparent); }
 .prog-rank b { color: var(--rc); }
 .prog-rank .ach-text span, .prog-rank .ach-text b { white-space: normal; overflow: visible; }
+
+/* Icône de dossier : un « autocollant » carré posé devant le dossier, entièrement visible. */
+.folder.has-icon .folder-icon {
+  z-index: 2; top: 14%; width: 50%; border-radius: 20%;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.85), 0 10px 24px rgba(0, 0, 0, 0.5);
+  rotate: -4deg; transition: translate 0.35s var(--spring), rotate 0.35s var(--spring);
+}
+.folder.has-icon .folder-icon img { object-fit: cover; object-position: center 30%; }
+.folder.has-icon .folder-front { z-index: 1; }
+.folder.has-icon .folder-name, .folder.has-icon .folder-count { position: relative; z-index: 3; }
+.focused.folder.has-icon .folder-icon { translate: -50% -10px; rotate: 0deg; }
