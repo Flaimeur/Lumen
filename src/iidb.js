@@ -255,4 +255,40 @@ async function iidbOptions(target, { signal, fetchImpl } = {}) {
   return out;
 }
 
-module.exports = { fetchIidb, applyIidb, iidbOptions, fold };
+// Toutes les collections iiDB (nom, icône, héros), pour parcourir et choisir l'icône d'un dossier.
+let collectionsCache = null;
+async function listCollections({ fetchImpl } = {}) {
+  if (collectionsCache && Date.now() - collectionsCache.at < 6 * 3600 * 1000) return collectionsCache.list;
+  const call = client({ signal: new AbortController().signal, fetchImpl });
+  const list = [];
+  for (let skip = 0; skip < 3000; skip += 50) {
+    const r = await call(`/collections/browse?skip=${skip}&limit=50`);
+    const items = (r && r.items) || [];
+    for (const c of items) {
+      if (!c.icon_filename) continue;
+      list.push({ id: c.id, name: c.name, count: c.parent_count || 0, icon: file(c.icon_filename), hero: file(c.hero_filename), logo: file(c.title_image_filename) });
+    }
+    if (items.length < 50) break;
+  }
+  list.sort((a, b) => b.count - a.count);
+  collectionsCache = { at: Date.now(), list };
+  return list;
+}
+
+// Icônes d'un jeu cherché par son nom (pour en mettre une sur un dossier).
+async function gameIcons(name, { fetchImpl } = {}) {
+  const call = client({ signal: new AbortController().signal, fetchImpl });
+  const res = await call(`/parents/search/enriched/page?q=${encodeURIComponent(name)}&skip=0&limit=6&assets_only=true&search_mode=default`);
+  const out = [];
+  for (const g of ((res && res.items) || []).slice(0, 4)) {
+    const a = await call(`/assets/browse/enriched?skip=0&limit=50&parent_id=${g.id}`);
+    for (const x of ((a && a.items) || [])) {
+      if (x.type !== 'icon' && x.type !== 'iisu_boxart' && x.type !== 'boxart') continue;
+      const url = x.raw_url ? `web-cover:${x.raw_url}` : file(x.filename);
+      out.push({ url, thumb: x.preview_url ? `web-cover:${x.preview_url}` : url, label: `${g.name} · ${x.type.replace(/_/g, ' ')}`, likes: (x.type === 'icon' ? 1000 : 0) + (x.like_count || 0) });
+    }
+  }
+  return out.sort((a, b) => b.likes - a.likes).slice(0, 40);
+}
+
+module.exports = { fetchIidb, applyIidb, iidbOptions, listCollections, gameIcons, fold };

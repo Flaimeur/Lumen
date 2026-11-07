@@ -957,3 +957,35 @@ body.wp-on .bg-shade { opacity: 0.3; }
 .details-logo { margin: 6px 0 12px; }
 .details-logo img { max-width: min(420px, 100%); max-height: 110px; object-fit: contain; object-position: left; filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.6)); }
 .fact b { font-weight: 700; }
+
+/* ---------- Widgets : taille qui suit l'écran, version large ---------- */
+.widgets { grid-auto-rows: clamp(150px, 9.5vw, 210px); }
+.widget.wide { grid-column: span 2; }
+.w-big { font-size: clamp(30px, 2.3vw, 46px); }
+.w-clock .w-big { font-size: clamp(46px, 3.6vw, 76px); }
+.w-np-cover, .w-surprise img { width: clamp(76px, 6.2vw, 128px); height: clamp(76px, 6.2vw, 128px); }
+.w-np-text b, .w-surprise-text b, .w-rank-text b { font-size: clamp(15px, 1.15vw, 21px); }
+.w-sub { font-size: clamp(13px, 0.85vw, 16px); }
+.w-rank .rank-emblem { width: clamp(60px, 4.6vw, 92px); height: clamp(60px, 4.6vw, 92px); }
+.w-favs img, .w-fav-empty { width: clamp(56px, 4.4vw, 90px); height: clamp(56px, 4.4vw, 90px); }
+.w-mbtn { width: clamp(30px, 2.2vw, 42px); height: clamp(30px, 2.2vw, 42px); }
+.w-mbtn.main { width: clamp(36px, 2.7vw, 50px); height: clamp(36px, 2.7vw, 50px); }
+
+/* Une seule horloge : celle du haut se cache quand le widget Horloge est affiché. */
+body.home-clock #topbar .status { visibility: hidden; }
+
+/* ---------- Mode réorganisation de l'accueil ---------- */
+.edit-banner {
+  position: sticky; top: 0; z-index: 5; margin: 0 10px 12px; padding: 10px 16px; border-radius: 14px; text-align: center; font-weight: 700;
+  background: color-mix(in srgb, var(--accent) 22%, var(--panel)); border: 1px dashed var(--accent);
+}
+.home.editing [data-block], .home.editing .widget { outline: 2px dashed rgba(255, 255, 255, 0.22); outline-offset: 4px; cursor: grab; border-radius: 18px; }
+.home.editing .dragging { opacity: 0.4; }
+.home.editing .drop-target { outline-color: var(--accent) !important; outline-style: solid !important; }
+
+/* ---------- Roulette : options ---------- */
+.roll-options { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin: 6px 0 4px; }
+/* La pochette et la jaquette suivent la hauteur disponible du widget (plus de débordement en bas). */
+.w-body { overflow: hidden; }
+.w-np, .w-surprise { height: 100%; min-height: 0; }
+.w-np-cover, .w-surprise img { height: min(100%, clamp(76px, 6.2vw, 128px)); width: auto; aspect-ratio: 1; flex: none; }

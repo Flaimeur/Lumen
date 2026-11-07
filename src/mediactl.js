@@ -22,7 +22,12 @@ function Say($s) { [Console]::Out.WriteLine($s); [Console]::Out.Flush() }
 Say('{"ready":true}')
 while ($null -ne ($line = [Console]::In.ReadLine())) {
   try {
-    $s = $mgr.GetCurrentSession()
+    # Session à suivre : on ignore Lumen lui-même (sa musique de fond), et on préfère celle qui joue.
+    $s = $null
+    $candidates = @()
+    foreach ($x in $mgr.GetSessions()) { if ($x.SourceAppUserModelId -notmatch 'lumen|electron') { $candidates += $x } }
+    foreach ($x in $candidates) { if ($x.GetPlaybackInfo().PlaybackStatus.ToString() -eq 'Playing') { $s = $x; break } }
+    if (-not $s -and $candidates.Count) { $s = $candidates[0] }
     if ($line -eq 'toggle' -or $line -eq 'next' -or $line -eq 'prev') {
       if ($s) {
         if ($line -eq 'toggle') { $null = Await ($s.TryTogglePlayPauseAsync()) ([bool]) }
@@ -66,6 +71,29 @@ let ready = null;
 const waiting = [];
 let coverDir = '';
 
+// Programme C# (mediahelper.cs) compilé une fois avec le compilateur de .NET Framework présent sur Windows.
+// Il lit aussi les pochettes, ce que PowerShell 5.1 ne sait pas faire. Repli : le script PowerShell ci-dessus.
+function helperExe(dir) {
+  const src = path.join(__dirname, 'mediahelper.cs');
+  const binDir = path.join(path.dirname(dir), 'bin');
+  const exe = path.join(binDir, 'lumen-media.exe');
+  try {
+    if (fs.existsSync(exe) && fs.statSync(exe).mtimeMs >= fs.statSync(src).mtimeMs) return exe;
+    const win = process.env.windir || 'C:\\Windows';
+    const csc = path.join(win, 'Microsoft.NET', 'Framework64', 'v4.0.30319', 'csc.exe');
+    const wm = path.join(win, 'System32', 'WinMetadata');
+    if (!fs.existsSync(csc)) return null;
+    fs.mkdirSync(binDir, { recursive: true });
+    // Le .cs est dans app.asar : on en fait une copie lisible par le compilateur.
+    const tmpSrc = path.join(binDir, 'mediahelper.cs');
+    fs.writeFileSync(tmpSrc, fs.readFileSync(src));
+    require('child_process').execFileSync(csc, ['-nologo', '-optimize', '-target:exe', `-out:${exe}`,
+      `-r:${path.join(wm, 'Windows.Media.winmd')}`, `-r:${path.join(wm, 'Windows.Foundation.winmd')}`, `-r:${path.join(wm, 'Windows.Storage.winmd')}`,
+      '-r:System.Runtime.dll', '-r:System.Core.dll', tmpSrc], { windowsHide: true, timeout: 60000 });
+    return fs.existsSync(exe) ? exe : null;
+  } catch { return null; }
+}
+
 function start(dir) {
   if (proc || process.platform !== 'win32') return;
   coverDir = dir;
@@ -75,10 +103,15 @@ function start(dir) {
     const files = fs.readdirSync(dir).map((f) => path.join(dir, f)).sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
     for (const f of files.slice(20)) fs.rmSync(f, { force: true });
   } catch { /* dossier vide */ }
-  const encoded = Buffer.from(SCRIPT, 'utf16le').toString('base64');
-  proc = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], {
-    windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'], env: { ...process.env, LUMEN_MEDIA_DIR: dir },
-  });
+  const exe = helperExe(dir);
+  if (exe) {
+    proc = spawn(exe, [dir], { windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] });
+  } else {
+    const encoded = Buffer.from(SCRIPT, 'utf16le').toString('base64');
+    proc = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], {
+      windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'], env: { ...process.env, LUMEN_MEDIA_DIR: dir },
+    });
+  }
   let resolveReady;
   ready = new Promise((r) => { resolveReady = r; });
   let rest = '';

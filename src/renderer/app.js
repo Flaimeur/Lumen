@@ -418,6 +418,26 @@
           focus: () => setHints('action'),
         });
       }),
+      t.type === 'collection' && api.iidbCollections ? focusable(h('div', { class: 'art-row' },
+        h('div', { class: 'art-thumb' }, '📚'),
+        h('div', { class: 'ach-text' }, h('b', {}, 'Parcourir les collections iiDB'), h('span', { class: 'muted small' }, 'Mario, Sonic, Zelda, Pokémon, Disney… plus de 500 icônes'))), {
+        a: () => openCollectionBrowser(t), focus: () => setHints('action'),
+      }) : null,
+      t.type === 'collection' && api.iidbGameIcons ? focusable(h('div', { class: 'art-row' },
+        h('div', { class: 'art-thumb' }, '🎮'),
+        h('div', { class: 'ach-text' }, h('b', {}, 'Prendre l’icône d’un jeu…'), h('span', { class: 'muted small' }, 'Par exemple un dossier « RPG » avec l’icône de Final Fantasy'))), {
+        a: async () => {
+          const v = await openPrompt({ title: 'Nom du jeu', value: '', help: 'Le jeu dont tu veux l’icône (ex. Final Fantasy VII, Zelda, Pokémon Rouge…)' });
+          if (v === null || !v.trim()) return openArtEditor(t);
+          toast('Recherche des icônes…', 'info', 6000);
+          const opts = await api.iidbGameIcons(v.trim());
+          document.getElementById('toast').hidden = true;
+          if (!opts.length) { toast(`Aucune icône trouvée pour « ${v.trim()} »`, 'error'); return openArtEditor(t); }
+          t.options = { ...(t.options || {}), ok: true, icon: opts };
+          openArtGallery(t, 'icon');
+        },
+        focus: () => setHints('action'),
+      }) : null,
       // Le nom ne correspond pas à iiDB (dossier perso, abréviation…) : recherche manuelle.
       focusable(h('div', { class: 'art-row' },
         h('div', { class: 'art-thumb' }, '🔎'),
@@ -453,6 +473,37 @@
     if (custom) items.push(['Revenir à l’image automatique', async () => { await setArt(t, kind, null); toast('Image d’origine rétablie'); openArtEditor(t); }]);
     items.push(['← Retour', () => openArtEditor(t)]);
     openMenu(ART_KINDS[kind], items);
+  }
+
+  // Catalogue des collections iiDB, filtrable en tapant (un morceau de nom suffit).
+  async function openCollectionBrowser(t, filter = '') {
+    if (!S.iidbCollections) {
+      toast('Chargement des collections iiDB…', 'info', 8000);
+      S.iidbCollections = await api.iidbCollections();
+      document.getElementById('toast').hidden = true;
+    }
+    const q = fold(filter);
+    const list = S.iidbCollections.filter((c) => !q || fold(c.name).includes(q));
+    const pickCol = async (c) => {
+      await setArt(t, 'icon', c.icon);
+      if (c.hero) await setArt(t, 'hero', c.hero);
+      toast(`Icône « ${c.name} » choisie`);
+      openArtEditor(t);
+    };
+    openOverlay(h('div', { class: 'modal art-gallery' },
+      h('div', { class: 'eyebrow' }, 'iiDB · Collections'),
+      h('h2', {}, t.name),
+      h('div', { class: 'roll-options', style: 'justify-content:flex-start' },
+        focusable(h('div', { class: 'chip' + (filter ? ' active' : '') }, filter ? `🔎 « ${filter} » · ${list.length}` : `🔎 Filtrer (${list.length})`), {
+          a: async () => { const v = await openPrompt({ title: 'Filtrer les collections', value: filter, help: 'Un morceau de nom : mar, poke, zel, dragon…' }); openCollectionBrowser(t, v === null ? filter : v.trim()); },
+          focus: () => setHints('action'),
+        })),
+      list.length
+        ? h('div', { class: 'art-grid icon' }, list.slice(0, 240).map((c) => focusable(h('div', { class: 'art-pick icon' },
+          h('img', { src: api.mediaUrl(c.icon), alt: '', loading: 'lazy' }), h('span', { class: 'art-credit small', style: 'opacity:1' }, c.name)), {
+          a: () => pickCol(c), focus: () => { setTitle(c.name, plural(c.count, 'jeu', 'jeux')); setHints('action'); },
+        })))
+        : h('p', { class: 'muted' }, 'Aucune collection ne contient ce texte.')), { onBack: () => openArtEditor(t) });
   }
 
   function openArtGallery(t, kind) {
@@ -945,6 +996,7 @@
   // ---------- Routage ----------
   function render(focusIndex = 0) {
     const v = S.route.view;
+    document.body.classList.toggle('home-clock', v === 'home' && !!S.cfg && homeCfg().widgets.includes('clock'));
     let content;
     if (v === 'home') content = viewHome();
     else if (v === 'search') content = viewSearch();
@@ -1268,11 +1320,13 @@
     const featured = recent[0] || S.byPath.get(S.featured);
     const home = homeCfg();
     const shelves = [];
-    if (home.blocks.recent && recent.length > 1) shelves.push(['Joués récemment', recent.slice(1).map(gameTile)]);
-    if (home.blocks.favorites && favs.length) shelves.push(['Favoris', favs.map(gameTile)]);
-    if (home.blocks.systems) shelves.push(['Consoles', S.lib.systems.map(systemCard)]);
+    const shelfOf = {};
+    const pushShelf = (id, title, items) => { shelves.push([title, items]); shelfOf[title] = id; };
+    if (home.blocks.recent && recent.length > 1) pushShelf('recent', 'Joués récemment', recent.slice(1).map(gameTile));
+    if (home.blocks.favorites && favs.length) pushShelf('favorites', 'Favoris', favs.map(gameTile));
+    if (home.blocks.systems) pushShelf('systems', 'Consoles', sortedSystems().map(systemCard));
     const folders = collectionsList().filter((c) => c.id !== '★' || favs.length);
-    if (home.blocks.folders && folders.length) shelves.push(['Dossiers', folders.map(folderTile)]);
+    if (home.blocks.folders && folders.length) pushShelf('folders', 'Dossiers', folders.map(folderTile));
     if (home.blocks.discover && (!recent.length || home.blocks.discoverAlways)) {
       const picks = [];
       const seen = new Set([featured.path]);
@@ -1280,14 +1334,59 @@
         const g = all[Math.floor(Math.random() * all.length)];
         if (!seen.has(g.path)) { seen.add(g.path); picks.push(g); }
       }
-      shelves.push(['À découvrir', picks.map(gameTile)]);
+      pushShelf('discover', 'À découvrir', picks.map(gameTile));
     }
     const widgets = home.widgets.filter((w) => WIDGETS[w]);
-    return h('div', { class: 'home' },
-      widgets.length ? h('section', { class: 'widgets', style: `--n:${Math.min(widgets.length, 4)}` }, widgets.map((w) => widgetCard(w))) : null,
-      home.blocks.hero ? heroCard(featured, recent.length ? 'Reprendre' : 'À la une', widgets.length ? 'compact' : '') : null,
-      shelves.map(([title, items]) =>
-        h('section', { class: 'shelf' }, h('div', { class: 'shelf-title' }, title), h('div', { class: 'row' }, items))));
+    const cols = widgets.reduce((n, w) => n + (home.wide[w] ? 2 : 1), 0);
+    const blocks = {
+      widgets: widgets.length ? h('section', { class: 'widgets', style: `--n:${Math.min(Math.max(cols, 1), 4)}` }, widgets.map((w) => widgetCard(w))) : null,
+      hero: home.blocks.hero ? heroCard(featured, recent.length ? 'Reprendre' : 'À la une', widgets.length ? 'compact' : '') : null,
+    };
+    for (const [title, items] of shelves) blocks[shelfOf[title]] = h('section', { class: 'shelf' }, h('div', { class: 'shelf-title' }, title), h('div', { class: 'row' }, items));
+    const ordered = [...home.order.filter((id) => id in blocks), ...Object.keys(blocks).filter((id) => !home.order.includes(id))];
+    const els = ordered.map((id) => {
+      const el = blocks[id];
+      if (!el) return null;
+      el.dataset.block = id;
+      if (S.homeEdit) makeDraggable(el, 'block', id);
+      return el;
+    });
+    return h('div', { class: 'home' + (S.homeEdit ? ' editing' : '') },
+      S.homeEdit ? h('div', { class: 'edit-banner' }, '✏ Réorganisation : glisse les widgets et les blocs où tu veux · Échap pour terminer') : null,
+      ...els);
+  }
+
+  // ---------- Réorganisation à la souris (mode édition de l'accueil) ----------
+  function makeDraggable(el, kind, id) {
+    el.draggable = true;
+    el.addEventListener('dragstart', (e) => { e.stopPropagation(); S.drag = { kind, id }; el.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
+    el.addEventListener('dragend', () => { el.classList.remove('dragging'); document.querySelectorAll('.drop-target').forEach((x) => x.classList.remove('drop-target')); });
+    el.addEventListener('dragover', (e) => { if (S.drag && S.drag.kind === kind && S.drag.id !== id) { e.preventDefault(); e.stopPropagation(); el.classList.add('drop-target'); } });
+    el.addEventListener('dragleave', () => el.classList.remove('drop-target'));
+    el.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const d = S.drag;
+      S.drag = null;
+      if (!d || d.kind !== kind || d.id === id) return;
+      const home = homeCfg();
+      const list = kind === 'widget' ? home.widgets : home.order;
+      if (kind === 'block') for (const b of Object.keys(HOME_ORDER_NAMES)) if (!list.includes(b)) list.push(b);
+      const from = list.indexOf(d.id);
+      const to = list.indexOf(id);
+      if (from < 0 || to < 0) return;
+      list.splice(from, 1);
+      list.splice(to, 0, d.id);
+      await saveCfg();
+      sfx('select');
+      S.keepAnim = true;
+      render(0);
+    });
+  }
+  function toggleHomeEdit(on) {
+    S.homeEdit = on;
+    if (S.route.view !== 'home') openTab('home'); else { S.keepAnim = true; render(0); }
+    if (on) toast('Glisse les widgets et les blocs à la souris · à la manette : Réglages → Personnaliser l’accueil', 'info', 5000);
   }
 
   // Coupe en or : la récompense d'un jeu terminé à 100 %.
@@ -1307,15 +1406,20 @@
 
   // ---------- Accueil : widgets et blocs (Réglages → Affichage → Personnaliser l'accueil) ----------
   const HOME_DEFAULT = {
-    widgets: ['clock', 'nowplaying', 'achievements', 'surprise'],
+    widgets: ['nowplaying', 'achievements', 'surprise', 'favorites'],
+    order: ['widgets', 'hero', 'recent', 'favorites', 'systems', 'folders', 'discover'],
+    wide: {},
     blocks: { hero: true, recent: true, favorites: false, systems: true, folders: true, discover: true, discoverAlways: false },
   };
   function homeCfg() {
     const c = S.cfg.home || (S.cfg.home = JSON.parse(JSON.stringify(HOME_DEFAULT)));
     c.widgets = Array.isArray(c.widgets) ? c.widgets : HOME_DEFAULT.widgets.slice();
     c.blocks = { ...HOME_DEFAULT.blocks, ...(c.blocks || {}) };
+    c.order = Array.isArray(c.order) ? c.order : HOME_DEFAULT.order.slice();
+    c.wide = c.wide || {};
     return c;
   }
+  const HOME_ORDER_NAMES = { widgets: 'Widgets', hero: 'Bandeau « Reprendre »', recent: 'Joués récemment', favorites: 'Favoris', systems: 'Consoles', folders: 'Dossiers', discover: 'À découvrir' };
   const HOME_BLOCKS = [
     ['hero', 'Bandeau « Reprendre »'], ['recent', 'Joués récemment'], ['favorites', 'Favoris'], ['systems', 'Consoles'],
     ['folders', 'Dossiers'], ['discover', 'À découvrir'], ['discoverAlways', 'À découvrir, même avec des jeux récents'],
@@ -1436,9 +1540,26 @@
   setInterval(() => { if (S.cfg && S.route.view === 'home' && homeCfg().widgets.includes('nowplaying') && document.hasFocus()) pollMedia(); }, 3000);
 
   // ---------- Roulette : un jeu au hasard, façon machine à sous ----------
+  const rollCfg = () => S.cfg.roll || (S.cfg.roll = { scope: 'installed', nsfw: false });
   function openRoll(systemId) {
-    const pool = S.lib.systems.filter((x) => !x.apps && (!systemId || x.id === systemId)).flatMap((x) => x.games).filter((g) => g.cover && g.installed !== false);
-    if (pool.length < 2) { toast('Pas assez de jeux avec une jaquette pour la roulette', 'error'); return; }
+    const rc = rollCfg();
+    if (systemId === undefined) systemId = rc.systemId || null;
+    const pool = S.lib.systems.filter((x) => !x.apps && (!systemId || x.id === systemId)).flatMap((x) => x.games)
+      .filter((g) => g.cover && (rc.scope === 'all' || (rc.scope === 'missing' ? g.installed === false : g.installed !== false)) && (rc.nsfw || !g.adult));
+    // Options en haut de la roulette.
+    const SCOPES = { installed: 'Installés', missing: 'À télécharger', all: 'Tous les jeux' };
+    const reroll = async () => { await saveCfg(); closeOverlay(true); openRoll(rc.systemId || null); };
+    const opt = (label, act) => focusable(h('div', { class: 'chip' }, label), { a: act, focus: () => setHints('action') });
+    const options = h('div', { class: 'roll-options' },
+      opt(`📦 ${SCOPES[rc.scope] || SCOPES.installed}`, () => { const k = Object.keys(SCOPES); rc.scope = k[(k.indexOf(rc.scope) + 1) % k.length]; reroll(); }),
+      opt(rc.nsfw ? '🔞 NSFW inclus' : '🚫 Sans NSFW', () => { rc.nsfw = !rc.nsfw; reroll(); }),
+      opt(`🎮 ${systemId ? (S.lib.systems.find((x) => x.id === systemId) || {}).name || 'Console' : 'Toutes les consoles'}`, () => openMenu('Roulette sur', [
+        ['Toutes les consoles', () => { rc.systemId = null; reroll(); }],
+        ...S.lib.systems.filter((x) => !x.apps).map((x) => [x.name, () => { rc.systemId = x.id; reroll(); }])])));
+    if (pool.length < 2) {
+      openOverlay(h('div', { class: 'modal roll' }, h('div', { class: 'eyebrow' }, '🎲 Jeu au hasard'), h('h2', {}, 'Pas assez de jeux avec ces options'), options));
+      return;
+    }
     const pick = () => pool[Math.floor(Math.random() * pool.length)];
     const STOP = 34;
     const items = Array.from({ length: STOP + 4 }, pick);
@@ -1446,7 +1567,7 @@
     const strip = h('div', { class: 'roll-strip' }, items.map((g, i) => h('div', { class: 'roll-item' + (i === STOP ? ' winner' : '') }, h('img', { src: api.mediaUrl(g.cover), alt: '' }))));
     const title = h('h2', { class: 'roll-title' }, 'La roulette tourne…');
     const actions = h('div', { class: 'actions roll-actions' });
-    const box = h('div', { class: 'modal roll' }, h('div', { class: 'eyebrow' }, '🎲 Jeu au hasard'), title,
+    const box = h('div', { class: 'modal roll' }, h('div', { class: 'eyebrow' }, '🎲 Jeu au hasard'), options, title,
       h('div', { class: 'roll-window' }, h('div', { class: 'roll-marker' }), strip), actions);
     openOverlay(box);
     const step = 172; // largeur d'une case + espace
@@ -1483,7 +1604,7 @@
     const w = WIDGETS[id];
     let body;
     try { body = w.render(); } catch { body = [h('div', { class: 'w-sub' }, 'Indisponible')]; }
-    return focusable(h('div', { class: 'widget w-' + id },
+    const card = focusable(h('div', { class: 'widget w-' + id + (homeCfg().wide[id] ? ' wide' : '') },
       h('div', { class: 'w-head' }, h('span', { class: 'w-ico' }, WIDGET_ICONS[id] || '•'), h('span', { class: 'w-title' }, w.name)),
       h('div', { class: 'w-body' }, ...body)), {
       a: w.act || (() => openHomeEditor()),
@@ -1491,6 +1612,8 @@
       y: w.y,
       focus: () => { setTitle(w.name, 'Widget'); setHints('action'); },
     });
+    if (S.homeEdit) makeDraggable(card, 'widget', id);
+    return card;
   }
 
   async function loadWeather() {
@@ -1532,6 +1655,38 @@
     el.dataset.theme = w.mode === 'theme' ? w.theme : '';
   }
 
+  // Styles tout prêts : fond, couleur, widgets et ordre de l'accueil en un clic.
+  const STYLE_PRESETS = {
+    portable: { name: 'Console portable (3DS)', desc: 'Horloge, météo, jeu surprise et mémo en haut, couleurs douces.', accent: '#5eead4',
+      wall: { mode: 'theme', theme: 'ocean', dim: 0.35 }, widgets: ['clock', 'weather', 'surprise', 'note'], wide: {},
+      order: ['widgets', 'recent', 'systems', 'folders', 'hero', 'favorites', 'discover'], blocks: { hero: false, recent: true, favorites: true, systems: true, folders: true, discover: true } },
+    salon: { name: 'Salon (Switch)', desc: 'Gros bandeau du jeu en cours et jeux récents d’abord, peu de widgets.', accent: '#fb7185',
+      wall: { mode: 'auto' }, widgets: ['nowplaying', 'achievements'], wide: { nowplaying: true, achievements: true },
+      order: ['hero', 'recent', 'widgets', 'systems', 'favorites', 'folders', 'discover'], blocks: { hero: true, recent: true, favorites: false, systems: true, folders: true, discover: true } },
+    nextgen: { name: 'Next-gen (PS5)', desc: 'Images des jeux en fond, rang et musique en cours, tout en grand.', accent: '#60a5fa',
+      wall: { mode: 'auto' }, widgets: ['achievements', 'nowplaying', 'surprise'], wide: { nowplaying: true },
+      order: ['hero', 'widgets', 'recent', 'favorites', 'systems', 'folders', 'discover'], blocks: { hero: true, recent: true, favorites: true, systems: true, folders: true, discover: true } },
+    synthwave: { name: 'Rétro synthwave', desc: 'Grille néon animée, rose et violet.', accent: '#f472b6',
+      wall: { mode: 'theme', theme: 'synthwave', dim: 0.15 }, widgets: ['clock', 'nowplaying', 'surprise', 'achievements'], wide: {},
+      order: ['widgets', 'hero', 'recent', 'systems', 'favorites', 'folders', 'discover'], blocks: { hero: true, recent: true, favorites: false, systems: true, folders: true, discover: true } },
+    minimal: { name: 'Minimal', desc: 'Pas de widgets ni de bandeau : seulement tes jeux.', accent: '#a78bfa',
+      wall: { mode: 'theme', theme: 'nuit', dim: 0.4 }, widgets: [], wide: {},
+      order: ['recent', 'favorites', 'systems', 'folders', 'discover', 'widgets', 'hero'], blocks: { hero: false, recent: true, favorites: true, systems: true, folders: true, discover: false } },
+  };
+  async function applyStylePreset(id) {
+    const p = STYLE_PRESETS[id];
+    if (!p) return;
+    const home = homeCfg();
+    Object.assign(home, { widgets: p.widgets.slice(), wide: { ...p.wide }, order: p.order.slice(), blocks: { ...home.blocks, ...p.blocks } });
+    Object.assign(wallCfg(), p.wall);
+    S.cfg.accent = p.accent;
+    applyCfg();
+    applyWallpaper();
+    await saveCfg();
+    S.dirty = true;
+    toast(`Style « ${p.name} » appliqué`);
+  }
+
   function openHomeEditor(focusLabel) {
     const home = homeCfg();
     const w = wallCfg();
@@ -1542,6 +1697,9 @@
     const reopen = async (label) => { await saveCfg(); applyWallpaper(); S.dirty = true; openHomeEditor(label); };
     const tog = (on) => h('span', { class: 'toggle' + (on ? ' on' : '') });
     const section = (t) => rows.push(h('div', { class: 'set-section' }, t));
+
+    section('Styles tout prêts');
+    for (const [id, p] of Object.entries(STYLE_PRESETS)) add(p.name, 'Appliquer', async () => { await applyStylePreset(id); openHomeEditor(p.name); }, p.desc);
 
     section('Fond d’écran');
     const MODES = { auto: 'Automatique (image du jeu)', theme: 'Thème animé', image: 'Mon image' };
@@ -1583,14 +1741,32 @@
         [home.widgets[i], home.widgets[j]] = [home.widgets[j], home.widgets[i]];
         reopen(WIDGETS[id].name);
       };
-      add(WIDGETS[id].name, on ? h('span', {}, `n°${home.widgets.indexOf(id) + 1} `, tog(true)) : tog(false), () => {
-        if (on) home.widgets = home.widgets.filter((x) => x !== id); else home.widgets.push(id);
-        reopen(WIDGETS[id].name);
+      add(WIDGETS[id].name, on ? h('span', {}, `n°${home.widgets.indexOf(id) + 1}${home.wide[id] ? ' · large' : ''} `, tog(true)) : tog(false), () => {
+        if (!on) { home.widgets.push(id); return reopen(WIDGETS[id].name); }
+        openMenu(WIDGETS[id].name, [
+          ['Retirer de l’accueil', () => { home.widgets = home.widgets.filter((x) => x !== id); reopen(WIDGETS[id].name); }],
+          [home.wide[id] ? 'Taille normale' : 'Grand (double largeur)', () => { home.wide[id] = !home.wide[id]; reopen(WIDGETS[id].name); }],
+          ['↑ Monter', () => move(-1)], ['↓ Descendre', () => move(1)],
+        ]);
       }, null, { x: () => move(-1), y: () => move(1) });
     }
 
     section('Blocs de l’accueil');
     for (const [id, label] of HOME_BLOCKS) add(label, tog(home.blocks[id]), () => { home.blocks[id] = !home.blocks[id]; reopen(label); });
+
+    section('Ordre de l’accueil');
+    rows.push(h('p', { class: 'muted small', style: 'margin: 0 6px 6px' }, 'X : monter · Y : descendre · ou « Réorganiser à la souris » depuis le menu de l’accueil'));
+    for (const b of Object.keys(HOME_ORDER_NAMES)) if (!home.order.includes(b)) home.order.push(b);
+    home.order.forEach((id, i) => {
+      const moveBlock = (d) => {
+        const j = i + d;
+        if (j < 0 || j >= home.order.length) return;
+        [home.order[i], home.order[j]] = [home.order[j], home.order[i]];
+        reopen(`${j + 1}. ${HOME_ORDER_NAMES[home.order[j]]}`);
+      };
+      add(`${i + 1}. ${HOME_ORDER_NAMES[id]}`, '⇅', () => openMenu(HOME_ORDER_NAMES[id], [['↑ Monter', () => moveBlock(-1)], ['↓ Descendre', () => moveBlock(1)]]), null,
+        { x: () => moveBlock(-1), y: () => moveBlock(1) });
+    });
 
     openOverlay(h('div', { class: 'modal art-editor profile-editor' },
       h('div', { class: 'eyebrow' }, 'Personnaliser'), h('h2', {}, 'Accueil et fond d’écran'), ...rows));
@@ -1811,6 +1987,7 @@
   // Saisie au clavier physique dans la recherche (avant les raccourcis de navigation).
   window.addEventListener('keydown', (ev) => {
     if (!S.cfg || S.overlay || S.route.view !== 'search' || ev.ctrlKey || ev.altKey) return;
+    if (!S.search && /^[qe]$/i.test(ev.key)) return; // champ vide : Q / E restent « onglet précédent / suivant »
     if (ev.key === 'Backspace' || (ev.key.length === 1 && /[\p{L}\p{N} '\-&:]/u.test(ev.key))) {
       ev.preventDefault();
       ev.stopImmediatePropagation();
@@ -2321,7 +2498,8 @@
       else items.push(['Jaquettes de cette console', () => { closeOverlay(true); openThumbs(sysId); }]);
     }
     if (S.route.view === 'home') items.push(['🎨 Personnaliser l’accueil', () => { closeOverlay(true); openHomeEditor(); }]);
-    if (!g || S.route.view === 'games') items.push([sysId ? '🎲 Jeu au hasard (cette console)' : '🎲 Jeu au hasard', () => { closeOverlay(true); openRoll(sysId || null); }]);
+    if (S.route.view === 'home') items.push([S.homeEdit ? '✓ Terminer la réorganisation' : '✏ Réorganiser à la souris', () => { closeOverlay(true); toggleHomeEdit(!S.homeEdit); }]);
+    if (!g || S.route.view === 'games') items.push([sysId ? '🎲 Jeu au hasard (cette console)' : '🎲 Jeu au hasard', () => { closeOverlay(true); openRoll(sysId || undefined); }]);
     if (S.route.view !== 'search') items.push(['Rechercher un jeu', () => { closeOverlay(true); openTab('search'); }]);
     items.push(
       ['Télécharger les jaquettes manquantes', () => { closeOverlay(true); openThumbs(); }],
@@ -3240,6 +3418,7 @@
   }
 
   function handleAction(a) {
+    if (a === 'b' && S.homeEdit && !S.overlay) { toggleHomeEdit(false); return; }
     if (S.mouse) { S.mouse = false; document.body.classList.add('no-cursor'); }
     // Pendant un lancement ou un téléchargement, seule l'annulation (B) est active.
     if (S.launching) {

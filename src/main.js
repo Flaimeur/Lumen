@@ -12,7 +12,7 @@ const { fetchMissingThumbnails } = require('./thumbnails');
 const romm = require('./romm');
 const { scanPcStores, fetchSteamGridDB, getSteamDir } = require('./pcstores');
 const achievements = require('./achievements');
-const { fetchIidb, applyIidb, iidbOptions } = require('./iidb');
+const { fetchIidb, applyIidb, iidbOptions, listCollections, gameIcons } = require('./iidb');
 const { STORES } = require('./pcstores');
 
 let pcLaunchers = new Map(); // id « steam:123 » → infos de lancement (rempli à chaque scan)
@@ -320,6 +320,8 @@ ipcMain.handle('art:options', async (_e, target = {}) => {
     return { ok: true, ...opts };
   } catch (err) { return { ok: false, error: err.message, cover: [], icon: [], logo: [], hero: [] }; }
 });
+ipcMain.handle('iidb:collections', async () => { try { return await listCollections({ fetchImpl: (u, o) => net.fetch(u, o) }); } catch { return []; } });
+ipcMain.handle('iidb:gameIcons', async (_e, name) => { try { return await gameIcons(String(name || ''), { fetchImpl: (u, o) => net.fetch(u, o) }); } catch { return []; } });
 ipcMain.handle('dialog:image', async (_e, title) => {
   const r = await dialog.showOpenDialog(win, { title, properties: ['openFile'], filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }] });
   return r.canceled ? null : r.filePaths[0];

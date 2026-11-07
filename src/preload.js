@@ -54,6 +54,8 @@ contextBridge.exposeInMainWorld('lumen', {
   pickAudio: (title) => ipcRenderer.invoke('dialog:audio', title),
   pickImage: (title) => ipcRenderer.invoke('dialog:image', title),
   artOptions: (target) => ipcRenderer.invoke('art:options', target),
+  iidbCollections: () => ipcRenderer.invoke('iidb:collections'),
+  iidbGameIcons: (name) => ipcRenderer.invoke('iidb:gameIcons', name),
   listMusic: (dir) => ipcRenderer.invoke('music:list', dir),
   readSound: (file) => ipcRenderer.invoke('sound:read', file),
   quit: () => ipcRenderer.invoke('app:quit'),
