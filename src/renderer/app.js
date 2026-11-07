@@ -2511,11 +2511,32 @@
     sfx('select');
   }
 
-  function openMenu(title, items, sound = 'select') {
+  // Menu : une liste courte d'actions ; { section } = titre de groupe ; opts.bar = rangée d'icônes en bas.
+  function openMenu(title, items, sound = 'select', opts = {}) {
+    const list = [];
+    for (const it of items) {
+      if (!it) continue;
+      if (it.section) { list.push(h('div', { class: 'menu-section' }, it.section)); continue; }
+      const [label, fn, extra = {}] = it;
+      list.push(focusable(h('div', { class: 'menu-item' + (extra.danger ? ' danger' : '') + (extra.sub ? ' has-sub' : '') },
+        extra.icon ? h('span', { class: 'mi-icon' }, extra.icon) : null,
+        h('span', { class: 'mi-label' }, label),
+        extra.sub ? h('span', { class: 'mi-arrow' }, '›') : null), { a: fn }));
+    }
+    const bar = opts.bar && opts.bar.length
+      ? h('div', { class: 'menu-bar' }, opts.bar.map(([icon, label, fn]) => focusable(h('div', { class: 'menu-chip', title: label }, h('span', { class: 'mc-icon' }, icon), h('span', { class: 'mc-label' }, label)), { a: fn })))
+      : null;
     openOverlay(h('div', { class: 'modal menu' },
+      opts.subtitle ? h('div', { class: 'menu-sub' }, opts.subtitle) : null,
       h('h2', {}, title),
-      items.map(([label, fn]) => focusable(h('div', { class: 'menu-item' }, label), { a: fn }))));
+      h('div', { class: 'menu-list' }, list),
+      bar));
     sfx(sound);
+  }
+  // Sous-menu avec un retour vers le menu rapide.
+  function openSubMenu(title, items, back) {
+    closeOverlay(true);
+    openMenu(title, [['Retour', () => { closeOverlay(true); back(); }, { icon: '‹' }], ...items], 'select');
   }
 
   function openQuickMenu() {
@@ -2523,31 +2544,37 @@
     S.menuGame = null;
     const coll = S.focusEl && S.focusEl._collection;
     const sysCard = S.focusEl && S.focusEl._system;
+    const reopen = () => { if (g) S.menuGame = g; openQuickMenu(); };
+    const run = (fn) => () => { closeOverlay(true); fn(); };
     const items = [];
+    let subtitle = '';
+
     if (sysCard) {
       const s = S.lib.systems.find((x) => x.id === sysCard);
       if (s) {
-        items.push(['🖼 Changer les images de la console…', () => { closeOverlay(true); openArtEditor(artTarget('platform', s)); }]);
-        items.push([`Ouvrir ${s.name}`, () => { closeOverlay(true); go({ view: 'games', systemId: s.id }); }]);
+        subtitle = 'Console';
+        items.push([`Ouvrir ${s.name}`, run(() => go({ view: 'games', systemId: s.id })), { icon: '▶' }]);
+        items.push(['Changer les images', run(() => openArtEditor(artTarget('platform', s))), { icon: '🖼' }]);
         const custom = (S.cfg.customSystems || []).find((x) => x.id === s.id);
         if (custom) {
-          items.push(['✎ Modifier la console (nom, dossier, émulateur)…', () => { closeOverlay(true); addCustomSystem(custom); }]);
-          items.push(['Retirer cette console', () => { closeOverlay(true); removeCustomSystem(s.id); }]);
-        } else items.push(['✎ Renommer la console…', () => { closeOverlay(true); renameSystem(s); }]);
+          items.push(['Modifier la console', run(() => addCustomSystem(custom)), { icon: '✎' }]);
+          items.push(['Retirer cette console', run(() => removeCustomSystem(s.id)), { icon: '✕', danger: true }]);
+        } else items.push(['Renommer la console', run(() => renameSystem(s)), { icon: '✎' }]);
       }
     }
+
     if (g) {
-      items.push(['🖼 Changer les images…', () => { closeOverlay(true); openArtEditor(artTarget('game', g)); }]);
-      items.push([isFav(g) ? 'Retirer des favoris' : 'Ajouter aux favoris', () => { closeOverlay(true); toggleFav(g); }]);
-      items.push(['Ranger dans un dossier…', () => { closeOverlay(true); openCollectionPicker(g); }]);
-      if (coll && coll !== '★') items.push([`Retirer du dossier « ${coll} »`, () => { closeOverlay(true); removeFromCollection(coll, g); }]);
+      subtitle = (sysById(g.system) || {}).name || 'Jeu';
+      items.push(['Jouer', run(() => launch(g)), { icon: '▶' }]);
+      items.push([isFav(g) ? 'Retirer des favoris' : 'Ajouter aux favoris', run(() => toggleFav(g)), { icon: isFav(g) ? '★' : '☆' }]);
+      items.push(['Ranger dans un dossier', run(() => openCollectionPicker(g)), { icon: '📁' }]);
       if (g.source === 'app') items.push(...appMenuItems(g.path.slice(4)));
-      else items.push(['Détails du jeu', () => { closeOverlay(true); openDetails(g); }]);
-      if (achInfo(g) || (/^steam:/.test(g.path) && api.achievements)) items.push(['Succès', () => { closeOverlay(true); openAchievements(g); }]);
-      if (api.mapper) items.push([profileOf(g) ? `🎮 Profil manette → clavier (${profileOf(g).enabled ? 'actif' : 'inactif'})` : '🎮 Profil manette → clavier…', () => { closeOverlay(true); openProfileEditor(g); }]);
-      if (api.pickAudio) items.push([g.customSound ? 'Changer mon son pour ce jeu…' : 'Choisir un son pour ce jeu…', () => { closeOverlay(true); pickGameSound(g); }]);
-      if (g.customSound) items.push(['Retirer mon son', () => { closeOverlay(true); clearGameSound(g); }]);
-      if (g.source !== 'app') items.push(['Renommer le jeu…', async () => {
+      else items.push(['Détails', run(() => openDetails(g)), { icon: 'ℹ' }]);
+      if (achInfo(g) || (/^steam:/.test(g.path) && api.achievements)) items.push(['Succès', run(() => openAchievements(g)), { icon: '🏆' }]);
+      // Tout le reste : dans « Personnaliser… ».
+      const custom = [];
+      custom.push(['Changer les images', run(() => openArtEditor(artTarget('game', g))), { icon: '🖼' }]);
+      if (g.source !== 'app') custom.push(['Renommer le jeu', async () => {
         closeOverlay(true);
         const v = await openPrompt({ title: 'Nom du jeu', value: g.name, help: 'Le nom affiché, aussi utilisé pour chercher les images iiDB (ex. « Mario Kart World » plutôt que « MKW »). Vide = nom d’origine.' });
         if (v === null) return;
@@ -2557,41 +2584,60 @@
         applyLib(await api.scan({ romm: false }));
         rerender();
         toast(v.trim() ? 'Jeu renommé · relance « Images iiDB » pour ses images' : 'Nom d’origine rétabli');
-      }]);
-      items.push(['Masquer ce jeu', () => { closeOverlay(true); hideGame(g); }]);
-      if (g.source === 'romm' && !g.downloaded) items.push([`Télécharger sans lancer (${fmtSize(g.size) || 'RomM'})`, () => { closeOverlay(true); downloadOnly(g); }]);
-      if (g.source === 'romm' && g.downloaded) items.push(['Supprimer la copie locale', () => { closeOverlay(true); deleteRommCopy(g); }]);
+      }, { icon: '✎' }]);
+      if (api.mapper) custom.push([profileOf(g) ? `Profil manette → clavier (${profileOf(g).enabled ? 'actif' : 'inactif'})` : 'Profil manette → clavier', run(() => openProfileEditor(g)), { icon: '🎮' }]);
+      if (api.pickAudio) custom.push([g.customSound ? 'Changer mon son' : 'Choisir un son', run(() => pickGameSound(g)), { icon: '♪' }]);
+      if (g.customSound) custom.push(['Retirer mon son', run(() => clearGameSound(g)), { icon: '✕' }]);
+      if (g.source === 'romm' && !g.downloaded) custom.push([`Télécharger sans lancer (${fmtSize(g.size) || 'RomM'})`, run(() => downloadOnly(g)), { icon: '⤓' }]);
+      if (g.source === 'romm' && g.downloaded) custom.push(['Supprimer la copie locale', run(() => deleteRommCopy(g)), { icon: '✕', danger: true }]);
+      if (coll && coll !== '★') custom.push([`Retirer du dossier « ${coll} »`, run(() => removeFromCollection(coll, g)), { icon: '📁' }]);
+      custom.push(['Masquer ce jeu', run(() => hideGame(g)), { icon: '⦸', danger: true }]);
+      items.push(['Personnaliser…', () => openSubMenu(g.name, custom, reopen), { icon: '⚙', sub: true }]);
     }
+
     const folder = (S.focusEl && S.focusEl._folder) || (S.route.view === 'folder' ? S.route.id : null);
-    if (folder && !g) items.push(['🖼 Changer l’icône du dossier…', () => { closeOverlay(true); openArtEditor(artTarget('collection', folder)); }]);
-    if (folder && folder !== '★') {
-      items.push([`Renommer le dossier « ${folder} »`, () => { closeOverlay(true); renameFolder(folder); }]);
-      items.push(['Changer la couleur du dossier', () => { closeOverlay(true); cycleFolderColor(folder); }]);
-      items.push([`Supprimer le dossier « ${folder} »`, () => { closeOverlay(true); deleteCollection(folder); }]);
+    if (folder && !g) {
+      subtitle = 'Dossier';
+      items.push(['Changer l’icône', run(() => openArtEditor(artTarget('collection', folder))), { icon: '🖼' }]);
+      if (folder !== '★') {
+        items.push(['Renommer', run(() => renameFolder(folder)), { icon: '✎' }]);
+        items.push(['Changer la couleur', run(() => cycleFolderColor(folder)), { icon: '🎨' }]);
+        items.push(['Supprimer le dossier', run(() => deleteCollection(folder)), { icon: '✕', danger: true }]);
+      }
     }
-    if (!g) items.push(['Nouveau dossier', () => { closeOverlay(true); createCollection(); }]);
+
     const sysId = S.route.view === 'games' ? S.route.systemId : null;
     if (sysId) {
-      items.push([`Trier par : ${sortLabel()}`, () => { closeOverlay(true); cycleSort(); }]);
       const cur = S.lib.systems.find((x) => x.id === sysId);
-      if (cur && filterChip(cur)) items.push([`Afficher : ${filterLabel(filterOf(sysId))}`, () => { closeOverlay(true); openFilterMenu(cur); }]);
-      if (api.iidb && S.cfg.iidb && S.cfg.iidb.enabled !== false && !(cur && cur.apps)) items.push(['Images iiDB de cette console', () => { closeOverlay(true); openIidb({ systemId: sysId }); }]);
-      if (cur && cur.pc && !cur.apps) items.push(['Images SteamGridDB', () => { closeOverlay(true); openSgdb(); }]);
-      else items.push(['Jaquettes de cette console', () => { closeOverlay(true); openThumbs(sysId); }]);
+      const view = [];
+      view.push([`Trier par : ${sortLabel()}`, run(cycleSort), { icon: '⇅' }]);
+      if (cur && filterChip(cur)) view.push([`Afficher : ${filterLabel(filterOf(sysId))}`, run(() => openFilterMenu(cur)), { icon: '⏷' }]);
+      if (api.iidb && S.cfg.iidb && S.cfg.iidb.enabled !== false && !(cur && cur.apps)) view.push(['Images iiDB de cette console', run(() => openIidb({ systemId: sysId })), { icon: '🖼' }]);
+      if (cur && cur.pc && !cur.apps) view.push(['Images SteamGridDB', run(openSgdb), { icon: '🖼' }]);
+      else view.push(['Jaquettes de cette console', run(() => openThumbs(sysId)), { icon: '⤓' }]);
+      if (g) items.push(['Cette console…', () => openSubMenu(cur ? cur.name : 'Console', view, reopen), { icon: '☰', sub: true }]);
+      else items.push(...view);
     }
-    if (S.route.view === 'home') items.push(['🎨 Personnaliser l’accueil', () => { closeOverlay(true); openHomeEditor(); }]);
-    if (S.route.view === 'home') items.push([S.homeEdit ? '✓ Terminer la réorganisation' : '✏ Réorganiser à la souris', () => { closeOverlay(true); toggleHomeEdit(!S.homeEdit); }]);
-    if (!g || S.route.view === 'games') items.push([sysId ? '🎲 Jeu au hasard (cette console)' : '🎲 Jeu au hasard', () => { closeOverlay(true); openRoll(sysId || undefined); }]);
-    if (S.route.view !== 'search') items.push(['Rechercher un jeu', () => { closeOverlay(true); openTab('search'); }]);
-    items.push(
-      ['Télécharger les jaquettes manquantes', () => { closeOverlay(true); openThumbs(); }],
-      ['Rescanner la bibliothèque', () => { closeOverlay(true); rescan(); }],
-      [S.cfg.muted ? '🔊 Remettre le son (M)' : '🔇 Couper le son (M)', () => { closeOverlay(true); toggleMute(); }],
-      ['Plein écran (F11)', () => { closeOverlay(true); api.toggleFullscreen(); }],
-      ['Réglages', () => { closeOverlay(true); openTab('settings'); }],
-      ['Quitter Lumen', () => api.quit()],
-    );
-    openMenu(g ? g.name : 'Menu', items, 'menu');
+
+    if (S.route.view === 'home' && !g && !sysCard && !folder) {
+      items.push(['Personnaliser l’accueil', run(openHomeEditor), { icon: '🎨' }]);
+      items.push([S.homeEdit ? 'Terminer la réorganisation' : 'Réorganiser à la souris', run(() => toggleHomeEdit(!S.homeEdit)), { icon: S.homeEdit ? '✓' : '✥' }]);
+    }
+    if (!g && !sysCard && !folder) items.push(['Nouveau dossier', run(createCollection), { icon: '＋' }]);
+    const library = [
+      ['Télécharger les jaquettes manquantes', run(() => openThumbs()), { icon: '⤓' }],
+      ['Rescanner la bibliothèque', run(rescan), { icon: '⟳' }],
+    ];
+    if (!g && !sysCard && !folder) items.push(['Bibliothèque…', () => openSubMenu('Bibliothèque', library, reopen), { icon: '📚', sub: true }]);
+
+    const bar = [];
+    if (S.route.view !== 'search') bar.push(['🔍', 'Rechercher', run(() => openTab('search'))]);
+    bar.push(['🎲', 'Au hasard', run(() => openRoll(sysId || undefined))]);
+    bar.push([S.cfg.muted ? '🔇' : '🔊', S.cfg.muted ? 'Son coupé' : 'Son', run(toggleMute)]);
+    bar.push(['⛶', 'Plein écran', run(() => api.toggleFullscreen())]);
+    bar.push(['⚙', 'Réglages', run(() => openTab('settings'))]);
+    bar.push(['⏻', 'Quitter', () => api.quit()]);
+    openMenu(g ? g.name : sysCard ? ((S.lib.systems.find((x) => x.id === sysCard) || {}).name || 'Menu') : folder ? folderName(folder) : sysId ? ((S.lib.systems.find((x) => x.id === sysId) || {}).name || 'Menu') : 'Menu', items, 'menu', { subtitle, bar });
   }
 
   // ---------- RomM ----------
