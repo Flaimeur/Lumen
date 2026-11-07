@@ -1481,7 +1481,7 @@
       const name = (musicList[musicIdx] || '').split(/[\\/]/).pop().replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ');
       return [h('div', { class: 'w-music' }, h('span', { class: 'w-eq' }, h('i'), h('i'), h('i')), h('b', {}, name)), h('div', { class: 'w-sub' }, 'A : morceau suivant')];
     }, act: () => { if (musicList.length) { nextTrack(); setTimeout(rerender, 100); } else openTab('settings'); } },
-    nowplaying: { name: 'Lecture en cours', render: () => mediaBody(), bg: () => (S.media && S.media.active && S.media.thumb) || null, act: () => mediaCmd('toggle'), x: () => mediaCmd('next'), y: () => mediaCmd('prev') },
+    nowplaying: { name: 'Lecture en cours', render: () => mediaBody(), bg: () => (S.media && S.media.active && S.media.thumb) || null, act: () => mediaCmd('toggle'), x: () => mediaCmd('next'), y: () => mediaCmd('prev'), lt: () => stepMediaVol(-0.1), rt: () => stepMediaVol(0.1) },
     favorites: { name: 'Favoris', render: () => {
       const favs = (S.cfg.favorites || []).map((p) => S.byPath.get(p)).filter(Boolean);
       if (!favs.length) return [h('div', { class: 'w-big' }, '☆'), h('div', { class: 'w-sub' }, 'X sur un jeu pour l’ajouter')];
@@ -1531,7 +1531,30 @@
       h('div', { class: 'w-np-text' },
         h('b', {}, m.title || 'Sans titre'),
         h('div', { class: 'w-sub' }, [m.artist, appName(m.app)].filter(Boolean).join(' · ')),
-        h('div', { class: 'w-np-ctrl' }, btn('⏮', 'prev'), btn(playing ? '⏸' : '▶', 'toggle', 'main'), btn('⏭', 'next'))))];
+        h('div', { class: 'w-np-ctrl' }, btn('⏮', 'prev'), btn(playing ? '⏸' : '▶', 'toggle', 'main'), btn('⏭', 'next'),
+          typeof m.vol === 'number' ? volCtl(m.vol) : null)))];
+  }
+  // Volume de l'appli qui joue (mélangeur Windows) : − / barre cliquable / +.
+  function volCtl(v) {
+    const pct = Math.round(v * 100);
+    const bar = h('div', { class: 'w-vol-bar', title: 'Volume de l’appli' }, h('i', { style: `width:${pct}%` }));
+    bar.addEventListener('click', (e) => { e.stopPropagation(); const r = bar.getBoundingClientRect(); setMediaVol((e.clientX - r.left) / r.width); });
+    const b = (label, d) => h('button', { class: 'w-mbtn w-vbtn', onClick: (e) => { e.stopPropagation(); stepMediaVol(d); } }, label);
+    return h('div', { class: 'w-vol' }, b(pct === 0 ? '🔇' : '🔉', -0.1), bar, b('🔊', 0.1), h('span', { class: 'w-vol-pct' }, pct + ' %'));
+  }
+  function stepMediaVol(d) {
+    const cur = S.media && typeof S.media.vol === 'number' ? S.media.vol : null;
+    if (cur === null) return;
+    setMediaVol(Math.round((cur + d) * 10) / 10);
+  }
+  async function setMediaVol(v) {
+    if (!api.media || !S.media) return;
+    v = Math.max(0, Math.min(1, v));
+    S.media.vol = v;
+    refreshMediaWidget();
+    sfx('move');
+    const r = await api.media('vol ' + v.toFixed(2));
+    if (r && typeof r.vol === 'number' && S.media) { S.media.vol = r.vol; refreshMediaWidget(); }
   }
   function refreshMediaWidget() {
     const card = document.querySelector('.widget.wg-nowplaying');
@@ -1639,7 +1662,9 @@
       a: w.act || (() => openHomeEditor()),
       x: w.x,
       y: w.y,
-      focus: () => { setTitle(w.name, 'Widget'); setHints('action'); },
+      lt: w.lt,
+      rt: w.rt,
+      focus: () => { setTitle(w.name, w.lt ? 'A : lecture/pause · X/Y : suivant/précédent · LT/RT : volume' : 'Widget'); setHints('action'); },
     });
     if (S.homeEdit) makeDraggable(card, 'widget', id);
     return card;
@@ -3691,8 +3716,8 @@
       case 'b': back(); break;
       case 'lb': switchTab(-1); break;
       case 'rb': switchTab(1); break;
-      case 'lt': jumpLetter(-1); break;
-      case 'rt': jumpLetter(1); break;
+      case 'lt': if (act && act.lt) act.lt(); else jumpLetter(-1); break;
+      case 'rt': if (act && act.rt) act.rt(); else jumpLetter(1); break;
       case 'search': if (S.route.view !== 'search') { S.trans = 'v-fade'; openTab('search'); } break;
       case 'menu': openQuickMenu(); break;
       default: break;

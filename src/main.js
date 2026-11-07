@@ -726,7 +726,8 @@ ipcMain.handle('config:import', async () => {
 // Média en cours sur le PC (Spotify, YouTube…) pour le widget « Lecture en cours ».
 const mediactl = require('./mediactl');
 ipcMain.handle('media:ask', async (_e, cmd) => {
-  const c = ['state', 'toggle', 'next', 'prev'].includes(cmd) ? cmd : 'state';
+  const m = /^vol (0(\.\d+)?|1(\.0+)?)$/.exec(String(cmd || ''));
+  const c = m ? m[0] : ['state', 'toggle', 'next', 'prev'].includes(cmd) ? cmd : 'state';
   return mediactl.ask(c, path.join(app.getPath('userData'), 'media-covers'));
 });
 app.on('will-quit', () => mediactl.stop());

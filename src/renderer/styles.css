@@ -1098,3 +1098,13 @@ body.home-clock #topbar .status { visibility: hidden; }
 .syscard.add-sys { display: grid; place-content: center; justify-items: center; gap: 6px; border: 2px dashed rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.03); }
 .syscard.add-sys .folder-plus { font-size: 30px; opacity: 0.8; }
 .syscard.add-sys .sys-name { text-align: center; }
+
+/* ---------- Widget lecture : volume de l'appli ---------- */
+.w-np-ctrl { flex-wrap: nowrap; min-width: 0; }
+.w-vol { display: flex; align-items: center; gap: 6px; margin-left: 8px; min-width: 0; flex: 1 1 auto; max-width: 300px; }
+.w-np-ctrl .w-vbtn { width: 28px; height: 28px; font-size: 12px; flex: none; }
+.w-vol-bar { position: relative; flex: 1 1 auto; min-width: 36px; height: 6px; border-radius: 99px; background: rgba(255, 255, 255, 0.14); cursor: pointer; }
+.w-vol-bar::before { content: ''; position: absolute; inset: -8px 0; }
+.w-vol-bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit; background: var(--accent); transition: width 0.2s ease; }
+.w-vol-pct { font-size: 12px; color: var(--muted); font-weight: 700; min-width: 38px; font-variant-numeric: tabular-nums; flex: none; }
+.widget:not(.wide) .w-vol-pct { display: none; }

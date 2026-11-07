@@ -71,7 +71,7 @@
       return { ok: true, cover: opt(8, 'iisu boxart'), icon: opt(3, 'icon'), logo: opt(2, 'logo'), hero: opt(4, 'hero') };
     },
     pickImage: async () => null,
-    media: (() => { let playing = true; return async (cmd) => { if (cmd === 'toggle') playing = !playing; return cmd === 'state' || !cmd ? { active: true, status: playing ? 'Playing' : 'Paused', title: 'Blinding Lights', artist: 'The Weeknd', app: 'Spotify.exe', thumb: '' } : { ok: true }; }; })(),
+    media: (() => { let playing = true; let vol = 0.7; return async (cmd) => { if (cmd === 'toggle') playing = !playing; if (/^vol /.test(cmd || '')) { vol = Number(cmd.slice(4)); return { vol }; } return cmd === 'state' || !cmd ? { active: true, status: playing ? 'Playing' : 'Paused', title: 'Blinding Lights', artist: 'The Weeknd', app: 'Spotify.exe', thumb: '', vol } : { ok: true }; }; })(),
     mapper: { start: async () => true, send: () => {}, stop: async () => true },
     achievements: {
       summary: async () => ({
