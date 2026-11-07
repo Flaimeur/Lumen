@@ -1517,7 +1517,7 @@
     const playing = m.status === 'Playing';
     const btn = (label, cmd, extra = '') => h('button', { class: 'w-mbtn ' + extra, onClick: (e) => { e.stopPropagation(); mediaCmd(cmd); } }, label);
     return [h('div', { class: 'w-np' },
-      m.thumb ? h('img', { class: 'w-np-cover', src: api.mediaUrl(m.thumb), alt: '' }) : h('div', { class: 'w-np-cover empty' }, playing ? h('span', { class: 'w-eq' }, h('i'), h('i'), h('i')) : '♪'),
+      m.thumb ? h('img', { class: 'w-np-cover', src: api.mediaUrl(m.thumb), alt: '' }) : h('div', { class: 'w-np-cover np-empty' }, playing ? h('span', { class: 'w-eq' }, h('i'), h('i'), h('i')) : '♪'),
       h('div', { class: 'w-np-text' },
         h('b', {}, m.title || 'Sans titre'),
         h('div', { class: 'w-sub' }, [m.artist, appName(m.app)].filter(Boolean).join(' · ')),
@@ -1927,7 +1927,7 @@
     const color = folderColor(c.id);
     const minis = h('div', { class: 'folder-minis' }, [0, 1, 2, 3].map((i) => {
       const g = games[i];
-      if (!g) return h('div', { class: 'mini empty' });
+      if (!g) return h('div', { class: 'mini blank' });
       const sys = sysById(g.system);
       return h('div', { class: 'mini' }, g.cover
         ? h('img', { src: api.mediaUrl(g.cover), loading: 'lazy', alt: '', draggable: 'false' })
@@ -1979,7 +1979,7 @@
           ? `Appuie sur ${Input.lastDevice === 'keyboard' ? 'F' : 'X'} sur un jeu pour l’ajouter aux favoris.`
           : 'Ouvre le menu rapide (☰) sur un jeu et choisis « Ranger dans un dossier ».')));
     }
-    return h('div', { class: 'folder-view', '--fc': color }, head, fillGrid(h('div', { class: 'grid' }), games, focusIndex, id));
+    return h('div', { class: 'folder-view', '--fc': color }, head, fillGrid(h('div', { class: 'grid' }), sortGames(games), focusIndex, id));
   }
 
   // ---------- Recherche ----------
@@ -2607,10 +2607,12 @@
     }
 
     const sysId = S.route.view === 'games' ? S.route.systemId : null;
+    // Tri : toujours en haut niveau là où il s'applique.
+    if (sysId || S.route.view === 'folder') items.push([`Trier par : ${sortLabel()}`, () => openSortMenu(reopen), { icon: '⇅', sub: true }]);
+    if (S.route.view === 'systems' && !g) items.push([`Trier les consoles : ${(SYS_SORTS.find(([id]) => id === (S.cfg.sysSort || 'default')) || SYS_SORTS[0])[1]}`, () => openSysSortMenu(reopen), { icon: '⇅', sub: true }]);
     if (sysId) {
       const cur = S.lib.systems.find((x) => x.id === sysId);
       const view = [];
-      view.push([`Trier par : ${sortLabel()}`, run(cycleSort), { icon: '⇅' }]);
       if (cur && filterChip(cur)) view.push([`Afficher : ${filterLabel(filterOf(sysId))}`, run(() => openFilterMenu(cur)), { icon: '⏷' }]);
       if (api.iidb && S.cfg.iidb && S.cfg.iidb.enabled !== false && !(cur && cur.apps)) view.push(['Images iiDB de cette console', run(() => openIidb({ systemId: sysId })), { icon: '🖼' }]);
       if (cur && cur.pc && !cur.apps) view.push(['Images SteamGridDB', run(openSgdb), { icon: '🖼' }]);
@@ -2783,6 +2785,23 @@
     toast(`Dossier « ${name} » supprimé (les jeux restent dans ta bibliothèque)`);
     if (S.route.view === 'folder' && S.route.id === name) { back(); return; }
     rerender();
+  }
+
+  function setSort(id) {
+    S.cfg.sort = id;
+    saveCfg();
+    toast(`Tri : ${sortLabel()}`);
+    S.keepAnim = false;
+    S.trans = 'v-fade';
+    render(0);
+  }
+  function openSortMenu(back) {
+    const cur = S.cfg.sort || 'name';
+    openSubMenu('Trier par', SORTS.map((o) => [o.label, () => { closeOverlay(true); setSort(o.id); }, { icon: o.id === cur ? '✓' : '' }]), back);
+  }
+  function openSysSortMenu(back) {
+    const cur = S.cfg.sysSort || 'default';
+    openSubMenu('Trier les consoles', SYS_SORTS.map(([id, label]) => [label, () => { closeOverlay(true); S.cfg.sysSort = id; saveCfg(); S.keepAnim = true; render(0); toast(`Consoles : ${label}`); }, { icon: id === cur ? '✓' : '' }]), back);
   }
 
   function cycleSort() {
