@@ -1,105 +1,71 @@
+<div align="center">
+
+<img src="build/icon.svg" alt="Logo de Lumen : un croissant de lune et les quatre boutons d'une manette" width="120">
+
 # Lumen
 
-Frontend de jeux pour Windows, pensé pour la manette : tes ROMs, tes jeux Steam, Epic et GOG et tes applications au même endroit. Lumen n'inclut ni jeux ni émulateurs : il range ta bibliothèque et lance tes émulateurs et launchers.
+**Tous tes jeux au même endroit, à piloter à la manette.**
 
-**Télécharger :** [dernière version](https://github.com/Flaimeur/Lumen/releases/latest). Ensuite, les mises à jour s'installent toutes seules.
+ROMs, Steam, Epic, GOG, RomM et tes applications dans une seule interface plein écran pour Windows.
 
-### « Windows a protégé votre ordinateur » ?
+[![Dernière version](https://img.shields.io/github/v/release/Flaimeur/Lumen?label=version&color=8b7cf0)](https://github.com/Flaimeur/Lumen/releases/latest)
+[![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-5eead4)](https://github.com/Flaimeur/Lumen/releases/latest)
+[![Téléchargements](https://img.shields.io/github/downloads/Flaimeur/Lumen/total?color=f472b6&label=t%C3%A9l%C3%A9chargements)](https://github.com/Flaimeur/Lumen/releases)
 
-L'installateur n'est pas signé avec un certificat payant, alors Windows SmartScreen affiche cet avertissement à la première installation. C'est normal :
+[Télécharger](https://github.com/Flaimeur/Lumen/releases/latest) · [Fonctionnalités](#fonctionnalités) · [Prise en main](#prise-en-main) · [Contrôles](#contrôles) · [Développer](#développer)
 
-1. Clique sur **Informations complémentaires**.
-2. Puis sur **Exécuter quand même**.
+<img src="docs/screenshots/accueil.jpg" alt="Accueil de Lumen : widgets, jeu à reprendre et jeux récents" width="900">
 
-Si le navigateur bloque le téléchargement (Edge/Chrome : « n'est pas fréquemment téléchargé »), ouvre le menu **⋯** du téléchargement → **Conserver** → **Conserver quand même**. Le code est entièrement ouvert ici ; les mises à jour suivantes s'installent ensuite sans ce message.
+</div>
+
+Lumen range ta bibliothèque, trouve les images de tes jeux et lance tes émulateurs et launchers. Il n'inclut ni jeux ni émulateurs.
 
 ## Fonctionnalités
 
-- **Bibliothèque** : ROMs (un dossier par console, noms ES-DE ou libres comme « Switch 2 game »), jeux Steam (installés ou non), Epic, GOG, applications (Word, Discord…), serveur RomM.
-- **Images** : iiDB (jaquettes iiSU de la bonne console, icônes, logos, héros, soundbites), SteamGridDB, libretro-thumbnails, ou tes propres images (clic droit → Changer les images).
-- **Tri et filtres** : genre, étiquettes Steam, NSFW, installés / non installés, temps de jeu, dernière session ; recherche par console.
-- **Succès** : Steam (lu en local) et RetroAchievements, avec XP, niveaux, rangs et coupe d'or pour les jeux à 100 %.
-- **Manettes** : PS4, PS5 (y compris DualSense en Bluetooth), Xbox, Switch, avec les bons symboles ; profils manette → clavier/souris pour les jeux qui ne gèrent pas la manette.
-- **Accueil personnalisable** : widgets (horloge, météo, lecture en cours Spotify/YouTube, rang, jeu surprise, favoris, mémo…), fond d'écran (thèmes animés ou ton image), roulette de jeu au hasard.
-- **Son** : sons d'interface et musique de fond (ton dossier), soundbites par jeu, touche M pour tout couper.
-- **Temps de jeu** : compté par Lumen et lu dans Steam.
-- **Sauvegarde** : export / import de la configuration ; mises à jour automatiques depuis GitHub.
+- **Une seule bibliothèque** : ROMs (un dossier par console, noms ES-DE), Steam (installés ou non), Epic, GOG, serveur RomM, applications Windows, et tes propres consoles (PS3, Xbox, Amiga…).
+- **De belles images** : jaquettes iiSU de la bonne console via iiDB, SteamGridDB, libretro-thumbnails, ou tes propres images.
+- **Succès** : Steam (lus en local) et RetroAchievements, avec XP, rangs, coupe d'or à 100 % et bannière « Succès débloqué » par-dessus le jeu.
+- **Statistiques et notes** : temps de jeu (Lumen et Steam), jeux les plus joués, temps par console et par semaine, notes sur 5 étoiles.
+- **Manettes** : PS4, PS5 (DualSense en Bluetooth compris), Xbox et Switch avec les bons symboles ; profils manette → clavier pour les jeux qui ne gèrent pas la manette.
+- **Accueil à ton goût** : widgets (lecture en cours Spotify/YouTube avec volume, météo, rang, jeu surprise…), 15 fonds animés, styles tout prêts.
+- **Tri, filtres et roulette** : par nom, note, temps de jeu, progression ; jeu au hasard avec options (jamais joués, sans les 100 %…).
+- **Toujours à jour** : mises à jour automatiques, sauvegarde et restauration de la configuration.
 
-## Lancer
+<table>
+  <tr>
+    <td><img src="docs/screenshots/consoles.jpg" alt="Liste des consoles"></td>
+    <td><img src="docs/screenshots/jeux.jpg" alt="Grille de jeux d'une console"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/stats.jpg" alt="Page Statistiques"></td>
+    <td><img src="docs/screenshots/menu.jpg" alt="Menu rapide"></td>
+  </tr>
+</table>
 
-```bash
-npm install
-npm start            # plein écran
-npm run windowed     # en fenêtre
-npm run check        # tests du scanner et des commandes
-npm run preview      # interface seule dans le navigateur (données de démo)
-```
+## Prise en main
 
-Si `npm install` n'a pas téléchargé Electron : `node node_modules/electron/install.js`.
+1. Télécharge `Lumen-Setup-x.y.z.exe` depuis la [dernière version](https://github.com/Flaimeur/Lumen/releases/latest) et lance-le.
+2. Au premier démarrage, l'assistant te guide : dossier des ROMs, Steam/Epic/GOG, RetroArch, manette, style d'accueil et images.
+3. C'est tout : les mises à jour suivantes s'installent toutes seules.
 
-## Ranger ses jeux
+> [!NOTE]
+> **« Windows a protégé votre ordinateur » ?** L'installateur n'est pas signé avec un certificat payant, alors SmartScreen affiche cet avertissement la première fois. Clique sur **Informations complémentaires**, puis sur **Exécuter quand même**.
+>
+> Si le navigateur bloque le fichier (« n'est pas fréquemment téléchargé »), ouvre le menu **⋯** du téléchargement → **Conserver** → **Conserver quand même**. Le code est entièrement ouvert ici.
 
-Un sous-dossier par console dans ton dossier de ROMs (noms compatibles ES-DE) :
+### Ranger ses jeux
+
+Un sous-dossier par console dans ton dossier de ROMs, avec les noms d'ES-DE :
 
 ```
 ROMs/
   snes/   gba/   n64/   psx/   ps2/   gc/   wii/   switch/   windows/ ...
 ```
 
-Le dossier `windows` accepte des raccourcis `.lnk` / `.url` (Steam, GOG…) ouverts directement par Windows.
+Le dossier `windows` accepte des raccourcis `.lnk` / `.url`. Pour une plateforme non prévue, utilise **Consoles → Ajouter une console** (dossier, extensions, émulateur).
 
-## Images
-
-Pour chaque jeu, Lumen cherche une image portant le même nom que la ROM (sans l'extension) dans :
-
-- `<médias ES-DE>/<console>/<type>/` (par défaut `~/ES-DE/downloaded_media`)
-- `<ROMs>/<console>/media/<type>/`
-
-| Dossier `<type>` | Utilisé pour |
-|---|---|
-| `boxart`, `icons`, `covers`, `miximages` | tuile du jeu (format 1:1 conseillé) |
-| `heroes`, `banners`, `fanart` | bannière d'accueil et fond flou |
-| `logos`, `marquees` | logo affiché sur la bannière |
-| `screenshots`, `titlescreens` | fond de secours |
-
-### Téléchargement automatique
-
-Réglages → « Télécharger les jaquettes manquantes » (ou menu rapide → « Jaquettes de cette console ») récupère depuis [libretro-thumbnails](https://github.com/libretro/libretro-thumbnails) les jaquettes, captures, écrans-titres et logos absents, et les range dans `<ROMs>/<console>/media/`. La correspondance se fait sur le nom du fichier : les ROMs nommées selon No-Intro / Redump trouvent presque toujours leur image ; sinon Lumen essaie une correspondance approximative (sans les tags de région) en préférant ta région. Pas de source pour Switch et les jeux PC.
-
-### iiDB
-
-Les types `boxart`, `icons`, `banners`, `heroes` et `logos` correspondent aux catégories d'assets d'iiDB. Ses conditions d'utilisation interdisent le téléchargement automatique hors API officielle : télécharge les assets un par un depuis le site et range-les dans ces dossiers.
-
-### Soundbites, musiques et vidéos
-
-| Dossier | Contenu |
-|---|---|
-| `<console>/media/soundbites/` | extrait audio (`.ogg`, `.mp3`, `.wav`, `.opus`…) joué quand le jeu est sélectionné |
-| `<console>/media/videos/` ou `videos/` d'ES-DE | vidéo (`.mp4`, `.webm`) lue dans la tuile après un instant |
-
-Les soundbites d'iiDB se téléchargent un par un depuis le site (ses conditions interdisent le téléchargement automatique sans API officielle) ; renomme-les comme la ROM. Activables/désactivables dans Réglages, avec le volume.
-
-## RomM
-
-Lumen peut afficher les jeux d'un serveur [RomM](https://romm.app) (4.x / 5.x) à côté des tiens :
-
-1. Dans RomM : **Administration → Client API Tokens** → crée un jeton (la portée `roms.read` suffit). Il commence par `rmm_`.
-2. Dans Lumen : **Réglages → RomM** → adresse du serveur, jeton (Ctrl+V), puis « Tester la connexion » et active « Utiliser mon serveur RomM ».
-
-- Les jeux RomM portent un badge ☁. **A** les télécharge (barre de progression, **B** pour annuler) puis les lance ; ils restent ensuite sur le PC (dossier réglable, par défaut `Documents\Lumen\RomM`).
-- Les jeux multi-fichiers (multi-disques…) arrivent en zip et sont extraits automatiquement ; le `.m3u` ou `.cue` est choisi pour le lancement.
-- Les jaquettes sont téléchargées à l'affichage puis mises en cache.
-- Menu rapide : « Télécharger sans lancer » / « Supprimer la copie locale ».
-- Si un fichier du même nom existe déjà dans ton dossier de ROMs, c'est la copie locale qui est utilisée.
-- Hors ligne, Lumen garde la dernière liste connue.
-- Le jeton (ou le mot de passe) est chiffré par Windows sur ce PC ; « Oublier les identifiants RomM » l'efface.
-
-## Installer
-
-```bash
-npm run dist            # installeur Windows dans dist/
-npm run dist:portable   # version portable (.exe unique)
-```
+> [!TIP]
+> Nomme tes ROMs selon No-Intro / Redump : Lumen trouve alors presque toujours leur jaquette.
 
 ## Contrôles
 
@@ -111,21 +77,57 @@ npm run dist:portable   # version portable (.exe unique)
 | Favori | X | F |
 | Détails | Y | I |
 | Onglet précédent / suivant | LB / RB | Q / E |
-| Lettre précédente / suivante | LT / RT | Page préc. / suiv. |
-| Menu rapide (images, dossiers, profil manette…) | Start / Select | Tab ou clic droit |
+| Lettre précédente / suivante (volume sur le widget musique) | LT / RT | Page préc. / suiv. |
+| Menu rapide | Start / Select | Tab ou clic droit |
 | Couper / remettre le son | — | M |
-| Recherche | onglet Recherche | / puis taper |
 | Quitter le jeu en cours | Select + Start maintenus 1,5 s | Ctrl + Maj + Q |
 | Plein écran | — | F11 |
 
-La bibliothèque est mise en cache : Lumen s'ouvre instantanément puis vérifie le disque en arrière-plan.
+## Images et médias
+
+Lumen cherche, pour chaque jeu, une image du même nom que la ROM dans `<médias ES-DE>/<console>/<type>/` ou `<ROMs>/<console>/media/<type>/`.
+
+| Dossier `<type>` | Utilisé pour |
+|---|---|
+| `boxart`, `icons`, `covers`, `miximages` | tuile du jeu (format carré conseillé) |
+| `heroes`, `banners`, `fanart` | bannière d'accueil et fond |
+| `logos`, `marquees` | logo sur la bannière |
+| `soundbites` | extrait audio joué à la sélection |
+| `videos` | vidéo lue dans la tuile |
+
+Le plus simple reste les boutons intégrés : **Images iiDB** (jaquettes iiSU, icônes, logos, soundbites), **SteamGridDB** pour les jeux PC, et **Télécharger les jaquettes manquantes** (libretro-thumbnails). Clic droit sur un jeu → **Changer les images** pour choisir toi-même.
+
+## RomM
+
+Lumen affiche les jeux d'un serveur [RomM](https://romm.app) (4.x / 5.x) à côté des tiens :
+
+1. Dans RomM : **Administration → Client API Tokens** → crée un jeton (`roms.read` suffit).
+2. Dans Lumen : **Réglages → Comptes → RomM** → adresse du serveur et jeton, puis **Tester la connexion**.
+
+Les jeux RomM portent un nuage ; **A** les télécharge puis les lance, et ils restent ensuite sur le PC. Le jeton est chiffré par Windows.
 
 ## Émulateurs
 
-Configure les chemins dans Réglages → Émulateurs. RetroArch est détecté automatiquement aux emplacements habituels. Chaque console a une commande modifiable (Réglages → Commandes par console), par exemple :
+RetroArch est détecté automatiquement. Les autres émulateurs (Dolphin, PCSX2, Cemu…) se règlent dans **Réglages → Émulateurs**, et chaque console a une commande modifiable :
 
 ```
 "{retroarch}" -f -L "{retroarchDir}\cores\snes9x_libretro.dll" "{rom}"
 ```
 
-Les cœurs RetroArch doivent être installés (Menu principal → Charger un cœur → Télécharger un cœur).
+## Développer
+
+Il faut [Node.js](https://nodejs.org) 20 ou plus.
+
+```bash
+npm install
+npm start              # plein écran
+npm run windowed       # en fenêtre
+npm run preview        # interface seule dans le navigateur, avec des données de démo
+npm run check          # tests du scanner et des commandes
+npm run dist           # installateur Windows dans dist/
+```
+
+> [!TIP]
+> Si `npm install` n'a pas téléchargé Electron : `node node_modules/electron/install.js`.
+
+L'icône se régénère à partir de `build/icon.svg` avec `npm run icon`.

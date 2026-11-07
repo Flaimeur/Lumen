@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-labelledby="t3">
+  <title id="t3">Lumen : halo lumineux autour d'une croix directionnelle</title>
+  <defs>
+    <linearGradient id="c3bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#151a33"/><stop offset="1" stop-color="#06070e"/></linearGradient>
+    <linearGradient id="c3r" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5eead4"/><stop offset=".55" stop-color="#818cf8"/><stop offset="1" stop-color="#f472b6"/></linearGradient>
+    <filter id="c3g" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4"/></filter>
+  </defs>
+  <rect width="120" height="120" rx="28" fill="url(#c3bg)"/>
+  <circle cx="60" cy="60" r="32" fill="none" stroke="url(#c3r)" stroke-width="10" stroke-linecap="round" stroke-dasharray="170 31" transform="rotate(-62 60 60)" filter="url(#c3g)" opacity=".6"/>
+  <circle cx="60" cy="60" r="32" fill="none" stroke="url(#c3r)" stroke-width="9" stroke-linecap="round" stroke-dasharray="170 31" transform="rotate(-62 60 60)"/>
+  <path d="M55 45a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v10h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H65v10a2 2 0 0 1-2 2h-6a2 2 0 0 1-2-2V65H45a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2h10z" fill="#f1f5f9"/>
+  <circle cx="86" cy="34" r="3" fill="#fff"/>
+</svg>

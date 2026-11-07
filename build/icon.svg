@@ -1,25 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 120 120">
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 120 120" role="img" aria-labelledby="t1">
+  <title id="t1">Lumen : croissant de lune et boutons de manette</title>
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#141a30"/>
-      <stop offset="1" stop-color="#070a12"/>
-    </linearGradient>
-    <linearGradient id="moon" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#d4d0fb"/>
-      <stop offset="1" stop-color="#8f86e6"/>
-    </linearGradient>
-    <mask id="crescent">
-      <circle cx="58" cy="60" r="32" fill="#fff"/>
-      <circle cx="74" cy="50" r="28" fill="#000"/>
-    </mask>
-    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
-      <feGaussianBlur stdDeviation="5"/>
-    </filter>
+    <linearGradient id="c1bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#161c36"/><stop offset="1" stop-color="#06080f"/></linearGradient>
+    <linearGradient id="c1moon" x1="0.1" y1="0" x2="0.8" y2="1"><stop offset="0" stop-color="#e0dcff"/><stop offset="1" stop-color="#8b7cf0"/></linearGradient>
+    <mask id="c1m"><circle cx="54" cy="62" r="34" fill="#fff"/><circle cx="72" cy="50" r="29" fill="#000"/></mask>
+    <filter id="c1g" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4"/></filter>
   </defs>
-  <rect width="120" height="120" rx="28" fill="url(#bg)"/>
-  <circle cx="58" cy="60" r="32" fill="#AFA9EC" mask="url(#crescent)" filter="url(#glow)" opacity="0.55"/>
-  <circle cx="58" cy="60" r="32" fill="url(#moon)" mask="url(#crescent)"/>
-  <circle cx="84" cy="80" r="6" fill="#5DCAA5"/>
-  <circle cx="96" cy="66" r="3.5" fill="#ED93B1"/>
-  <circle cx="30" cy="30" r="2.5" fill="#F1EFE8"/>
+  <rect width="120" height="120" rx="28" fill="url(#c1bg)"/>
+  <circle cx="54" cy="62" r="34" fill="#a99cf5" mask="url(#c1m)" filter="url(#c1g)" opacity=".5"/>
+  <circle cx="54" cy="62" r="34" fill="url(#c1moon)" mask="url(#c1m)"/>
+  <g>
+    <circle cx="76" cy="36" r="4.6" fill="#5eead4"/>
+    <circle cx="88" cy="48" r="4.6" fill="#f472b6"/>
+    <circle cx="76" cy="60" r="4.6" fill="#fbbf24"/>
+    <circle cx="64" cy="48" r="4.6" fill="#60a5fa"/>
+  </g>
 </svg>

@@ -10,11 +10,15 @@
 <body class="no-cursor booting">
   <div id="boot" aria-hidden="true">
     <svg class="boot-mark" viewBox="0 0 120 120">
-      <mask id="boot-crescent"><circle cx="58" cy="60" r="32" fill="#fff"/><circle cx="74" cy="50" r="28" fill="#000"/></mask>
-      <g class="moon"><circle cx="58" cy="60" r="32" fill="#AFA9EC" mask="url(#boot-crescent)"/></g>
-      <circle class="star s1" cx="84" cy="80" r="6" fill="#5DCAA5"/>
-      <circle class="star s2" cx="96" cy="66" r="3.5" fill="#ED93B1"/>
-      <circle class="star s3" cx="30" cy="30" r="2.5" fill="#F1EFE8"/>
+      <defs>
+        <linearGradient id="boot-moon-g" x1="0.1" y1="0" x2="0.8" y2="1"><stop offset="0" stop-color="#e0dcff"/><stop offset="1" stop-color="#8b7cf0"/></linearGradient>
+        <mask id="boot-crescent"><circle cx="54" cy="62" r="34" fill="#fff"/><circle cx="72" cy="50" r="29" fill="#000"/></mask>
+      </defs>
+      <g class="moon"><circle cx="54" cy="62" r="34" fill="url(#boot-moon-g)" mask="url(#boot-crescent)"/></g>
+      <circle class="star s1" cx="76" cy="36" r="4.6" fill="#5eead4"/>
+      <circle class="star s2" cx="88" cy="48" r="4.6" fill="#f472b6"/>
+      <circle class="star s3" cx="76" cy="60" r="4.6" fill="#fbbf24"/>
+      <circle class="star s4" cx="64" cy="48" r="4.6" fill="#60a5fa"/>
     </svg>
     <div class="boot-word">lumen</div>
   </div>

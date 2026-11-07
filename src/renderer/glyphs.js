@@ -84,7 +84,7 @@
   }
 
   // Où chercher les libellés à convertir.
-  const SEL = '.btn, .chip, .folder-plus, .w-sub, .w-hint, .folder-name, .set-label, .set-desc, .ach-sub, .st-name, .st-tile span, .mi-icon, .mc-icon, .eyebrow, .w-big, .w-ico, .vh-badge, .menu-section, .toast, .set-value, .wiz-status, .stars-label, .roll-actions .btn, .np-empty';
+  const SEL = '.btn, .chip, .badge-cloud, .folder-plus, .w-sub, .w-hint, .folder-name, .set-label, .set-desc, .ach-sub, .st-name, .st-tile span, .mi-icon, .mc-icon, .eyebrow, .w-big, .w-ico, .vh-badge, .menu-section, .toast, .set-value, .wiz-status, .stars-label, .roll-actions .btn, .np-empty';
   function convert(el) {
     if (el.dataset.gi) return;
     const t = [...el.childNodes].find((n) => n.nodeType === 3 && n.nodeValue.trim());
