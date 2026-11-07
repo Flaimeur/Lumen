@@ -3656,6 +3656,8 @@
     Input.on(onAction);
     Input.onDevice(() => { setHints(S.hintKind); renderDock(); });
     api.onGameExit(onGameExit);
+    // Jaquettes iiDB revérifiées en arrière-plan : on recharge la bibliothèque sans interrompre.
+    if (api.onLibraryChanged) api.onLibraryChanged(async () => { try { applyLib(await api.scan({ romm: false })); if (!document.querySelector('.overlay')) rerender(); } catch { /* rien */ } });
     startClock();
     setHints('none');
     S.cursorHold = true;

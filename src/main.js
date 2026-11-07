@@ -297,7 +297,8 @@ function readIidb() {
   try { return JSON.parse(fs.readFileSync(iidbPath(), 'utf8')) || {}; } catch { return {}; }
 }
 let iidbAbort = null;
-ipcMain.handle('iidb:fetch', async (_e, opts = {}) => {
+ipcMain.handle('iidb:fetch', (_e, opts = {}) => runIidbFetch(opts));
+async function runIidbFetch(opts = {}) {
   if (iidbAbort) return { ok: false, error: 'Un téléchargement est déjà en cours.' };
   const cfg = loadConfig();
   const lib = await buildLibrary(cfg, { romm: false });
@@ -311,7 +312,7 @@ ipcMain.handle('iidb:fetch', async (_e, opts = {}) => {
   let lastSave = Date.now();
   try {
     const stats = await fetchIidb({
-      systems, collections: opts.systemId ? [] : Object.keys(cfg.collections || {}), cache,
+      systems, collections: opts.systemId ? [] : Object.keys(cfg.collections || {}), cache, refreshOnly: !!opts.refreshOnly,
       signal: iidbAbort.signal, fetchImpl: (u, o) => net.fetch(u, o),
       onProgress: (p) => {
         if (win) win.webContents.send('iidb:progress', p);
@@ -325,8 +326,21 @@ ipcMain.handle('iidb:fetch', async (_e, opts = {}) => {
     save();
     iidbAbort = null;
   }
-});
+}
 ipcMain.handle('iidb:cancel', () => { if (iidbAbort) iidbAbort.abort(); });
+
+// Ancien cache iiDB (jaquettes choisies sans tenir compte de la console) : revérification automatique en arrière-plan
+// au démarrage, une requête par jeu déjà trouvé, puis l'affichage est rafraîchi.
+app.whenReady().then(() => setTimeout(async () => {
+  const cache = readIidb();
+  const cfg = loadConfig();
+  const pending = cache.v !== 2 || Object.values(cache.games || {}).some((v) => v && v.stale);
+  if (!cache.games || !pending || cfg.iidb.enabled === false || iidbAbort) return;
+  try {
+    const res = await runIidbFetch({ refreshOnly: true });
+    if (res && res.ok && win && !win.isDestroyed()) win.webContents.send('library:changed');
+  } catch { /* hors ligne : on réessaiera au prochain démarrage */ }
+}, 20000));
 
 // Variantes iiDB pour l'éditeur d'images (clic droit → Changer les images).
 // target : { type: 'game' | 'platform' | 'collection', key, name, systemId }

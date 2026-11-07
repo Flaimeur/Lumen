@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('lumen', {
   systems: () => ipcRenderer.invoke('systems'),
   cachedLibrary: () => ipcRenderer.invoke('library:cached'),
   scan: (opts) => ipcRenderer.invoke('library:scan', opts || {}),
+  onLibraryChanged: (cb) => ipcRenderer.on('library:changed', () => cb()),
   romm: {
     status: () => ipcRenderer.invoke('romm:status'),
     setSecret: (kind, value) => ipcRenderer.invoke('romm:setSecret', kind, value),

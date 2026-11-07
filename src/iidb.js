@@ -77,7 +77,8 @@ async function findGame(call, name, platformName) {
 
 // Remplit `cache` ({ games, platforms, collections }) pour ce qui n'a pas encore été cherché.
 // Chaque recherche est mémorisée, même sans résultat, pour ne pas la refaire.
-async function fetchIidb({ systems, collections = [], cache, signal, onProgress, fetchImpl }) {
+// refreshOnly : ne revérifie que les jeux déjà trouvés avec l'ancienne règle (pas de nouvelles recherches).
+async function fetchIidb({ systems, collections = [], cache, signal, onProgress, fetchImpl, refreshOnly = false }) {
   const call = client({ signal, fetchImpl });
   cache.games = cache.games || {};
   cache.platforms = cache.platforms || {};
@@ -97,15 +98,16 @@ async function fetchIidb({ systems, collections = [], cache, signal, onProgress,
   }
   for (const s of sysJobs) for (const g of s.games) {
     const e = cache.games[g.path];
-    if (e === undefined || (e && e.stale)) gameJobs.push({ s, g });
+    if (refreshOnly ? e && e.stale : e === undefined || (e && e.stale)) gameJobs.push({ s, g });
   }
-  const colJobs = collections.filter((n) => !(n in cache.collections));
-  stats.total = sysJobs.filter((s) => !(s.id in cache.platforms)).length + gameJobs.length + (colJobs.length ? 1 : 0);
+  const colJobs = refreshOnly ? [] : collections.filter((n) => !(n in cache.collections));
+  stats.total = (refreshOnly ? 0 : sysJobs.filter((s) => !(s.id in cache.platforms)).length) + gameJobs.length + (colJobs.length ? 1 : 0);
 
   for (const s of sysJobs) {
     if (signal.aborted) break;
     const known = cache.platforms[s.id];
     if (known !== undefined) { platformName[s.id] = known && known.name; continue; }
+    if (refreshOnly) continue; // revérification : pas de nouvelle recherche de console
     try {
       const p = await findPlatform(call, s);
       if (p) {
@@ -179,7 +181,7 @@ function applyIidb(lib, cache, { priority = true } = {}) {
       if (!a) continue;
       for (const k of ['cover', 'hero', 'logo', 'icon', 'soundbite']) {
         // Ancien cache pas encore rafraîchi : sa jaquette iiSU peut être celle d'une autre console.
-        if (k === 'cover' && a.stale && /\/iisu_boxart\//.test(a.cover || '')) continue;
+        if (k === 'cover' && (a.stale || cache.v !== 2) && /\/iisu_boxart\//.test(a.cover || '')) continue;
         if (a[k] && (priority || !g[k])) g[k] = a[k];
       }
       const bg = a.background || a.hero;
