@@ -45,6 +45,8 @@
     { id: 'playtime', label: 'Temps de jeu' },
     { id: 'year', label: 'Année' },
     { id: 'genre', label: 'Genre' },
+    { id: 'added', label: 'Ajouté récemment' },
+    { id: 'progress', label: 'Progression des succès' },
   ];
   const VOLUMES = [0.3, 0.5, 0.7, 1];
   const EMULATORS = [
@@ -1181,9 +1183,17 @@
   const playtimeOf = (g) => Math.max((S.cfg.playtime || {})[g.path] || 0, g.storePlaytime || 0);
 
   function sortGames(games) {
+    const list = sortGamesBy(games);
+    return S.cfg.sortDesc ? [...list].reverse() : list;
+  }
+  function sortGamesBy(games) {
     const mode = S.cfg.sort || 'name';
     if (mode === 'name') return games;
     const list = [...games];
+    const seen = S.cfg.firstSeen || {};
+    if (mode === 'added') list.sort((a, b) => (seen[b.path] || 0) - (seen[a.path] || 0) || a.name.localeCompare(b.name));
+    const prog = (g) => { const a = achInfo(g); return a && a.total ? a.unlocked / a.total : -1; };
+    if (mode === 'progress') list.sort((a, b) => prog(b) - prog(a) || a.name.localeCompare(b.name));
     const last = S.cfg.lastPlayed || {};
     const lastOf = (g) => Math.max(last[g.path] || 0, g.storeLastPlayed || 0);
     if (mode === 'recent') list.sort((a, b) => lastOf(b) - lastOf(a) || a.name.localeCompare(b.name));
@@ -1262,7 +1272,7 @@
       focus: () => { setTitle('Afficher', filterLabel(filterOf(s.id))); setHints('action'); },
     });
   }
-  const sortLabel = () => (SORTS.find((s) => s.id === (S.cfg.sort || 'name')) || SORTS[0]).label;
+  const sortLabel = () => (SORTS.find((s) => s.id === (S.cfg.sort || 'name')) || SORTS[0]).label + (S.cfg.sortDesc ? ' ↓' : '');
 
   const platformArt = (id) => (S.lib.platformArt || {})[id] || {};
 
@@ -1559,7 +1569,7 @@
     const rc = rollCfg();
     if (systemId === undefined) systemId = rc.systemId || null;
     const pool = S.lib.systems.filter((x) => !x.apps && (!systemId || x.id === systemId)).flatMap((x) => x.games)
-      .filter((g) => g.cover && (rc.scope === 'all' || (rc.scope === 'missing' ? g.installed === false : g.installed !== false)) && (rc.nsfw || !g.adult) && (rc.perfect !== false || !isPerfect(g)));
+      .filter((g) => g.cover && (rc.scope === 'all' || (rc.scope === 'missing' ? g.installed === false : g.installed !== false)) && (rc.nsfw || !g.adult) && (rc.perfect !== false || !isPerfect(g)) && (!rc.unplayed || !hasPlayed(g)));
     // Options en haut de la roulette.
     const SCOPES = { installed: 'Installés', missing: 'À télécharger', all: 'Tous les jeux' };
     const reroll = async () => { await saveCfg(); closeOverlay(true); openRoll(rc.systemId || null); };
@@ -1568,6 +1578,7 @@
       opt(`📦 ${SCOPES[rc.scope] || SCOPES.installed}`, () => { const k = Object.keys(SCOPES); rc.scope = k[(k.indexOf(rc.scope) + 1) % k.length]; reroll(); }),
       opt(rc.nsfw ? '🔞 NSFW inclus' : '🚫 Sans NSFW', () => { rc.nsfw = !rc.nsfw; reroll(); }),
       opt(rc.perfect === false ? '🏆 Sans les 100 %' : '🏆 100 % inclus', () => { rc.perfect = rc.perfect === false; reroll(); }),
+      opt(rc.unplayed ? '🆕 Jamais joués' : '🕹 Joués ou non', () => { rc.unplayed = !rc.unplayed; reroll(); }),
       opt(`🎮 ${systemId ? (S.lib.systems.find((x) => x.id === systemId) || {}).name || 'Console' : 'Toutes les consoles'}`, () => openMenu('Roulette sur', [
         ['Toutes les consoles', () => { rc.systemId = null; reroll(); }],
         ...S.lib.systems.filter((x) => !x.apps).map((x) => [x.name, () => { rc.systemId = x.id; reroll(); }])])));
@@ -1649,18 +1660,27 @@
   setInterval(() => { S.weather = null; }, 20 * 60 * 1000);
 
   // ---------- Fond d'écran ----------
+  // Thèmes : un fond sombre + trois « nappes » de couleur qui dérivent lentement, et un effet optionnel (étoiles, grille, grain).
   const WALL_THEMES = {
-    aurore: { name: 'Aurore', css: 'linear-gradient(125deg, #0f1b4d, #0d7a7a 30%, #5b2bb5 60%, #1e3a8a 85%, #0f766e)' },
-    coucher: { name: 'Coucher de soleil', css: 'linear-gradient(160deg, #2e1065, #9d174d 40%, #ea580c 75%, #fbbf24)' },
-    ocean: { name: 'Océan', css: 'linear-gradient(170deg, #0c1e5b, #1d4ed8 40%, #0891b2 75%, #67e8f9)' },
-    foret: { name: 'Forêt', css: 'linear-gradient(160deg, #052e16, #166534 40%, #15803d 70%, #a3e635)' },
-    nuit: { name: 'Nuit étoilée', css: 'radial-gradient(circle at 20% 20%, rgba(255,255,255,0.9) 0 1px, transparent 2px) 0 0 / 140px 140px, radial-gradient(circle at 70% 60%, rgba(255,255,255,0.7) 0 1px, transparent 2px) 0 0 / 220px 220px, linear-gradient(180deg, #05060f, #111a3b)' },
-    synthwave: { name: 'Synthwave', css: 'linear-gradient(transparent 62%, rgba(236,72,153,0.35) 62.3%, transparent 63%), repeating-linear-gradient(90deg, rgba(236,72,153,0.28) 0 1px, transparent 1px 70px), linear-gradient(180deg, #120428, #3b0764 55%, #9d174d 62%, #1e0336 63%)' },
-    sakura: { name: 'Sakura', css: 'linear-gradient(150deg, #4a044e, #be185d 45%, #f472b6 80%, #fbcfe8)' },
+    aurore: { name: 'Aurore', base: 'linear-gradient(160deg, #060a1c, #0a1630)', blobs: ['#0d9488', '#6d28d9', '#1d4ed8'], fx: 'grain' },
+    boreale: { name: 'Aurore boréale', base: 'linear-gradient(180deg, #01040c, #071a24)', blobs: ['#22c55e', '#14b8a6', '#8b5cf6'], fx: 'stars' },
+    galaxie: { name: 'Galaxie', base: 'linear-gradient(180deg, #04020c, #0c0620)', blobs: ['#7c3aed', '#db2777', '#2563eb'], fx: 'stars' },
+    nuit: { name: 'Nuit étoilée', base: 'linear-gradient(180deg, #03040b, #0d1533)', blobs: ['#1e3a8a', '#312e81', '#0f172a'], fx: 'stars' },
+    coucher: { name: 'Coucher de soleil', base: 'linear-gradient(180deg, #14061f, #2a0a1a)', blobs: ['#db2777', '#f97316', '#facc15'], fx: 'grain' },
+    ocean: { name: 'Océan', base: 'linear-gradient(180deg, #020b1f, #04203a)', blobs: ['#0ea5e9', '#1d4ed8', '#22d3ee'], fx: 'grain' },
+    foret: { name: 'Forêt', base: 'linear-gradient(180deg, #020d07, #06200f)', blobs: ['#15803d', '#65a30d', '#0f766e'], fx: 'grain' },
+    sakura: { name: 'Sakura', base: 'linear-gradient(180deg, #1c0619, #2a0a24)', blobs: ['#ec4899', '#f9a8d4', '#a855f7'], fx: 'grain' },
+    lave: { name: 'Lave', base: 'linear-gradient(180deg, #0d0202, #1c0505)', blobs: ['#dc2626', '#f97316', '#7f1d1d'], fx: 'grain' },
+    glace: { name: 'Glace', base: 'linear-gradient(180deg, #07111d, #0e2236)', blobs: ['#93c5fd', '#a5f3fc', '#6366f1'], fx: 'grain' },
+    neon: { name: 'Néon', base: 'linear-gradient(180deg, #040410, #080818)', blobs: ['#06b6d4', '#d946ef', '#22c55e'], fx: 'grid' },
+    synthwave: { name: 'Synthwave', base: 'linear-gradient(transparent 62%, rgba(236,72,153,0.35) 62.3%, transparent 63%), repeating-linear-gradient(90deg, rgba(236,72,153,0.28) 0 1px, transparent 1px 70px), linear-gradient(180deg, #120428, #3b0764 55%, #9d174d 62%, #1e0336 63%)', blobs: ['#ec4899', '#7c3aed', '#f59e0b'], fx: '' },
+    pastel: { name: 'Pastel', base: 'linear-gradient(180deg, #17142a, #1f1a33)', blobs: ['#f9a8d4', '#a5b4fc', '#99f6e4'], fx: 'grain' },
+    or: { name: 'Minuit doré', base: 'linear-gradient(180deg, #070503, #120c05)', blobs: ['#b45309', '#eab308', '#78350f'], fx: 'grain' },
+    graphite: { name: 'Graphite', base: 'linear-gradient(180deg, #08090c, #111318)', blobs: ['#374151', '#4b5563', '#1f2937'], fx: 'grain' },
   };
   const wallCfg = () => S.cfg.wallpaper || (S.cfg.wallpaper = { mode: 'auto', theme: 'aurore', image: '', dim: 0.25, gameArt: false });
-  function applyWallpaper() {
-    const w = wallCfg();
+  function applyWallpaper(previewTheme) {
+    const w = previewTheme ? { ...wallCfg(), mode: 'theme', theme: previewTheme } : wallCfg();
     let el = document.getElementById('wallpaper');
     if (!el) { el = h('div', { id: 'wallpaper' }); const bg = document.getElementById('bg'); if (bg) bg.prepend(el); }
     document.body.classList.toggle('wp-on', w.mode !== 'auto');
@@ -1668,9 +1688,13 @@
     document.body.classList.toggle('wp-fixed', w.mode !== 'auto' && !w.gameArt);
     document.documentElement.style.setProperty('--wp-dim', String(w.dim ?? 0.25));
     if (w.mode === 'image' && w.image) el.style.background = `center / cover no-repeat url("${api.mediaUrl(w.image)}")`;
-    else if (w.mode === 'theme') el.style.background = (WALL_THEMES[w.theme] || WALL_THEMES.aurore).css;
-    else el.style.background = '';
-    el.dataset.theme = w.mode === 'theme' ? w.theme : '';
+    else if (w.mode === 'theme') {
+      const t = WALL_THEMES[w.theme] || WALL_THEMES.aurore;
+      el.style.background = t.base;
+      t.blobs.forEach((c, i) => el.style.setProperty('--b' + (i + 1), c));
+    } else el.style.background = '';
+    el.dataset.theme = w.mode === 'theme' ? (WALL_THEMES[w.theme] ? w.theme : 'aurore') : '';
+    el.dataset.fx = w.mode === 'theme' ? (WALL_THEMES[w.theme] || WALL_THEMES.aurore).fx : '';
   }
 
   // Styles tout prêts : fond, couleur, widgets et ordre de l'accueil en un clic.
@@ -1730,7 +1754,10 @@
       w.mode = id;
       reopen('Type de fond');
     }])));
-    if (w.mode === 'theme') add('Thème', (WALL_THEMES[w.theme] || WALL_THEMES.aurore).name, () => openMenu('Thème', Object.entries(WALL_THEMES).map(([id, t]) => [t.name, () => { w.theme = id; reopen('Thème'); }])));
+    if (w.mode === 'theme') add('Thème', (WALL_THEMES[w.theme] || WALL_THEMES.aurore).name, () => openMenu('Thème', Object.entries(WALL_THEMES).map(([id, t]) => [t.name + (id === w.theme ? '  ✓' : ''), () => { w.theme = id; reopen('Thème'); }, {
+      icon: h('span', { class: 'wp-swatch', style: `background: radial-gradient(circle at 30% 30%, ${t.blobs[0]}, transparent 60%), radial-gradient(circle at 75% 70%, ${t.blobs[1]}, transparent 60%), ${t.blobs[2]}` }),
+      focus: () => applyWallpaper(id),
+    }]), 'select', { onClose: () => applyWallpaper() }));
     if (w.mode === 'image') add('Image', w.image ? w.image.split(/[\\/]/).pop() : 'Aucune', async () => {
       const file = api.pickImage && await api.pickImage('Image de fond');
       if (!file) return;
@@ -2522,7 +2549,7 @@
       list.push(focusable(h('div', { class: 'menu-item' + (extra.danger ? ' danger' : '') + (extra.sub ? ' has-sub' : '') },
         extra.icon ? h('span', { class: 'mi-icon' }, extra.icon) : null,
         h('span', { class: 'mi-label' }, label),
-        extra.sub ? h('span', { class: 'mi-arrow' }, '›') : null), { a: fn }));
+        extra.sub ? h('span', { class: 'mi-arrow' }, '›') : null), { a: fn, focus: extra.focus }));
     }
     const bar = opts.bar && opts.bar.length
       ? h('div', { class: 'menu-bar' }, opts.bar.map(([icon, label, fn]) => focusable(h('div', { class: 'menu-chip', title: label }, h('span', { class: 'mc-icon' }, icon), h('span', { class: 'mc-label' }, label)), { a: fn })))
@@ -2531,7 +2558,7 @@
       opts.subtitle ? h('div', { class: 'menu-sub' }, opts.subtitle) : null,
       h('h2', {}, title),
       h('div', { class: 'menu-list' }, list),
-      bar));
+      bar), opts.onClose ? { onClose: opts.onClose } : {});
     sfx(sound);
   }
   // Sous-menu avec un retour vers le menu rapide.
@@ -2798,7 +2825,10 @@
   }
   function openSortMenu(back) {
     const cur = S.cfg.sort || 'name';
-    openSubMenu('Trier par', SORTS.map((o) => [o.label, () => { closeOverlay(true); setSort(o.id); }, { icon: o.id === cur ? '✓' : '' }]), back);
+    openSubMenu('Trier par', [
+      ...SORTS.map((o) => [o.label, () => { closeOverlay(true); setSort(o.id); }, { icon: o.id === cur ? '✓' : '' }]),
+      [S.cfg.sortDesc ? 'Ordre inversé : oui' : 'Ordre inversé : non', () => { closeOverlay(true); S.cfg.sortDesc = !S.cfg.sortDesc; setSort(cur); }, { icon: '⇵' }],
+    ], back);
   }
   function openSysSortMenu(back) {
     const cur = S.cfg.sysSort || 'default';
@@ -2918,6 +2948,8 @@
   // ---------- Succès (Steam en local, RetroAchievements en ligne) ----------
   // Chaque entrée : { key, path?, raId?, title, icon, total, unlocked, last, source } ; key sert à ouvrir la liste.
   const achInfo = (g) => (S.ach && S.ach.byPath && S.ach.byPath.get(g.path)) || null;
+  // Déjà lancé : depuis Lumen, d'après le magasin (Steam…) ou du temps de jeu connu.
+  const hasPlayed = (g) => !!((S.cfg.lastPlayed || {})[g.path] || g.storeLastPlayed || playtimeOf(g) > 0);
   const isPerfect = (g) => { const a = achInfo(g); return !!(a && a.total && a.unlocked === a.total); };
   const fmtDay = (t) => new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
   const achFold = (x) => fold(String(x || '').replace(/~[^~]*~/g, ' ').replace(/\s*[([].*?[)\]]\s*/g, ' '));
@@ -3373,6 +3405,13 @@
     }
     S.byPath = new Map();
     for (const s of S.lib.systems) for (const g of s.games) S.byPath.set(g.path, g);
+    {
+      const seen = S.cfg.firstSeen || (S.cfg.firstSeen = {});
+      const first = !Object.keys(seen).length; // première fois : toute la bibliothèque existante compte comme « ancienne »
+      let added = false;
+      for (const p of S.byPath.keys()) if (!(p in seen)) { seen[p] = first ? 0 : Date.now(); added = true; }
+      if (added) setTimeout(() => saveCfg(), 0);
+    }
     for (const s of S.lib.systems) {
       const n = (S.cfg.sysNames || {})[s.id];
       if (n) { s.origName = s.origName || s.name; s.name = n.name || s.name; if (n.short) s.short = n.short; }
