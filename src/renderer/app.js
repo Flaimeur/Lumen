@@ -47,6 +47,7 @@
     { id: 'genre', label: 'Genre' },
     { id: 'added', label: 'Ajouté récemment' },
     { id: 'progress', label: 'Progression des succès' },
+    { id: 'rating', label: 'Ma note' },
   ];
   const VOLUMES = [0.3, 0.5, 0.7, 1];
   const EMULATORS = [
@@ -152,7 +153,7 @@
   const totalGames = () => S.lib.systems.reduce((n, s) => n + s.games.length, 0);
   const sysById = (id) => S.lib.systems.find((s) => s.id === id) || S.defs.find((s) => s.id === id);
   const isFav = (g) => S.cfg.favorites.includes(g.path);
-  const tabOf = (route) => (route.view === 'games' ? 'systems' : route.view === 'folder' ? 'favorites' : route.view);
+  const tabOf = (route) => (route.view === 'games' ? 'systems' : route.view === 'folder' ? 'favorites' : route.view === 'stats' ? 'achievements' : route.view);
   const saveCfg = () => api.setConfig(S.cfg);
 
   function fmtSize(bytes) {
@@ -1007,6 +1008,7 @@
     else if (v === 'favorites') content = viewFavorites();
     else if (v === 'folder') content = viewFolder(S.route.id, focusIndex);
     else if (v === 'achievements') content = viewAchievements();
+    else if (v === 'stats') content = viewStats();
     else content = viewSettings();
 
     const view = $('#view');
@@ -1148,6 +1150,7 @@
     if (g.source === 'app' && g.cover) tile.append(h('div', { class: 'app-name' }, g.name));
     const ai = achInfo(g);
     if (ai && ai.total && ai.unlocked === ai.total) tile.append(trophyIcon('on-tile'));
+    if (myRating(g)) tile.append(h('div', { class: 'tile-rating' }, '★ ' + myRating(g)));
     if (g.installed === false) { tile.classList.add('not-installed'); tile.append(h('span', { class: 'badge-cloud badge-dl', title: 'Non installé' }, '⬇')); }
     tile._game = g;
     return focusable(tile, {
@@ -1193,6 +1196,7 @@
     const seen = S.cfg.firstSeen || {};
     if (mode === 'added') list.sort((a, b) => (seen[b.path] || 0) - (seen[a.path] || 0) || a.name.localeCompare(b.name));
     const prog = (g) => { const a = achInfo(g); return a && a.total ? a.unlocked / a.total : -1; };
+    if (mode === 'rating') list.sort((a, b) => myRating(b) - myRating(a) || a.name.localeCompare(b.name));
     if (mode === 'progress') list.sort((a, b) => prog(b) - prog(a) || a.name.localeCompare(b.name));
     const last = S.cfg.lastPlayed || {};
     const lastOf = (g) => Math.max(last[g.path] || 0, g.storeLastPlayed || 0);
@@ -1294,6 +1298,35 @@
         setHints('system');
       },
     });
+  }
+
+  // ---------- Ma note (1 à 5 étoiles) ----------
+  const myRating = (g) => (S.cfg.ratings || {})[g.path] || 0;
+  async function setRating(g, n) {
+    const r = S.cfg.ratings || (S.cfg.ratings = {});
+    if (n) r[g.path] = n; else delete r[g.path];
+    await saveCfg();
+    S.dirty = true;
+    toast(n ? `${g.name} : ${'★'.repeat(n)}${'☆'.repeat(5 - n)}` : 'Note retirée');
+  }
+  // Rangée d'étoiles : A sur une étoile = cette note ; A sur la note actuelle = la retirer.
+  function starPicker(g) {
+    const row = h('div', { class: 'stars-pick' }, h('span', { class: 'stars-label' }, 'Ma note'));
+    const paint = () => row.querySelectorAll('.star').forEach((el, i) => el.classList.toggle('on', i < myRating(g)));
+    for (let i = 1; i <= 5; i++) {
+      row.append(focusable(h('span', { class: 'star' }, '★'), {
+        a: async () => { await setRating(g, myRating(g) === i ? 0 : i); paint(); },
+        focus: () => { setTitle('Ma note', i + ' / 5'); setHints('overlay'); },
+      }));
+    }
+    paint();
+    return row;
+  }
+  function openRatingMenu(g, back) {
+    const cur = myRating(g);
+    const items = [5, 4, 3, 2, 1].map((n) => ['★'.repeat(n) + '☆'.repeat(5 - n), () => { closeOverlay(true); setRating(g, n); if (S.route.view !== 'home') rerender(); }, { icon: n === cur ? '✓' : '' }]);
+    if (cur) items.push(['Retirer ma note', () => { closeOverlay(true); setRating(g, 0); rerender(); }, { icon: '✕' }]);
+    openSubMenu('Noter ' + g.name, items, back);
   }
 
   function actionButton(label, fn, primary) {
@@ -2257,6 +2290,13 @@
       toast('Tous les jeux sont de nouveau visibles');
     }, 'Masque un jeu depuis son menu rapide (☰).');
 
+    if (api.testAchNotify) {
+      cat('accounts');
+      section('Succès');
+      row('Bannière pendant le jeu', toggle(c.achNotify !== false), () => { c.achNotify = c.achNotify === false; saveCfg(); rerender(); },
+        'Affiche « Succès débloqué » par-dessus le jeu (Steam, RetroAchievements). Marche en plein écran fenêtré / sans bordure.');
+      row('Voir un exemple', 'Afficher', () => api.testAchNotify());
+    }
     if (api.ra) {
       const ra = c.retroachievements || (c.retroachievements = { username: '' });
       const st = S.raStatus || {};
@@ -2531,7 +2571,7 @@
     const facts = [
       ['Genre', g.genre], ['Étiquettes', (g.tags || []).slice(0, 6).join(', ')], ['Contenu', g.adult ? 'NSFW (adultes)' : null],
       ['Joueurs', g.players], ['Éditeur', g.publisher],
-      ['Note', g.rating != null ? `${g.rating} / 5` : null],
+      ['Note (base)', g.rating != null ? `${g.rating} / 5` : null],
       ['Temps de jeu', played ? formatTime(played) : null],
       ['Dernière session', (() => { const t = Math.max((S.cfg.lastPlayed || {})[g.path] || 0, g.storeLastPlayed || 0); return t ? new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : null; })()],
       ['Source', g.source === 'romm' ? (g.downloaded ? 'RomM · sur ce PC' : `RomM · ${fmtSize(g.size) || 'à télécharger'}`) : null],
@@ -2558,6 +2598,7 @@
           ? h('p', { class: 'desc' }, g.desc)
           : g.source === 'pc' || g.source === 'app' ? null
             : h('p', { class: 'desc muted' }, 'Pas de description. Indique tes dossiers ES-DE dans les Réglages pour enrichir les fiches.'),
+        starPicker(g),
         h('div', { class: 'actions' }, actionButton(g.installed === false ? '⬇ Installer' : '▶ Jouer', () => { closeOverlay(true); launch(g); }, true), favBtn,
           achInfo(g) ? actionButton(`🏆 Succès ${achInfo(g).unlocked} / ${achInfo(g).total}`, () => openAchievements(g)) : null,
           actionButton('⋯ Plus', () => { closeOverlay(true); const el = [...document.querySelectorAll('.tile')].find((t) => t._game === g); if (el) setFocus(el, { silent: true }); S.menuGame = g; openQuickMenu(); })),
@@ -2622,6 +2663,7 @@
       items.push(['Jouer', run(() => launch(g)), { icon: '▶' }]);
       items.push([isFav(g) ? 'Retirer des favoris' : 'Ajouter aux favoris', run(() => toggleFav(g)), { icon: isFav(g) ? '★' : '☆' }]);
       items.push(['Ranger dans un dossier', run(() => openCollectionPicker(g)), { icon: '📁' }]);
+      items.push([myRating(g) ? `Ma note : ${'★'.repeat(myRating(g))}` : 'Noter ce jeu', () => openRatingMenu(g, reopen), { icon: '✩', sub: true }]);
       if (g.source === 'app') items.push(...appMenuItems(g.path.slice(4)));
       else items.push(['Détails', run(() => openDetails(g)), { icon: 'ℹ' }]);
       if (achInfo(g) || (/^steam:/.test(g.path) && api.achievements)) items.push(['Succès', run(() => openAchievements(g)), { icon: '🏆' }]);
@@ -2689,6 +2731,7 @@
     const bar = [];
     if (S.route.view !== 'search') bar.push(['🔍', 'Rechercher', run(() => openTab('search'))]);
     bar.push(['🎲', 'Au hasard', run(() => openRoll(sysId || undefined))]);
+    if (S.route.view !== 'stats') bar.push(['📊', 'Stats', run(() => go({ view: 'stats' }))]);
     bar.push([S.cfg.muted ? '🔇' : '🔊', S.cfg.muted ? 'Son coupé' : 'Son', run(toggleMute)]);
     bar.push(['⛶', 'Plein écran', run(() => api.toggleFullscreen())]);
     bar.push(['⚙', 'Réglages', run(() => openTab('settings'))]);
@@ -2902,7 +2945,8 @@
 
   // Configuration guidée en 4 étapes.
   function openWelcome(step = 0) {
-    const STEPS = 5;
+    const STEPS = 7;
+    const done = async () => { S.cfg.onboarded = true; await saveCfg(); };
     const dots = h('div', { class: 'steps-dots' }, Array.from({ length: STEPS }, (_v, i) => h('span', { class: i === step ? 'on' : i < step ? 'done' : '' })));
     const next = () => { closeOverlay(true); openWelcome(step + 1); };
     let body;
@@ -2911,7 +2955,7 @@
         h('div', { class: 'logo-mark big' }),
         h('h1', {}, 'Bienvenue dans Lumen'),
         h('p', { class: 'muted' }, 'Tes ROMs, tes jeux Steam, Epic et GOG et tes applis au même endroit, à piloter à la manette. Lumen n’inclut ni jeux ni émulateurs : il range tes jeux et lance tes émulateurs et launchers. On règle tout en quelques étapes.'),
-        h('div', { class: 'actions' }, actionButton('Commencer', next, true), actionButton('Plus tard', () => closeOverlay())),
+        h('div', { class: 'actions' }, actionButton('Commencer', next, true), actionButton('Plus tard', async () => { closeOverlay(); await done(); toast('Tu pourras relancer l’assistant dans Réglages → Configuration guidée', 'info', 5000); })),
       ];
     } else if (step === 1) {
       const n = totalGames();
@@ -2923,38 +2967,75 @@
           S.cfg.romsRoot ? `${S.cfg.romsRoot} · ${plural(n, 'jeu trouvé', 'jeux trouvés')} sur ${plural(S.lib.systems.length, 'console', 'consoles')}` : 'Aucun dossier choisi'),
         h('div', { class: 'actions' },
           actionButton(S.cfg.romsRoot ? 'Changer de dossier' : 'Choisir le dossier', async () => { closeOverlay(true); await pickRoms(); openWelcome(1); }, !S.cfg.romsRoot),
-          actionButton('Continuer', next, !!S.cfg.romsRoot)),
+          actionButton(S.cfg.romsRoot ? 'Continuer' : 'Je n’ai pas de ROMs', next, !!S.cfg.romsRoot)),
       ];
     } else if (step === 2) {
+      // Jeux PC : Steam, Epic, GOG (installés ou non).
+      const stores = S.cfg.pcStores || (S.cfg.pcStores = { steam: true, epic: true, gog: true, steamUninstalled: true });
+      const pcGames = S.lib.systems.filter((x) => x.pc && !x.apps).flatMap((x) => x.games);
+      const count = (st) => pcGames.filter((g) => g.store === st).length;
+      const storeBtn = (id, label) => actionButton(`${stores[id] !== false ? '✓' : '○'} ${label}${stores[id] !== false && count(id) ? ' · ' + count(id) : ''}`, async () => {
+        stores[id] = stores[id] === false; await saveCfg(); closeOverlay(true); applyLib(await api.scan({ romm: false })); openWelcome(2);
+      });
       body = [
-        h('div', { class: 'eyebrow' }, 'Étape 2 · Émulateurs'),
+        h('div', { class: 'eyebrow' }, 'Étape 2 · Jeux PC'),
+        h('h1', {}, 'Steam, Epic et GOG'),
+        h('p', { class: 'muted' }, 'Lumen trouve tout seul les jeux de tes launchers, installés ou non, avec leur temps de jeu et tes succès Steam. Décoche ceux que tu n’utilises pas.'),
+        h('div', { class: 'wiz-status' + (pcGames.length ? ' ok' : '') }, pcGames.length ? plural(pcGames.length, 'jeu PC trouvé', 'jeux PC trouvés') : 'Aucun jeu PC trouvé pour l’instant'),
+        h('div', { class: 'actions wiz-choices' }, storeBtn('steam', 'Steam'), storeBtn('epic', 'Epic Games'), storeBtn('gog', 'GOG Galaxy')),
+        h('div', { class: 'actions' }, actionButton('Continuer', next, true)),
+      ];
+    } else if (step === 3) {
+      body = [
+        h('div', { class: 'eyebrow' }, 'Étape 3 · Émulateurs'),
         h('h1', {}, 'RetroArch'),
         h('p', { class: 'muted' }, 'RetroArch fait tourner la plupart des consoles rétro. Les émulateurs autonomes (Dolphin, PCSX2…) se règlent dans Réglages → Émulateurs.'),
         h('div', { class: 'wiz-status' + (S.cfg.emulators.retroarch ? ' ok' : '') }, S.cfg.emulators.retroarch ? `Trouvé : ${S.cfg.emulators.retroarch}` : 'RetroArch n’a pas été détecté automatiquement'),
         h('div', { class: 'actions' },
-          actionButton(S.cfg.emulators.retroarch ? 'Changer' : 'Indiquer retroarch.exe', async () => { closeOverlay(true); await pickEmulator('retroarch'); openWelcome(2); }, !S.cfg.emulators.retroarch),
-          actionButton('Continuer', next, !!S.cfg.emulators.retroarch)),
+          actionButton(S.cfg.emulators.retroarch ? 'Changer' : 'Indiquer retroarch.exe', async () => { closeOverlay(true); await pickEmulator('retroarch'); openWelcome(3); }, !S.cfg.emulators.retroarch),
+          actionButton(S.cfg.emulators.retroarch ? 'Continuer' : 'Passer', next, !!S.cfg.emulators.retroarch)),
       ];
-    } else if (step === 3) {
+    } else if (step === 4) {
+      // Manette : détection en direct.
+      const pads = Input.pads ? Input.pads() : [];
+      const PAD = { ps4: 'PlayStation 4', ps5: 'PlayStation 5', xbox: 'Xbox', switch: 'Nintendo Switch', generic: 'Manette' };
+      const status = h('div', { class: 'wiz-status' + (pads.length ? ' ok' : '') }, pads.length
+        ? pads.map((p) => PAD[p.type] || 'Manette').join(' + ') + ' · reconnue avec les bons symboles'
+        : 'Aucune manette : branche-la ou connecte-la en Bluetooth, puis appuie sur un bouton.');
+      if (!pads.length) {
+        const t = setInterval(() => {
+          if (!status.isConnected) { clearInterval(t); return; }
+          if (Input.pads && Input.pads().length) { clearInterval(t); closeOverlay(true); openWelcome(4); }
+        }, 700);
+      }
       body = [
-        h('div', { class: 'eyebrow' }, 'Étape 3 · Images'),
+        h('div', { class: 'eyebrow' }, 'Étape 4 · Manette'),
+        h('h1', {}, 'Ta manette'),
+        h('p', { class: 'muted' }, 'PlayStation (même la DualSense en Bluetooth), Xbox, Switch : Lumen les reconnaît et affiche les bons boutons. Le clavier et la souris marchent aussi.'),
+        status,
+        h('div', { class: 'actions' },
+          actionButton(`Inverser A/B : ${S.cfg.swapAB ? 'oui' : 'non'}`, async () => { S.cfg.swapAB = !S.cfg.swapAB; Input.swapAB = S.cfg.swapAB; await saveCfg(); closeOverlay(true); openWelcome(4); }),
+          actionButton('Continuer', next, true)),
+      ];
+    } else if (step === 5) {
+      // Style : un preset en un clic.
+      body = [
+        h('div', { class: 'eyebrow' }, 'Étape 5 · Style'),
+        h('h1', {}, 'Choisis un style d’accueil'),
+        h('p', { class: 'muted' }, 'Fond, couleur, widgets et ordre de l’accueil d’un coup. Tout se modifie ensuite (menu → Personnaliser l’accueil).'),
+        h('div', { class: 'wiz-presets' }, Object.entries(STYLE_PRESETS).map(([id, p]) => focusable(h('div', { class: 'wiz-preset', style: `--pc:${p.accent}` }, h('b', {}, p.name), h('span', {}, p.desc)), {
+          a: async () => { await applyStylePreset(id); next(); }, focus: () => setHints('overlay'),
+        }))),
+        h('div', { class: 'actions' }, actionButton('Garder le style actuel', next)),
+      ];
+    } else if (step === 6) {
+      body = [
+        h('div', { class: 'eyebrow' }, 'Étape 6 · Images'),
         h('h1', {}, 'Des images pour tous tes jeux'),
         h('p', { class: 'muted' }, 'Jaquettes iiSU, icônes, logos, bannières et soundbites depuis iiDB, pour tes jeux, tes consoles et tes dossiers. Tu pourras en choisir d’autres plus tard (clic droit → Changer les images).'),
         h('div', { class: 'actions' },
           api.iidb ? actionButton('Télécharger les images iiDB', () => { closeOverlay(true); openIidb(); }, true) : null,
           actionButton('Plus tard', next, !api.iidb)),
-      ];
-    } else if (step === 4) {
-      const pads = Input.getPads ? Input.getPads() : [];
-      const PAD = { ps4: 'PlayStation 4', ps5: 'PlayStation 5', xbox: 'Xbox', switch: 'Switch' };
-      body = [
-        h('div', { class: 'eyebrow' }, 'Étape 4 · À ton goût'),
-        h('h1', {}, 'Personnalise ton accueil'),
-        h('p', { class: 'muted' }, 'Fond d’écran (thème animé ou ton image), widgets (horloge, météo, musique en cours, rang, jeu surprise…) et blocs de l’accueil. Tout se change ensuite dans Réglages → Affichage.'),
-        h('div', { class: 'wiz-status' + (pads.length ? ' ok' : '') }, pads.length ? `Manette détectée : ${PAD[Input.padType] || 'manette'}` : 'Aucune manette pour l’instant : appuie sur un bouton, elle sera reconnue.'),
-        h('div', { class: 'actions' },
-          actionButton('Personnaliser', () => { closeOverlay(true); openHomeEditor(); }, true),
-          actionButton('Continuer', next)),
       ];
     } else {
       body = [
@@ -2964,8 +3045,9 @@
           h('li', {}, 'LB / RB : changer d’onglet · LT / RT : sauter à la lettre suivante'),
           h('li', {}, 'X : favori · Y : détails · Start / clic droit : menu rapide (images, dossiers, profil manette…)'),
           h('li', {}, 'Select + Start maintenus : quitter le jeu en cours · M : couper le son'),
-          h('li', {}, 'Onglet Succès : tes succès Steam et RetroAchievements, ton rang et ton XP')),
-        h('div', { class: 'actions' }, actionButton('C’est parti', () => { closeOverlay(); S.trans = 'v-in'; openTab('home'); }, true)),
+          h('li', {}, 'Onglet Succès : tes succès Steam et RetroAchievements, ton rang et ton XP · 📊 Stats dans le menu'),
+          h('li', {}, 'Note tes jeux (★) depuis leur fiche ou le menu rapide')),
+        h('div', { class: 'actions' }, actionButton('C’est parti', async () => { closeOverlay(); await done(); S.trans = 'v-in'; openTab('home'); }, true)),
       ];
     }
     openOverlay(h('div', { class: 'modal welcome' }, step > 0 && step < STEPS ? dots : null, ...body));
@@ -3136,11 +3218,83 @@
   // Jeu de la bibliothèque, ou fiche minimale pour un jeu RetroAchievements absent des ROMs.
   const achGame = (x) => (x.path && S.byPath.get(x.path)) || { name: x.title || x.gameName || 'Jeu', cover: x.icon, path: x.key, background: null };
 
+  // ---------- Statistiques ----------
+  function viewStats() {
+    const games = S.lib.systems.filter((x) => !x.apps).flatMap((x) => x.games);
+    const played = games.map((g) => ({ g, t: playtimeOf(g) })).filter((x) => x.t > 0).sort((a, b) => b.t - a.t);
+    const total = played.reduce((n, x) => n + x.t, 0);
+    const perfect = games.filter(isPerfect).length;
+    const rated = games.filter((g) => myRating(g));
+    const avg = rated.length ? rated.reduce((n, g) => n + myRating(g), 0) / rated.length : 0;
+    const head = h('div', { class: 'view-head' },
+      h('div', { class: 'vh-badge ach-badge' }, '📊'),
+      h('div', { class: 'vh-text' }, h('h1', {}, 'Statistiques'), h('p', { class: 'muted' }, 'Temps compté par Lumen et lu dans Steam')),
+      focusable(h('div', { class: 'chip' }, '🏆 Succès'), { a: () => go({ view: 'achievements' }), focus: () => setHints('action') }));
+    const tile = (big, label) => h('div', { class: 'st-tile' }, h('b', {}, big), h('span', {}, label));
+    const tiles = h('div', { class: 'st-tiles' },
+      tile(total ? formatTime(total) : '0 min', 'de jeu au total'),
+      tile(String(played.length), plural(played.length, 'jeu lancé', 'jeux lancés').replace(/^\d+\s/, '')),
+      tile(String(perfect), 'à 100 %'),
+      tile(rated.length ? avg.toFixed(1).replace('.', ',') + ' ★' : '—', rated.length ? `note moyenne (${rated.length})` : 'aucun jeu noté'));
+
+    // Jeux les plus joués.
+    const top = played.slice(0, 10);
+    const maxT = top.length ? top[0].t : 1;
+    const topList = h('div', { class: 'st-card' }, h('h2', {}, 'Les plus joués'),
+      top.length ? top.map(({ g, t }, i) => {
+        const sys = sysById(g.system);
+        return focusable(h('div', { class: 'st-row' },
+          h('span', { class: 'st-rank' }, String(i + 1)),
+          g.cover ? h('img', { class: 'st-cover', src: api.mediaUrl(g.cover), alt: '', loading: 'lazy' }) : h('div', { class: 'st-cover' }, fallbackArt(g.name, sys && sys.color)),
+          h('div', { class: 'st-main' }, h('div', { class: 'st-name' }, g.name, h('span', { class: 'st-sys' }, sys ? sys.short || sys.name : '')),
+            h('div', { class: 'st-bar' }, h('i', { style: `width:${Math.max(3, (t / maxT) * 100)}%` }))),
+          h('span', { class: 'st-val' }, formatTime(t))), {
+          a: () => openDetails(g), focus: () => { setTitle(g.name, formatTime(t)); setHints('action'); },
+        });
+      }) : h('p', { class: 'muted' }, 'Lance un jeu depuis Lumen pour commencer à compter.'));
+
+    // Temps par console.
+    const bySys = new Map();
+    for (const { g, t } of played) bySys.set(g.system, (bySys.get(g.system) || 0) + t);
+    const sysRows = [...bySys.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+    const maxS = sysRows.length ? sysRows[0][1] : 1;
+    const sysCard = h('div', { class: 'st-card' }, h('h2', {}, 'Par console'),
+      sysRows.length ? sysRows.map(([id, t]) => {
+        const sys = sysById(id) || {};
+        return h('div', { class: 'st-row compact' },
+          h('span', { class: 'st-badge', style: `--c:${sys.color || '#64748b'}` }, sys.short || '?'),
+          h('div', { class: 'st-main' }, h('div', { class: 'st-name' }, sys.name || id),
+            h('div', { class: 'st-bar' }, h('i', { style: `width:${Math.max(3, (t / maxS) * 100)}%; background:${sys.color || 'var(--accent)'}` }))),
+          h('span', { class: 'st-val' }, formatTime(t)));
+      }) : h('p', { class: 'muted' }, 'Rien pour l’instant.'));
+
+    // 12 dernières semaines (sessions lancées depuis Lumen).
+    const WEEK = 7 * 864e5;
+    const now = new Date();
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7)).getTime();
+    const weeks = Array.from({ length: 12 }, (_, i) => ({ start: monday - (11 - i) * WEEK, t: 0 }));
+    for (const x of S.cfg.sessions || []) {
+      const w = weeks.find((k) => x.t >= k.start && x.t < k.start + WEEK);
+      if (w) w.t += x.s;
+    }
+    const maxW = Math.max(1, ...weeks.map((w) => w.t));
+    const weekCard = h('div', { class: 'st-card wide' }, h('h2', {}, '12 dernières semaines'),
+      (S.cfg.sessions || []).length
+        ? h('div', { class: 'st-weeks' }, weeks.map((w, i) => h('div', { class: 'st-week' + (i === 11 ? ' now' : ''), title: formatTime(w.t) },
+          h('span', { class: 'st-wv' }, w.t ? (w.t >= 3600 ? Math.round(w.t / 3600) + ' h' : Math.round(w.t / 60) + ' min') : ''),
+          h('div', { class: 'st-col' }, h('i', { style: `height:${w.t ? Math.max(4, (w.t / maxW) * 100) : 0}%` })),
+          h('span', { class: 'st-wl' }, i === 11 ? 'Cette sem.' : new Date(w.start).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })))))
+        : h('p', { class: 'muted' }, 'Le graphique se remplit avec les parties lancées depuis Lumen (à partir de maintenant).'));
+
+    return h('div', { class: 'stats-view' }, head, tiles, h('div', { class: 'st-grid' }, topList, sysCard, weekCard));
+  }
+
   function viewAchievements() {
     loadAchievements();
     const head = (sub, ...chips) => h('div', { class: 'view-head' },
       h('div', { class: 'vh-badge ach-badge' }, icon('achievements')),
-      h('div', { class: 'vh-text' }, h('h1', {}, 'Succès'), h('p', { class: 'muted' }, sub)), ...chips);
+      h('div', { class: 'vh-text' }, h('h1', {}, 'Succès'), h('p', { class: 'muted' }, sub)), ...chips,
+      focusable(h('div', { class: 'chip' }, '📊 Statistiques'), { a: () => go({ view: 'stats' }), focus: () => setHints('action') }));
     if (!S.ach) return h('div', {}, head('Lecture des succès…'));
     // Filtre par plateforme (Steam, RetroAchievements).
     const SOURCES = [...new Set(S.ach.games.map((x) => x.source))];
@@ -3671,6 +3825,9 @@
     if (S.launchFx) { S.launchFx.close(); S.launchFx = null; }
     if (d.seconds > 5) {
       S.cfg.playtime[d.path] = (S.cfg.playtime[d.path] || 0) + d.seconds;
+      const log = S.cfg.sessions || (S.cfg.sessions = []);
+      log.push({ p: d.path, t: Date.now() - d.seconds * 1000, s: d.seconds });
+      if (log.length > 3000) log.splice(0, log.length - 3000);
       saveCfg();
     }
     if (!S.overlay && (S.route.view === 'home' || S.dirty)) { S.dirty = false; rerender(); }
@@ -3789,6 +3946,7 @@
     Input.onDevice(() => { setHints(S.hintKind); renderDock(); });
     api.onGameExit(onGameExit);
     // Jaquettes iiDB revérifiées en arrière-plan : on recharge la bibliothèque sans interrompre.
+    if (api.onAchievementsChanged) api.onAchievementsChanged(() => { S.ach = null; if (!S.inGame) loadAchievements(true); });
     if (api.onLibraryChanged) api.onLibraryChanged(async () => { try { applyLib(await api.scan({ romm: false })); if (!document.querySelector('.overlay')) rerender(); } catch { /* rien */ } });
     startClock();
     setHints('none');
@@ -3812,7 +3970,7 @@
     render(0);
     sfx('boot');
     if (useCache) refreshInBackground();
-    if (!S.cfg.romsRoot) openWelcome();
+    if (!S.cfg.onboarded && !S.cfg.romsRoot && !totalGames()) openWelcome();
   }
 
   init().catch((err) => toast(`Erreur au démarrage : ${err.message}`, 'error', 10000));

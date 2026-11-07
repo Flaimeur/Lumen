@@ -4,6 +4,15 @@ Frontend de jeux pour Windows, pensé pour la manette : tes ROMs, tes jeux Steam
 
 **Télécharger :** [dernière version](https://github.com/Flaimeur/Lumen/releases/latest). Ensuite, les mises à jour s'installent toutes seules.
 
+### « Windows a protégé votre ordinateur » ?
+
+L'installateur n'est pas signé avec un certificat payant, alors Windows SmartScreen affiche cet avertissement à la première installation. C'est normal :
+
+1. Clique sur **Informations complémentaires**.
+2. Puis sur **Exécuter quand même**.
+
+Si le navigateur bloque le téléchargement (Edge/Chrome : « n'est pas fréquemment téléchargé »), ouvre le menu **⋯** du téléchargement → **Conserver** → **Conserver quand même**. Le code est entièrement ouvert ici ; les mises à jour suivantes s'installent ensuite sans ce message.
+
 ## Fonctionnalités
 
 - **Bibliothèque** : ROMs (un dossier par console, noms ES-DE ou libres comme « Switch 2 game »), jeux Steam (installés ou non), Epic, GOG, applications (Word, Discord…), serveur RomM.

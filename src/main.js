@@ -239,6 +239,7 @@ function quitCurrentGame() {
 
 function onGameEnded(gamePath, code, started) {
   currentGame = null;
+  stopRaWatch();
   globalShortcut.unregister(QUIT_SHORTCUT);
   if (!win) return;
   if (win.isMinimized()) win.restore();
@@ -482,6 +483,64 @@ ipcMain.handle('achievements:game', async (_e, gamePath) => {
   const dir = m && await getSteamDir();
   return dir ? achievements.steamGame(dir, Number(m[1])) : null;
 });
+
+// ---------- Bannière « Succès débloqué » pendant le jeu ----------
+const { notify: achNotify } = require('./achnotify');
+const achNotifyOn = () => loadConfig().achNotify !== false;
+const webIcon = (u) => (u && u.startsWith('web-cover:') ? u.slice(10) : null);
+const achSeen = new Set(); // succès déjà annoncés
+// Steam : Steam réécrit UserGameStats_<compte>_<appid>.bin à chaque déblocage ; on surveille le dossier.
+async function startSteamAchWatch() {
+  const dir = await getSteamDir();
+  if (!dir) return;
+  const statsDir = path.join(dir, 'appcache', 'stats');
+  const since = Date.now() - 5000;
+  const timers = new Map();
+  try {
+    fs.watch(statsDir, (_ev, file) => {
+      const m = /^UserGameStats_d+_(d+).bin$/.exec(String(file || ''));
+      if (!m || !achNotifyOn()) return;
+      const appid = Number(m[1]);
+      clearTimeout(timers.get(appid));
+      timers.set(appid, setTimeout(async () => {
+        const r = await achievements.steamGame(dir, appid).catch(() => null);
+        if (!r) return;
+        const fresh = r.list.filter((a) => a.unlocked && a.time >= since && !achSeen.has('s' + appid + a.id));
+        if (!fresh.length) return;
+        const l = pcLaunchers.get('steam:' + appid);
+        for (const a of fresh.sort((x, y) => x.time - y.time)) {
+          achSeen.add('s' + appid + a.id);
+          achNotify({ game: (l && l.name) || 'Steam', name: a.name, desc: a.desc, icon: webIcon(a.icon), source: 'Steam', accent: loadConfig().accent });
+        }
+        if (win && !win.isDestroyed()) win.webContents.send('achievements:changed');
+      }, 1500));
+    });
+  } catch { /* dossier absent : pas de succès Steam sur ce PC */ }
+}
+app.whenReady().then(() => setTimeout(() => startSteamAchWatch().catch(() => {}), 15000));
+// RetroAchievements : pendant une partie rétro, on regarde toutes les 45 s les succès récents.
+let raWatch = null;
+function startRaWatch(gameName) {
+  stopRaWatch();
+  if (!readRaKey() || !(loadConfig().retroachievements || {}).username) return;
+  const since = Date.now() - 5000;
+  raWatch = setInterval(async () => {
+    if (!achNotifyOn()) return;
+    try {
+      const list = await raCall('API_GetUserRecentAchievements', { m: 15 });
+      for (const a of (Array.isArray(list) ? list : []).reverse()) {
+        const key = 'r' + a.AchievementID;
+        if (achSeen.has(key) || raDate(a.Date) < since) continue;
+        achSeen.add(key);
+        achNotify({ game: a.GameTitle || gameName, name: a.Title, desc: a.Description, icon: a.BadgeURL ? RA_MEDIA + a.BadgeURL : null, source: 'RetroAchievements', accent: loadConfig().accent });
+        if (win && !win.isDestroyed()) win.webContents.send('achievements:changed');
+      }
+    } catch { /* hors ligne */ }
+  }, 45000);
+}
+function stopRaWatch() { if (raWatch) clearInterval(raWatch); raWatch = null; }
+// Aperçu depuis les Réglages.
+ipcMain.handle('achnotify:test', () => { achNotify({ game: 'Lumen', name: 'Premier pas', desc: 'Voici à quoi ressemble la bannière pendant un jeu.', icon: null, source: 'Test', accent: loadConfig().accent }); return true; });
 
 // ---------- RetroAchievements (pseudo + clé Web API de l'utilisateur) ----------
 const raKeyPath = () => path.join(app.getPath('userData'), 'retroachievements-key.bin');
@@ -904,6 +963,7 @@ ipcMain.handle('game:launch', async (_e, game) => {
     });
     child.once('spawn', () => {
       currentGame = { child, path: game.path };
+      if (!sys.pc) startRaWatch(path.parse(game.path).name);
       globalShortcut.register(QUIT_SHORTCUT, quitCurrentGame);
       resolve({ ok: true });
     });
