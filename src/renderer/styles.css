@@ -250,7 +250,7 @@ body.has-cursor .f.focused { outline-color: transparent !important; }
 }
 
 /* ---------- Tuiles de jeu ---------- */
-.f { outline: 3px solid transparent; outline-offset: 3px; transition: scale 0.32s var(--spring), box-shadow 0.25s ease, outline-color 0.18s, background 0.2s, filter 0.25s; }
+.f { outline: 3px solid transparent; outline-offset: 3px; transition: scale 0.32s var(--spring), transform 140ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.25s ease, outline-color 0.18s, background-color 0.2s, filter 0.25s; }
 .tile {
   position: relative; aspect-ratio: 1; border-radius: 20px; overflow: hidden;
   background: #141826; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
@@ -1099,15 +1099,41 @@ body.home-clock #topbar .status { visibility: hidden; }
 .syscard.add-sys .folder-plus { font-size: 30px; opacity: 0.8; }
 .syscard.add-sys .sys-name { text-align: center; }
 
-/* ---------- Widget lecture : volume de l'appli ---------- */
-.w-np-ctrl { flex-wrap: nowrap; min-width: 0; }
-.w-vol { display: flex; align-items: center; gap: 6px; margin-left: 8px; min-width: 0; flex: 1 1 auto; max-width: 300px; }
-.w-np-ctrl .w-vbtn { width: 28px; height: 28px; font-size: 12px; flex: none; }
-.w-vol-bar { position: relative; flex: 1 1 auto; min-width: 36px; height: 6px; border-radius: 99px; background: rgba(255, 255, 255, 0.14); cursor: pointer; }
-.w-vol-bar::before { content: ''; position: absolute; inset: -8px 0; }
-.w-vol-bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit; background: var(--accent); transition: width 0.2s ease; }
-.w-vol-pct { font-size: 12px; color: var(--muted); font-weight: 700; min-width: 38px; font-variant-numeric: tabular-nums; flex: none; }
-.widget:not(.wide) .w-vol-pct { display: none; }
+/* ---------- Widget lecture : contrôles ---------- */
+.w-np-ctrl { display: flex; align-items: center; gap: 4px; margin-top: 10px; flex-wrap: nowrap; min-width: 0; }
+.np-btn {
+  --s: 34px; width: var(--s); height: var(--s); flex: none; padding: 0; border: 0; border-radius: 50%;
+  display: grid; place-items: center; cursor: pointer; color: rgba(255, 255, 255, 0.82); background: transparent;
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), background-color 160ms ease, color 160ms ease;
+}
+.np-ico, .np-ico svg { display: block; width: 18px; height: 18px; }
+.np-btn:active { transform: scale(0.92); }
+.np-btn.main { --s: 42px; color: #0b0d14; background: #fff; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); margin: 0 2px; }
+.np-btn.main .np-ico, .np-btn.main svg { width: 20px; height: 20px; }
+@media (hover: hover) and (pointer: fine) {
+  .np-btn:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+  .np-btn.main:hover { background: #fff; transform: scale(1.04); }
+  .np-btn.main:active { transform: scale(0.94); }
+}
+.np-vol { display: flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; max-width: 260px; margin-left: 12px; padding-left: 12px; border-left: 1px solid rgba(255, 255, 255, 0.1); }
+.np-vol-ico { --s: 30px; color: rgba(255, 255, 255, 0.7); }
+.np-vol-ico .np-ico, .np-vol-ico svg { width: 17px; height: 17px; }
+.np-slider { flex: 1 1 auto; min-width: 48px; padding: 10px 0; cursor: pointer; touch-action: none; }
+.np-track { position: relative; height: 4px; border-radius: 99px; background: rgba(255, 255, 255, 0.16); }
+.np-fill { position: absolute; inset: 0; border-radius: inherit; background: #fff; transform-origin: left center; transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1); }
+.np-thumb {
+  position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4); transform: scale(0.6); opacity: 0;
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), opacity 140ms ease, left 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.np-slider.drag .np-fill, .np-slider.drag .np-thumb { transition-property: transform, opacity; }
+.np-slider.drag .np-fill { transition: none; }
+.np-slider.drag .np-thumb, .focused.widget .np-thumb { transform: scale(1); opacity: 1; }
+@media (hover: hover) and (pointer: fine) { .np-slider:hover .np-thumb { transform: scale(1); opacity: 1; } .np-slider:hover .np-fill { background: var(--accent); } }
+.np-pct { flex: none; min-width: 36px; font-size: 11.5px; font-weight: 700; color: rgba(255, 255, 255, 0.55); font-variant-numeric: tabular-nums; }
+.widget:not(.wide) .np-pct, .widget:not(.wide) .np-slider { display: none; }
+.widget:not(.wide) .np-vol { flex: none; margin-left: 6px; padding-left: 6px; }
+@media (prefers-reduced-motion: reduce) { .np-btn, .np-fill, .np-thumb { transition: none; } }
 
 /* ---------- Ma note ---------- */
 .stars-pick { display: flex; align-items: center; gap: 4px; margin: 4px 0 14px; }
@@ -1160,3 +1186,34 @@ body.home-clock #topbar .status { visibility: hidden; }
 .wiz-preset.focused { outline-color: var(--pc); background: linear-gradient(135deg, color-mix(in srgb, var(--pc) 35%, transparent), rgba(255, 255, 255, 0.05)); }
 .tile-rating.is-fav { color: #3b2a00; background: linear-gradient(180deg, #fde047, #f59e0b); box-shadow: 0 2px 8px rgba(245, 158, 11, 0.45); }
 .tile-rating.is-fav b { color: #3b2a00; }
+
+/* ---------- Pictos SVG (glyphs.js) et retour au clic ---------- */
+.gi { display: inline-flex; flex: none; width: 1.1em; height: 1.1em; vertical-align: -0.18em; }
+.gi svg { width: 100%; height: 100%; display: block; }
+.gi:not(.solo) { margin-right: 0.45em; }
+.btn .gi:not(.solo) { margin-right: 0; }
+.chip { display: inline-flex; align-items: center; }
+.chip .gi { width: 1.05em; height: 1.05em; opacity: 0.85; }
+.mi-icon { display: grid; place-items: center; }
+.mi-icon .gi { width: 18px; height: 18px; margin: 0; }
+.menu-item.danger .mi-icon .gi { color: #fca5a5; }
+.menu-chip .mc-icon { display: grid; place-items: center; height: 20px; }
+.menu-chip .mc-icon .gi { width: 19px; height: 19px; margin: 0; }
+.w-ico { display: inline-grid; place-items: center; }
+.w-ico .gi { width: 14px; height: 14px; margin: 0; }
+.w-big .gi.solo { width: 0.95em; height: 0.95em; margin: 0; opacity: 0.55; }
+.w-big .gi svg { stroke-width: 1.6; }
+.vh-badge .gi.solo { width: 26px; height: 26px; margin: 0; }
+.eyebrow .gi { width: 1.05em; height: 1.05em; }
+.toast .gi { color: var(--accent); }
+/* Tout ce qui se presse s'enfonce légèrement : l'interface répond tout de suite. */
+.btn:active, .chip:active, .menu-item:active, .menu-chip:active, .wiz-preset:active, .st-row:active, .syscard:active, .folder:active { transform: scale(0.97); }
+@media (hover: hover) and (pointer: fine) {
+  .btn:not(.primary):hover, .chip:hover, .menu-item:hover, .menu-chip:hover { background-color: rgba(255, 255, 255, 0.12); }
+  .btn.primary:hover { filter: brightness(1.08); }
+}
+@media (prefers-reduced-motion: reduce) { .btn:active, .chip:active, .menu-item:active, .menu-chip:active { transform: none; } }
+.w-sub .gi { width: 1em; height: 1em; opacity: 0.8; }
+.w-hint .gi, .folder-name .gi { width: 1em; height: 1em; }
+.folder-plus .gi.solo { width: 1em; height: 1em; margin: 0; }
+.folder-plus .gi svg { stroke-width: 1.6; }

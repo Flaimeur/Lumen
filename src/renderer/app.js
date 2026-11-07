@@ -1558,27 +1558,59 @@
     if (m === undefined) setTimeout(pollMedia, 0); // premier affichage : on lit l'état tout de suite
     if (!m || !m.active) return [h('div', { class: 'w-big' }, '🎧'), h('div', { class: 'w-sub' }, 'Rien en lecture (Spotify, YouTube…)')];
     const playing = m.status === 'Playing';
-    const btn = (label, cmd, extra = '') => h('button', { class: 'w-mbtn ' + extra, onClick: (e) => { e.stopPropagation(); mediaCmd(cmd); } }, label);
+    const btn = (ico, cmd, extra = '', title = '') => h('button', { class: 'np-btn ' + extra, title, 'aria-label': title, onClick: (e) => { e.stopPropagation(); mediaCmd(cmd); } }, npIcon(ico));
     return [h('div', { class: 'w-np' },
       m.thumb ? h('img', { class: 'w-np-cover', src: api.mediaUrl(m.thumb), alt: '' }) : h('div', { class: 'w-np-cover np-empty' }, playing ? h('span', { class: 'w-eq' }, h('i'), h('i'), h('i')) : '♪'),
       h('div', { class: 'w-np-text' },
         h('b', {}, m.title || 'Sans titre'),
         h('div', { class: 'w-sub' }, [m.artist, appName(m.app)].filter(Boolean).join(' · ')),
-        h('div', { class: 'w-np-ctrl' }, btn('⏮', 'prev'), btn(playing ? '⏸' : '▶', 'toggle', 'main'), btn('⏭', 'next'),
+        h('div', { class: 'w-np-ctrl' }, btn('prev', 'prev', '', 'Précédent'), btn(playing ? 'pause' : 'play', 'toggle', 'main', playing ? 'Pause' : 'Lecture'), btn('next', 'next', '', 'Suivant'),
           typeof m.vol === 'number' ? volCtl(m.vol) : null)))];
   }
   // Volume de l'appli qui joue (mélangeur Windows) : − / barre cliquable / +.
+  // Icônes du lecteur : un seul jeu de pictos SVG (les caractères ⏮ ⏸ 🔉 changent d'aspect selon la police).
+  const NP_ICONS = {
+    prev: '<path d="M7 6v12"/><path d="M18 6.5v11a.6.6 0 0 1-.9.5L9 12.5a.6.6 0 0 1 0-1L17.1 6a.6.6 0 0 1 .9.5z" fill="currentColor" stroke="none"/>',
+    next: '<path d="M17 6v12"/><path d="M6 6.5v11a.6.6 0 0 0 .9.5L15 12.5a.6.6 0 0 0 0-1L6.9 6a.6.6 0 0 0-.9.5z" fill="currentColor" stroke="none"/>',
+    play: '<path d="M8 5.6v12.8a.8.8 0 0 0 1.2.7l10.3-6.4a.8.8 0 0 0 0-1.4L9.2 4.9A.8.8 0 0 0 8 5.6z" fill="currentColor" stroke="none"/>',
+    pause: '<rect x="6.5" y="5" width="3.6" height="14" rx="1.2" fill="currentColor" stroke="none"/><rect x="13.9" y="5" width="3.6" height="14" rx="1.2" fill="currentColor" stroke="none"/>',
+    vol0: '<path d="M4 9.5h3l4-3.5v12l-4-3.5H4z" fill="currentColor" stroke="none"/><path d="M16 9.5l5 5M21 9.5l-5 5"/>',
+    vol1: '<path d="M4 9.5h3l4-3.5v12l-4-3.5H4z" fill="currentColor" stroke="none"/><path d="M15 9.2a4 4 0 0 1 0 5.6"/>',
+    vol2: '<path d="M4 9.5h3l4-3.5v12l-4-3.5H4z" fill="currentColor" stroke="none"/><path d="M15 9.2a4 4 0 0 1 0 5.6"/><path d="M17.8 6.6a7.6 7.6 0 0 1 0 10.8"/>',
+  };
+  function npIcon(name) {
+    const el = h('span', { class: 'np-ico' });
+    el.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${NP_ICONS[name]}</svg>`;
+    return el;
+  }
+  // Volume : pictogramme (clic = couper / remettre), curseur fin avec poignée, molette, pourcentage.
   function volCtl(v) {
     const pct = Math.round(v * 100);
-    const bar = h('div', { class: 'w-vol-bar', title: 'Volume de l’appli' }, h('i', { style: `width:${pct}%` }));
-    bar.addEventListener('click', (e) => { e.stopPropagation(); const r = bar.getBoundingClientRect(); setMediaVol((e.clientX - r.left) / r.width); });
-    const b = (label, d) => h('button', { class: 'w-mbtn w-vbtn', onClick: (e) => { e.stopPropagation(); stepMediaVol(d); } }, label);
-    return h('div', { class: 'w-vol' }, b(pct === 0 ? '🔇' : '🔉', -0.1), bar, b('🔊', 0.1), h('span', { class: 'w-vol-pct' }, pct + ' %'));
+    const mute = h('button', { class: 'np-btn np-vol-ico', title: pct ? 'Couper le son de l’appli' : 'Remettre le son', onClick: (e) => {
+      e.stopPropagation();
+      if (pct) { S.mediaVolBefore = v; setMediaVol(0); } else setMediaVol(S.mediaVolBefore || 0.5);
+    } }, npIcon(pct === 0 ? 'vol0' : pct < 50 ? 'vol1' : 'vol2'));
+    const track = h('div', { class: 'np-track' }, h('i', { class: 'np-fill', style: `transform: scaleX(${v})` }), h('i', { class: 'np-thumb', style: `left:${pct}%` }));
+    const slider = h('div', { class: 'np-slider', role: 'slider', 'aria-label': 'Volume de l’appli', 'aria-valuenow': String(pct) }, track);
+    const at = (e) => { const r = track.getBoundingClientRect(); return (e.clientX - r.left) / r.width; };
+    slider.addEventListener('pointerdown', (e) => {
+      e.stopPropagation(); e.preventDefault();
+      slider.setPointerCapture(e.pointerId);
+      slider.classList.add('drag');
+      const move = (ev) => { const x = Math.max(0, Math.min(1, at(ev))); track.firstChild.style.transform = `scaleX(${x})`; track.lastChild.style.left = x * 100 + '%'; slider.nextSibling.textContent = Math.round(x * 100) + ' %'; };
+      move(e);
+      const up = (ev) => { slider.removeEventListener('pointermove', move); slider.classList.remove('drag'); setMediaVol(Math.round(at(ev) * 100) / 100); };
+      slider.addEventListener('pointermove', move);
+      slider.addEventListener('pointerup', up, { once: true });
+    });
+    slider.addEventListener('click', (e) => e.stopPropagation());
+    slider.addEventListener('wheel', (e) => { e.preventDefault(); e.stopPropagation(); stepMediaVol(e.deltaY < 0 ? 0.05 : -0.05); }, { passive: false });
+    return h('div', { class: 'np-vol' }, mute, slider, h('span', { class: 'np-pct' }, pct + ' %'));
   }
   function stepMediaVol(d) {
     const cur = S.media && typeof S.media.vol === 'number' ? S.media.vol : null;
     if (cur === null) return;
-    setMediaVol(Math.round((cur + d) * 10) / 10);
+    setMediaVol(Math.round((cur + d) * 20) / 20);
   }
   async function setMediaVol(v) {
     if (!api.media || !S.media) return;
@@ -1591,7 +1623,7 @@
   }
   function refreshMediaWidget() {
     const card = document.querySelector('.widget.wg-nowplaying');
-    if (!card) return;
+    if (!card || card.querySelector('.np-slider.drag')) return;
     const bg = card.querySelector('.w-bgimg img');
     const thumb = S.media && S.media.active && S.media.thumb ? api.mediaUrl(S.media.thumb) : null;
     if ((bg ? bg.getAttribute('src') : null) !== thumb) {
