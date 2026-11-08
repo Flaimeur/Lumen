@@ -2867,7 +2867,7 @@
         toast('Recherche de mises à jour…');
         S.update = await api.update.check();
         rerender();
-      }, u.status === 'error' ? `Dernière erreur : ${u.error}` : 'Automatiques : Lumen vérifie au démarrage, télécharge en arrière-plan et s’installe à la fermeture.');
+      }, u.status === 'error' ? `Dernière erreur : ${u.error}` : 'Automatiques : Lumen vérifie toutes les heures, télécharge en arrière-plan, puis te propose de redémarrer (installation silencieuse). A : vérifier maintenant.');
     }
     row('Quitter un jeu en cours', 'Select + Start (2 s)', null, 'Ou Ctrl + Maj + Q au clavier. Ferme l’émulateur et revient dans Lumen.');
     section('Sauvegarde');
