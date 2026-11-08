@@ -128,6 +128,8 @@
     trackRaf = requestAnimationFrame(() => { trackRaf = 0; placeCursor(true); });
   }
   document.addEventListener('scroll', trackCursor, true);
+  // Pendant un défilement à la molette, la ligne qui passe sous la souris ne prend pas la sélection.
+  window.addEventListener('wheel', () => { S.mouseHoldUntil = performance.now() + 220; }, { passive: true, capture: true });
   // Une fenêtre qui s'ouvre (ou se redessine) en s'animant déplace l'élément sélectionné : le cadre se recale à la fin.
   document.addEventListener('animationend', trackCursor, true);
   document.addEventListener('transitionend', (e) => { if (e.propertyName === 'transform' || e.propertyName === 'translate' || e.propertyName === 'scale') trackCursor(); }, true);
@@ -2034,7 +2036,8 @@
     // Même largeur que le vrai accueil (ses tailles dépendent de la largeur de l'écran), puis réduit.
     const HPV_W = Math.max(1200, (document.getElementById('view') || document.body).clientWidth);
     let hpvTimer = 0;
-    const paintHome = (o = {}) => { clearTimeout(hpvTimer); hpvTimer = setTimeout(() => paintHomeNow(o), 60); };
+    let hpvLast = '';
+    const paintHome = (o = {}) => { const key = JSON.stringify(o); if (key === hpvLast) return; clearTimeout(hpvTimer); hpvTimer = setTimeout(() => { hpvLast = key; paintHomeNow(o); }, 140); };
     const paintHomeNow = (o) => {
       if (!hpv.isConnected) return;
       const saved = o.preset ? JSON.stringify({ home: S.cfg.home, wallpaper: S.cfg.wallpaper, accent: S.cfg.accent }) : null;
@@ -2162,6 +2165,8 @@
     const pv = h('div', { class: 'w-preview', 'aria-hidden': 'true' }, h('div', { class: 'w-preview-label' }, 'Aperçu de l’accueil'));
     const PV_W = 1400;
     rows.paintPreview = (focusId) => {
+      if (rows.pvLast === focusId && pv.querySelector('.pv-inner')) return;
+      rows.pvLast = focusId;
       const ids = home.widgets.filter((x) => WIDGETS[x]);
       if (focusId && !ids.includes(focusId)) ids.push(focusId);
       const inner = h('div', { class: 'widgets pv-inner', style: `width:${PV_W}px` });
@@ -2182,7 +2187,8 @@
         inner.style.transform = `scale(${k})`;
         pv.style.height = Math.ceil(inner.offsetHeight * k + 44) + 'px';
         // L'aperçu change de hauteur : la ligne sélectionnée reste visible et le cadre la suit.
-        if (S.focusEl && pv.parentElement && pv.parentElement.contains(S.focusEl)) S.focusEl.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+        // Seulement à la manette / au clavier : à la souris, c'est la molette qui décide du défilement.
+        if (!S.mouse && S.focusEl && pv.parentElement && pv.parentElement.contains(S.focusEl)) S.focusEl.scrollIntoView({ block: 'nearest', behavior: 'auto' });
         trackCursor();
       });
     };
