@@ -2905,6 +2905,8 @@
       'Sur une console, l’interface prend sa couleur (rouge pour Switch, bleu pour PlayStation…).');
 
     cat('about');
+    section('Profils');
+    row('Profil actuel', activeProfile().name, () => openProfileMenu(), plural(profiles().length, 'profil', 'profils') + ' sur ce PC. Chacun a ses favoris, notes, temps de jeu, dossiers et son accueil.');
     section('Lumen');
     row('Version', api.version || '', null, 'Frontend de jeux pour Windows : ROMs, jeux PC et applications.');
     if (api.update) {
@@ -3256,6 +3258,7 @@
     bar.push([S.cfg.muted ? '🔇' : '🔊', S.cfg.muted ? 'Son coupé' : 'Son', run(toggleMute)]);
     bar.push(['⛶', 'Écran', run(() => api.toggleFullscreen())]);
     bar.push(['⚙', 'Réglages', run(() => openTab('settings'))]);
+    bar.push(['👤', profiles().length > 1 ? activeProfile().name.slice(0, 9) : 'Profil', () => openProfileMenu(reopen)]);
     bar.push(['⏻', 'Quitter', () => api.quit()]);
     openMenu(g ? g.name : sysCard ? ((S.lib.systems.find((x) => x.id === sysCard) || {}).name || 'Menu') : folder ? folderName(folder) : sysId ? ((S.lib.systems.find((x) => x.id === sysId) || {}).name || 'Menu') : 'Menu', items, 'menu', { subtitle, bar });
   }
@@ -4449,6 +4452,82 @@
     api.remote.library(list);
   }
 
+  // ---------- Profils de joueurs ----------
+  // Chaque profil a ses favoris, notes, récents, temps de jeu, dossiers, accueil, fond, couleur… La bibliothèque,
+  // les émulateurs et les comptes restent communs. Le profil actif vit dans la config « normale » ; les autres
+  // sont rangés dans cfg.profileData et échangés au changement de profil.
+  const PROFILE_KEYS = ['favorites', 'ratings', 'recent', 'lastPlayed', 'sessions', 'playtime', 'firstPlayed', 'collections', 'home', 'wallpaper', 'accent', 'homeNote', 'arcade', 'sort', 'sortDesc'];
+  const PROFILE_COLORS = ['#5eead4', '#f472b6', '#a78bfa', '#fbbf24', '#60a5fa', '#4ade80', '#fb923c', '#f87171'];
+  function profiles() {
+    if (!Array.isArray(S.cfg.profiles) || !S.cfg.profiles.length) { S.cfg.profiles = [{ id: 'p1', name: 'Joueur 1', color: PROFILE_COLORS[0] }]; S.cfg.activeProfile = 'p1'; }
+    if (!S.cfg.profiles.some((p) => p.id === S.cfg.activeProfile)) S.cfg.activeProfile = S.cfg.profiles[0].id;
+    return S.cfg.profiles;
+  }
+  const activeProfile = () => profiles().find((p) => p.id === S.cfg.activeProfile);
+  function renderProfileBadge() {
+    const el = document.getElementById('profile-badge');
+    if (!el || !S.cfg) return;
+    const list = profiles();
+    const p = activeProfile();
+    el.hidden = list.length < 2;
+    el.textContent = p ? p.name : '';
+    el.style.setProperty('--pc', p ? p.color : 'var(--accent)');
+  }
+  async function switchProfile(id) {
+    if (id === S.cfg.activeProfile) return;
+    const data = S.cfg.profileData || (S.cfg.profileData = {});
+    const cur = {};
+    for (const k of PROFILE_KEYS) if (S.cfg[k] !== undefined) cur[k] = S.cfg[k];
+    data[S.cfg.activeProfile] = cur;
+    const next = data[id] || {};
+    for (const k of PROFILE_KEYS) delete S.cfg[k];
+    Object.assign(S.cfg, { favorites: [], ratings: {}, recent: [], lastPlayed: {}, sessions: [], playtime: {}, firstPlayed: {}, collections: {}, accent: '#5eead4', homeNote: '' }, next);
+    delete data[id];
+    S.cfg.activeProfile = id;
+    await saveCfg();
+    syncCustomWidgets();
+    applyCfg();
+    applyWallpaper();
+    applyLib(await api.scan({ romm: false }));
+    S.ach = null;
+    renderProfileBadge();
+    S.trans = 'v-fade';
+    openTab('home');
+    toast(`Profil « ${activeProfile().name} »`);
+  }
+  async function addProfile() {
+    const name = await openPrompt({ title: 'Nom du nouveau profil', value: '', help: 'Ses favoris, notes, temps de jeu et son accueil seront à part.' });
+    if (name === null || !name.trim()) return;
+    const list = profiles();
+    const p = { id: 'p' + Date.now().toString(36), name: name.trim().slice(0, 24), color: PROFILE_COLORS[list.length % PROFILE_COLORS.length] };
+    list.push(p);
+    await saveCfg();
+    await switchProfile(p.id);
+  }
+  function openProfileMenu(back) {
+    const list = profiles();
+    const items = list.map((p) => [p.name + (p.id === S.cfg.activeProfile ? '  ✓' : ''), () => { closeOverlay(true); switchProfile(p.id); }, { icon: h('span', { class: 'prof-dot', style: `--pc:${p.color}` }, p.name.slice(0, 1).toUpperCase()) }]);
+    items.push(['Ajouter un profil', () => { closeOverlay(true); addProfile(); }, { icon: '＋' }]);
+    items.push(['Renommer « ' + activeProfile().name + ' »', async () => {
+      closeOverlay(true);
+      const v = await openPrompt({ title: 'Nom du profil', value: activeProfile().name });
+      if (v && v.trim()) { activeProfile().name = v.trim().slice(0, 24); await saveCfg(); renderProfileBadge(); rerender(); }
+    }, { icon: '✎' }]);
+    items.push(['Changer sa couleur', () => { const p = activeProfile(); p.color = PROFILE_COLORS[(PROFILE_COLORS.indexOf(p.color) + 1) % PROFILE_COLORS.length]; saveCfg(); renderProfileBadge(); closeOverlay(true); openProfileMenu(back); }, { icon: '🎨' }]);
+    if (list.length > 1) items.push(['Supprimer « ' + activeProfile().name + ' »', async () => {
+      closeOverlay(true);
+      const p = activeProfile();
+      const other = list.find((x) => x.id !== p.id);
+      await switchProfile(other.id);
+      S.cfg.profiles = profiles().filter((x) => x.id !== p.id);
+      if (S.cfg.profileData) delete S.cfg.profileData[p.id];
+      await saveCfg();
+      renderProfileBadge();
+      toast(`Profil « ${p.name} » supprimé`);
+    }, { icon: '✕', danger: true }]);
+    if (back) openSubMenu('Profils', items, back); else openMenu('Profils', items);
+  }
+
   function setAccent(color) {
     const c = (S.cfg.consoleAccent !== false && readableAccent(color)) || S.cfg.accent;
     if (S.accentNow === c) return;
@@ -4561,6 +4640,8 @@
     document.body.classList.add('has-cursor');
     Input.lock(reduceMotion ? 0 : 1400);
     S.cfg = await api.getConfig();
+    profiles();
+    renderProfileBadge();
     syncCustomWidgets();
     loadCompanions();
     setInterval(() => { if (document.hasFocus() && S.route.view === 'home' && homeCfg().widgets.some((x) => x.startsWith('co-'))) loadCompanions(true); }, 60000);

@@ -34,6 +34,7 @@
     search: '<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>',
     dice: '<rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="9" cy="9" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="15" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1.2" fill="currentColor" stroke="none"/><circle cx="9" cy="15" r="1.2" fill="currentColor" stroke="none"/>',
     stats: '<path d="M4 20h16M7 16v-5M12 16V6M17 16v-8"/>',
+    user: '<circle cx="12" cy="8.5" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/>',
     sound: '<path d="M4 9.5h3l4-3.5v12l-4-3.5H4z" fill="currentColor"/><path d="M15 9.2a4 4 0 0 1 0 5.6M17.8 6.6a7.6 7.6 0 0 1 0 10.8"/>',
     mute: '<path d="M4 9.5h3l4-3.5v12l-4-3.5H4z" fill="currentColor"/><path d="M16 9.5l5 5M21 9.5l-5 5"/>',
     fullscreen: '<path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15"/>',
@@ -70,7 +71,7 @@
     '⛶': 'fullscreen', '⏻': 'power', '✓': 'check', '‹': 'back', '⋯': 'more', '🕒': 'clock', '⏱': 'timer', '📝': 'note',
     '📦': 'box', '🔞': 'adult', '🆕': 'sparkle', '☁': 'cloud', '☀': 'sun', '🌙': 'moon', '🌤': 'sunCloud', '🌦': 'sunCloud',
     '⛅': 'sunCloud', '🌧': 'rain', '🌨': 'snow', '❄': 'snow', '⛈': 'storm', '🌩': 'storm', '🌫': 'fog', '⚠': 'alert', '⚡': 'bolt',
-    '⌨': 'keyboard', '🖱': 'mouse',
+    '⌨': 'keyboard', '🖱': 'mouse', '👤': 'user',
   };
   const keys = Object.keys(MAP).sort((a, b) => b.length - a.length).map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   const LEAD = new RegExp('^\\s*(' + keys.join('|') + ')\\uFE0F?\\s*');

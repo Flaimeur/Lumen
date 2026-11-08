@@ -1391,3 +1391,8 @@ body.home-clock #topbar .status { visibility: hidden; }
 @media (prefers-reduced-motion: reduce) { .tpv-blobs { animation: none; } }
 
 .remote-pin { font-size: 22px; letter-spacing: 0.25em; font-variant-numeric: tabular-nums; color: var(--accent); }
+
+/* ---------- Profils ---------- */
+#profile-badge { margin-left: 4px; padding: 3px 10px; border-radius: 99px; font-size: 12px; font-weight: 750; letter-spacing: 0; color: #0b0d14; background: var(--pc, var(--accent)); }
+#profile-badge[hidden] { display: none; }
+.prof-dot { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-size: 11px; font-weight: 800; color: #0b0d14; background: var(--pc); }
