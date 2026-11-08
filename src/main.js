@@ -10,7 +10,7 @@ const { scanLibrary } = require('./scanner');
 const { buildLaunch } = require('./launcher');
 const { fetchMissingThumbnails } = require('./thumbnails');
 const romm = require('./romm');
-const { scanPcStores, fetchSteamGridDB, getSteamDir } = require('./pcstores');
+const { scanPcStores, fetchSteamGridDB, getSteamDir, steamAccounts, setSteamAccountMode, steamAccountFilter } = require('./pcstores');
 const achievements = require('./achievements');
 const { fetchIidb, applyIidb, iidbOptions, listCollections, gameIcons } = require('./iidb');
 const { STORES } = require('./pcstores');
@@ -120,7 +120,9 @@ async function steamTagNames() {
   if (Date.now() - cached.at > 7 * 86400e3) refreshSteamTags().catch(() => {});
   return cached.names || {};
 }
-const scanPc = async (cfg) => scanPcStores(cfg.pcStores, readSgdbArt(), await steamTagNames());
+const scanPc = async (cfg) => { setSteamAccountMode((cfg.pcStores || {}).steamAccount); return scanPcStores(cfg.pcStores, readSgdbArt(), await steamTagNames()); };
+const steamAcc = async (dir) => { setSteamAccountMode((loadConfig().pcStores || {}).steamAccount); return steamAccountFilter(dir); };
+ipcMain.handle('steam:accounts', async () => { const dir = await getSteamDir(); return dir ? steamAccounts(dir) : []; });
 
 // ---------- RomM : secret chiffré par Windows (DPAPI via safeStorage) ----------
 const rommSecretPath = () => path.join(app.getPath('userData'), 'romm-secret.bin');
@@ -476,12 +478,12 @@ ipcMain.handle('achievements:summary', async () => {
   if (!dir) return { games: [], recent: [], error: 'Steam introuvable sur ce PC.' };
   if (![...pcLaunchers.values()].some((l) => l.store === 'steam')) pcLaunchers = (await scanPc(loadConfig())).launchers;
   const games = [...pcLaunchers.values()].filter((l) => l.store === 'steam' && l.appid).map((l) => ({ path: l.id, appid: l.appid }));
-  return achievements.steamSummary(dir, games);
+  return achievements.steamSummary(dir, games, await steamAcc(dir));
 });
 ipcMain.handle('achievements:game', async (_e, gamePath) => {
   const m = /^steam:(\d+)$/.exec(String(gamePath || ''));
   const dir = m && await getSteamDir();
-  return dir ? achievements.steamGame(dir, Number(m[1])) : null;
+  return dir ? achievements.steamGame(dir, Number(m[1]), await steamAcc(dir)) : null;
 });
 
 // ---------- Bannière « Succès débloqué » pendant le jeu ----------
@@ -503,7 +505,7 @@ async function startSteamAchWatch() {
       const appid = Number(m[1]);
       clearTimeout(timers.get(appid));
       timers.set(appid, setTimeout(async () => {
-        const r = await achievements.steamGame(dir, appid).catch(() => null);
+        const r = await achievements.steamGame(dir, appid, await steamAcc(dir)).catch(() => null);
         if (!r) return;
         const fresh = r.list.filter((a) => a.unlocked && a.time >= since && !achSeen.has('s' + appid + a.id));
         if (!fresh.length) return;
@@ -725,6 +727,7 @@ ipcMain.handle('sgdb:fetch', async () => {
   const key = readSgdbKey();
   if (!key) return { ok: false, error: 'Ajoute d’abord ta clé SteamGridDB.' };
   const cfg = loadConfig();
+  setSteamAccountMode((cfg.pcStores || {}).steamAccount);
   const { systems } = await scanPcStores(cfg.pcStores, {});
   if (!systems.length) return { ok: false, error: 'Aucun jeu PC à traiter.' };
   const art = readSgdbArt();

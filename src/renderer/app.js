@@ -126,6 +126,9 @@
     trackRaf = requestAnimationFrame(() => { trackRaf = 0; placeCursor(true); });
   }
   document.addEventListener('scroll', trackCursor, true);
+  // Une fenêtre qui s'ouvre (ou se redessine) en s'animant déplace l'élément sélectionné : le cadre se recale à la fin.
+  document.addEventListener('animationend', trackCursor, true);
+  document.addEventListener('transitionend', (e) => { if (e.propertyName === 'transform' || e.propertyName === 'translate' || e.propertyName === 'scale') trackCursor(); }, true);
   // La mise en page bouge sans défilement (scan, images, polices, contenu qui change de hauteur) :
   // le cadre suit l'élément sélectionné au lieu de rester à son ancienne place.
   if (window.ResizeObserver) {
@@ -1825,7 +1828,7 @@
     const rows = [];
     const add = (label, value, act, desc, extra = {}) => rows.push(focusable(h('div', { class: 'set-row' },
       h('div', { class: 'set-text' }, h('div', { class: 'set-label' }, label), desc ? h('div', { class: 'set-desc' }, desc) : null),
-      h('div', { class: 'set-value' }, value)), { a: act, x: extra.x, y: extra.y, focus: () => setHints('settings') }));
+      h('div', { class: 'set-value' }, value)), { a: act, x: extra.x, y: extra.y, focus: () => { setHints('settings'); if (extra.focus) extra.focus(); else if (rows.paintPreview) rows.paintPreview(null); } }));
     const reopen = async (label) => { await saveCfg(); applyWallpaper(); S.dirty = true; openHomeEditor(label); };
     const tog = (on) => h('span', { class: 'toggle' + (on ? ' on' : '') });
     const section = (t) => rows.push(h('div', { class: 'set-section' }, t));
@@ -1865,6 +1868,37 @@
 
     section('Widgets');
     rows.push(h('p', { class: 'muted small', style: 'margin: 0 6px 6px' }, 'A : activer ou retirer · X : monter · Y : descendre'));
+    // Aperçu en direct : les widgets tels qu'ils seront sur l'accueil, celui sélectionné mis en avant
+    // (un widget pas encore ajouté apparaît en transparence, à la place qu'il prendrait).
+    const pv = h('div', { class: 'w-preview', 'aria-hidden': 'true' }, h('div', { class: 'w-preview-label' }, 'Aperçu de l’accueil'));
+    const PV_W = 1400;
+    rows.paintPreview = (focusId) => {
+      const ids = home.widgets.filter((x) => WIDGETS[x]);
+      if (focusId && !ids.includes(focusId)) ids.push(focusId);
+      const inner = h('div', { class: 'widgets pv-inner', style: `width:${PV_W}px` });
+      for (const id of ids) {
+        let card;
+        try { card = widgetCard(id); } catch { continue; }
+        card.classList.remove('f');
+        card._act = {};
+        if (id === focusId) card.classList.add('pv-hl');
+        if (!home.widgets.includes(id)) card.classList.add('pv-ghost');
+        inner.append(card);
+      }
+      if (!ids.length) inner.append(h('div', { class: 'pv-empty' }, 'Aucun widget sur l’accueil'));
+      pv.querySelectorAll('.pv-inner').forEach((x) => x.remove());
+      pv.append(inner);
+      requestAnimationFrame(() => {
+        const k = (pv.clientWidth - 24) / PV_W;
+        inner.style.transform = `scale(${k})`;
+        pv.style.height = Math.ceil(inner.offsetHeight * k + 44) + 'px';
+        // L'aperçu change de hauteur : la ligne sélectionnée reste visible et le cadre la suit.
+        if (S.focusEl && pv.parentElement && pv.parentElement.contains(S.focusEl)) S.focusEl.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+        trackCursor();
+      });
+    };
+    rows.push(pv);
+    requestAnimationFrame(() => rows.paintPreview(null));
     const ordered = [...home.widgets.filter((id) => WIDGETS[id]), ...Object.keys(WIDGETS).filter((id) => !home.widgets.includes(id))];
     for (const id of ordered) {
       const on = home.widgets.includes(id);
@@ -1883,7 +1917,7 @@
           [home.wide[id] ? 'Taille normale' : 'Grand (double largeur)', () => { home.wide[id] = !home.wide[id]; reopen(WIDGETS[id].name); }],
           ['↑ Monter', () => move(-1)], ['↓ Descendre', () => move(1)],
         ]);
-      }, null, { x: () => move(-1), y: () => move(1) });
+      }, null, { x: () => move(-1), y: () => move(1), focus: () => rows.paintPreview(id) });
     }
 
     section('Blocs de l’accueil');
@@ -2293,6 +2327,21 @@
       if (id === 'steam' && stores.steam !== false) {
         row('Jeux Steam non installés', toggle(stores.steamUninstalled !== false), async () => { stores.steamUninstalled = stores.steamUninstalled === false; await saveCfg(); rescan(); },
           'Affiche aussi les jeux du dossier stplug-in pas encore installés (badge ⬇) ; les lancer ouvre l’installation Steam.');
+      }
+      if (id === 'steam' && stores.steam !== false && api.steamAccounts) {
+        const mode = stores.steamAccount || 'current';
+        const accs = S.steamAccounts || [];
+        const label = mode === 'all' ? 'Tous les comptes (cumulés)' : mode === 'current' ? `Compte connecté${accs[0] ? ' · ' + accs[0].name : ''}` : ((accs.find((x) => x.id === mode) || {}).name || mode);
+        row('Compte Steam pour le temps et les succès', label, async () => {
+          S.steamAccounts = await api.steamAccounts();
+          const pick = async (m) => { closeOverlay(true); stores.steamAccount = m; await saveCfg(); S.ach = null; toast('Compte Steam changé · relecture du temps de jeu…'); await rescan(true); loadAchievements(true); rerender(); };
+          openMenu('Compte Steam', [
+            ['Compte connecté (automatique)', () => pick('current'), { icon: mode === 'current' ? '✓' : '' }],
+            ...S.steamAccounts.map((x) => [x.name + (x.mostRecent ? ' · connecté' : ''), () => pick(x.id), { icon: mode === x.id ? '✓' : '' }]),
+            ['Tous les comptes (temps cumulés)', () => pick('all'), { icon: mode === 'all' ? '✓' : '' }],
+          ]);
+        }, 'Plusieurs comptes Steam ont servi sur ce PC ? Lumen ne compte que celui choisi.');
+        if (!S.steamAccounts) api.steamAccounts().then((l) => { S.steamAccounts = l; });
       }
     }
     cat('images');

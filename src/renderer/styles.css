@@ -1249,3 +1249,15 @@ body.home-clock #topbar .status { visibility: hidden; }
 .cap-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .cap-info b { font-size: 16px; }
 .cap-info span { font-size: 13px; }
+
+/* ---------- Éditeur d'accueil : aperçu des widgets ---------- */
+.w-preview { position: sticky; top: -1px; z-index: 3; margin: 2px 4px 12px; padding: 32px 12px 12px; border-radius: 16px; overflow: hidden;
+  background: linear-gradient(180deg, rgba(10, 12, 20, 0.96), rgba(10, 12, 20, 0.9)); box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+.w-preview-label { position: absolute; top: 10px; left: 14px; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.pv-inner { transform-origin: top left; pointer-events: none; margin: 0 !important; }
+.pv-inner .widget { transition: opacity 160ms ease, box-shadow 160ms ease; }
+.pv-inner .widget.pv-hl { box-shadow: 0 0 0 4px var(--accent), 0 0 40px color-mix(in srgb, var(--accent) 40%, transparent); }
+.pv-inner:has(.pv-hl) .widget:not(.pv-hl) { opacity: 0.45; }
+.pv-inner .widget.pv-ghost { opacity: 0.75; outline: 3px dashed color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: 4px; }
+.pv-empty { grid-column: 1 / -1; padding: 40px; text-align: center; color: var(--muted); font-size: 28px; }

@@ -37,13 +37,14 @@ const pickText = (v) => {
 };
 
 // Index des fichiers de progression : appid → chemin le plus récent.
-async function progressIndex(statsDir) {
+async function progressIndex(statsDir, account) {
   const index = new Map();
   let files = [];
   try { files = await fsp.readdir(statsDir); } catch { return index; }
   for (const f of files) {
     const m = /^UserGameStats_(\d+)_(\d+)\.bin$/.exec(f);
     if (!m) continue;
+    if (account && m[1] !== String(account)) continue;
     const full = path.join(statsDir, f);
     let mtime = 0;
     try { mtime = (await fsp.stat(full)).mtimeMs; } catch { continue; }
@@ -88,9 +89,9 @@ async function readGame(statsDir, appid, progressFile) {
 }
 
 // Vue d'ensemble pour une liste de jeux Steam { path, appid }.
-async function steamSummary(steamDir, games) {
+async function steamSummary(steamDir, games, account) {
   const statsDir = path.join(steamDir, 'appcache', 'stats');
-  const progress = await progressIndex(statsDir);
+  const progress = await progressIndex(statsDir, account);
   const out = { games: [], recent: [] };
   for (const g of games) {
     const r = await readGame(statsDir, g.appid, (progress.get(g.appid) || {}).file);
@@ -103,9 +104,9 @@ async function steamSummary(steamDir, games) {
   return out;
 }
 
-async function steamGame(steamDir, appid) {
+async function steamGame(steamDir, appid, account) {
   const statsDir = path.join(steamDir, 'appcache', 'stats');
-  const progress = await progressIndex(statsDir);
+  const progress = await progressIndex(statsDir, account);
   return readGame(statsDir, appid, (progress.get(appid) || {}).file);
 }
 

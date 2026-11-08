@@ -181,10 +181,37 @@ async function readSteamAppInfo(steamDir, wanted) {
 }
 
 // Temps de jeu noté par Steam (userdata/<compte>/config/localconfig.vdf, en minutes) ; plusieurs comptes : le plus grand.
+// ---------- Comptes Steam du PC ----------
+// Plusieurs comptes peuvent avoir servi sur ce PC : le temps de jeu et les succès suivent un seul compte.
+// steamAccountMode : 'current' (dernier connecté, par défaut), 'all' (temps cumulés) ou un identifiant de compte.
+let steamAccountMode = 'current';
+function setSteamAccountMode(mode) { steamAccountMode = mode || 'current'; }
+async function steamAccounts(steamDir) {
+  const out = [];
+  const text = await readText(path.join(steamDir, 'config', 'loginusers.vdf'));
+  const users = text ? (parseVdf(text).users || parseVdf(text).Users || {}) : {};
+  for (const [id64, u] of Object.entries(users)) {
+    let id = '';
+    try { id = String(BigInt(id64) - 76561197960265728n); } catch { continue; }
+    const k = (n) => u[n] ?? u[n.toLowerCase()];
+    out.push({ id, name: k('PersonaName') || k('AccountName') || id, last: Number(k('Timestamp')) || 0, mostRecent: String(k('MostRecent')) === '1' });
+  }
+  return out.sort((a, b) => (b.mostRecent - a.mostRecent) || (b.last - a.last));
+}
+// Compte(s) retenu(s) : null = tous.
+async function steamAccountFilter(steamDir) {
+  if (steamAccountMode === 'all') return null;
+  if (/^\d+$/.test(steamAccountMode)) return steamAccountMode;
+  const list = await steamAccounts(steamDir);
+  return list.length ? list[0].id : null;
+}
+
 async function readSteamPlaytime(steamDir) {
   const out = new Map();
   let accounts = [];
   try { accounts = await fsp.readdir(path.join(steamDir, 'userdata')); } catch { return out; }
+  const only = await steamAccountFilter(steamDir);
+  if (only) accounts = accounts.filter((a) => a === only);
   for (const acc of accounts) {
     const text = await readText(path.join(steamDir, 'userdata', acc, 'config', 'localconfig.vdf'));
     if (!text) continue;
@@ -198,7 +225,7 @@ async function readSteamPlaytime(steamDir) {
       const last = (Number(a && a.LastPlayed) || 0) * 1000;
       if (!minutes && !last) continue;
       const prev = out.get(Number(id)) || { seconds: 0, last: 0 };
-      out.set(Number(id), { seconds: Math.max(prev.seconds, minutes * 60), last: Math.max(prev.last, last) });
+      out.set(Number(id), { seconds: prev.seconds + minutes * 60, last: Math.max(prev.last, last) });
     }
   }
   return out;
@@ -494,4 +521,4 @@ async function fetchSteamGridDB({ key, systems, art, signal, onProgress, fetchIm
   return stats;
 }
 
-module.exports = { scanPcStores, parseVdf, STORES, fetchSteamGridDB, getSteamDir };
+module.exports = { scanPcStores, parseVdf, STORES, fetchSteamGridDB, getSteamDir, steamAccounts, setSteamAccountMode, steamAccountFilter };

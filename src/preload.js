@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('lumen', {
   onLibraryChanged: (cb) => ipcRenderer.on('library:changed', () => cb()),
   onAchievementsChanged: (cb) => ipcRenderer.on('achievements:changed', () => cb()),
   testAchNotify: () => ipcRenderer.invoke('achnotify:test'),
+  steamAccounts: () => ipcRenderer.invoke('steam:accounts'),
   capture: {
     arm: (game) => ipcRenderer.invoke('capture:arm', game || null),
     take: () => ipcRenderer.invoke('capture:take'),
