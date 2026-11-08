@@ -27,6 +27,7 @@
     favorites: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>',
     settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>',
     achievements: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20h7M10 17h4"/></svg>',
+    stats: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20h16M7 16v-5M12 16V6M17 16v-8"/></svg>',
     search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>',
   };
   const icon = (name) => { const s = h('span', { class: 'ico' }); s.innerHTML = ICONS[name]; return s; };
@@ -37,6 +38,7 @@
     { id: 'systems', label: 'Consoles' },
     { id: 'favorites', label: 'Dossiers' },
     { id: 'achievements', label: 'Succès' },
+    { id: 'stats', label: 'Stats' },
     { id: 'settings', label: 'Réglages' },
   ];
   const SORTS = [
@@ -156,7 +158,7 @@
   const totalGames = () => S.lib.systems.reduce((n, s) => n + s.games.length, 0);
   const sysById = (id) => S.lib.systems.find((s) => s.id === id) || S.defs.find((s) => s.id === id);
   const isFav = (g) => S.cfg.favorites.includes(g.path);
-  const tabOf = (route) => (route.view === 'games' ? 'systems' : route.view === 'folder' ? 'favorites' : route.view === 'stats' ? 'achievements' : route.view);
+  const tabOf = (route) => (route.view === 'games' ? 'systems' : route.view === 'folder' ? 'favorites' : route.view);
   const saveCfg = () => api.setConfig(S.cfg);
 
   function fmtSize(bytes) {
@@ -4183,7 +4185,23 @@
   }
 
   // ---------- Entrées ----------
+  // Code secret : ↑ ↑ ↓ ↓ ← → ← → B A ouvre un mini-jeu d'arcade au hasard.
+  const KONAMI = ['up', 'up', 'down', 'down', 'left', 'right', 'left', 'right', 'b', 'a'];
   function onAction(a) {
+    S.konami = [...(S.konami || []), a].slice(-KONAMI.length);
+    if (S.konami.length === KONAMI.length && S.konami.every((x, i) => x === KONAMI[i]) && window.LumenArcade && !S.inGame) {
+      S.konami = [];
+      if (S.overlay) closeOverlay(true);
+      Input.paused = true;
+      stopPreview && stopPreview();
+      sfx('boot');
+      window.LumenArcade.open({
+        best: (k) => ((S.cfg.arcade || {})[k] || 0),
+        saveBest: (k, v) => { (S.cfg.arcade || (S.cfg.arcade = {}))[k] = v; saveCfg(); },
+        onClose: () => { Input.paused = false; Input.lock(400); },
+      });
+      return;
+    }
     handleAction(a);
     // Le contenu peut bouger après une action (texte, résultats…) : on recale le curseur.
     requestAnimationFrame(() => { if (!S.cursorHold) placeCursor(); });
