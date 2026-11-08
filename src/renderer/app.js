@@ -947,7 +947,7 @@
   function focusable(el, act) {
     el.classList.add('f');
     el._act = act || {};
-    el.addEventListener('mouseenter', () => { if (S.mouse) setFocus(el, { silent: true, noScroll: true }); });
+    el.addEventListener('mouseenter', () => { if (S.mouse && !(S.mouseHoldUntil > performance.now())) setFocus(el, { silent: true, noScroll: true }); });
     el.addEventListener('click', () => {
       setFocus(el, { silent: true, noScroll: true });
       if (el._act.a) { pressFx(el); sfx('select'); el._act.a(); }
@@ -1946,7 +1946,12 @@
     const add = (label, value, act, desc, extra = {}) => rows.push(focusable(h('div', { class: 'set-row' },
       h('div', { class: 'set-text' }, h('div', { class: 'set-label' }, label), desc ? h('div', { class: 'set-desc' }, desc) : null),
       h('div', { class: 'set-value' }, value)), { a: act, x: extra.x, y: extra.y, focus: () => { setHints('settings'); if (extra.focus) extra.focus(); else if (rows.paintPreview) rows.paintPreview(null); } }));
-    const reopen = async (label) => { await saveCfg(); applyWallpaper(); S.dirty = true; openHomeEditor(label); };
+    // Rouvre l'éditeur à la même position de défilement (sinon il repart en haut et la souris sélectionne une autre ligne).
+    const reopen = async (label) => {
+      const m = document.querySelector('#overlay .modal.profile-editor');
+      S.homeEdScroll = m ? m.scrollTop : (S.homeEdLast || 0);
+      await saveCfg(); applyWallpaper(); S.dirty = true; openHomeEditor(label);
+    };
     const tog = (on) => h('span', { class: 'toggle' + (on ? ' on' : '') });
     const section = (t) => rows.push(h('div', { class: 'set-section' }, t));
 
@@ -2058,9 +2063,12 @@
 
     openOverlay(h('div', { class: 'modal art-editor profile-editor' },
       h('div', { class: 'eyebrow' }, 'Personnaliser'), h('h2', {}, 'Accueil et fond d’écran'), ...rows));
+    const modal = document.querySelector('#overlay .modal.profile-editor');
+    if (modal && S.homeEdScroll != null) { modal.scrollTop = S.homeEdScroll; S.homeEdScroll = null; S.mouseHoldUntil = performance.now() + 400; }
+    if (modal) modal.addEventListener('scroll', () => { S.homeEdLast = modal.scrollTop; }, { passive: true });
     if (focusLabel) {
       const el = rows.find((r) => r.querySelector && r.querySelector('.set-label') && r.querySelector('.set-label').textContent === focusLabel);
-      if (el) setFocus(el, { silent: true });
+      if (el) setFocus(el, { silent: true, instant: true });
     }
   }
 
