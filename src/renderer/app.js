@@ -1006,6 +1006,7 @@
   // ---------- Routage ----------
   function render(focusIndex = 0) {
     const v = S.route.view;
+    if (S.cfg) setAccent(v === 'games' ? (sysById(S.route.systemId) || {}).color : null);
     document.body.classList.toggle('home-clock', v === 'home' && !!S.cfg && homeCfg().widgets.includes('clock'));
     let content;
     if (v === 'home') content = viewHome();
@@ -1302,6 +1303,7 @@
       focus: () => {
         setTitle(s.name, plural(s.games.length, 'jeu', 'jeux'));
         setBackground(withBg ? withBg.background || withBg.cover : null, s.color);
+        setAccent(s.color);
         setHints('system');
       },
     });
@@ -2860,6 +2862,8 @@
       c.accent = ACCENTS[(ACCENTS.indexOf(c.accent) + 1) % ACCENTS.length];
       applyCfg(); saveCfg(); rerender();
     });
+    row('Couleur selon la console', toggle(c.consoleAccent !== false), () => { c.consoleAccent = c.consoleAccent === false; saveCfg(); applyCfg(); rerender(); },
+      'Sur une console, l’interface prend sa couleur (rouge pour Switch, bleu pour PlayStation…).');
 
     cat('about');
     section('Lumen');
@@ -2961,6 +2965,15 @@
     const seen = (S.cfg.firstSeen || {})[g.path];
     let hist = { firstAchievement: 0, installed: 0 };
     if (api.gameHistory && /^steam:/.test(g.path)) { try { hist = await api.gameHistory(g.path); } catch { /* hors Steam */ } }
+    // Jeu rétro : premier succès RetroAchievements (dates fournies par le site).
+    const ai = achInfo(g);
+    if (!hist.firstAchievement && ai && ai.raId && api.ra) {
+      try {
+        const r = await api.ra.game(ai.raId);
+        const times = ((r && r.list) || []).filter((a) => a.unlocked && a.time > 0).map((a) => a.time);
+        if (times.length) hist.firstAchievement = Math.min(...times);
+      } catch { /* hors ligne */ }
+    }
     if (!exact && hist.firstAchievement) add('Première partie', 'au plus tard le ' + fmtLong(hist.firstAchievement));
     if (hist.installed) add('Installé le', fmtLong(hist.installed));
     if (seen) add('Ajouté à Lumen', fmtLong(seen));
@@ -4372,7 +4385,24 @@
     disarmCapture();
   }
 
+  // Couleur d'accent : celle de la console sélectionnée ou ouverte (réglable), sinon celle choisie dans les Réglages.
+  // Une couleur trop sombre est éclaircie pour rester lisible sur le fond.
+  function readableAccent(hex) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
+    if (!m) return null;
+    let [r, g, b] = [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16));
+    const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    if (lum < 0.45) { const k = Math.min(0.75, (0.6 - lum) / 0.6 + 0.15); [r, g, b] = [r, g, b].map((v) => Math.round(v + (255 - v) * k)); }
+    return '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
+  }
+  function setAccent(color) {
+    const c = (S.cfg.consoleAccent !== false && readableAccent(color)) || S.cfg.accent;
+    if (S.accentNow === c) return;
+    S.accentNow = c;
+    document.documentElement.style.setProperty('--accent', c);
+  }
   function applyCfg() {
+    S.accentNow = S.cfg.accent;
     document.documentElement.style.setProperty('--accent', S.cfg.accent);
     Input.swapAB = !!S.cfg.swapAB;
     Input.nintendoConfirm = S.cfg.nintendoConfirm !== false;
