@@ -12,6 +12,13 @@ contextBridge.exposeInMainWorld('lumen', {
   testAchNotify: () => ipcRenderer.invoke('achnotify:test'),
   steamAccounts: () => ipcRenderer.invoke('steam:accounts'),
   gameHistory: (p) => ipcRenderer.invoke('game:history', p),
+  remote: {
+    info: () => ipcRenderer.invoke('remote:info'),
+    set: (on) => ipcRenderer.invoke('remote:set', !!on),
+    newPin: () => ipcRenderer.invoke('remote:newPin'),
+    library: (list) => ipcRenderer.send('remote:library', list),
+    onLaunch: (cb) => ipcRenderer.on('remote:launch', (_e, p) => cb(p)),
+  },
   saves: {
     info: () => ipcRenderer.invoke('saves:info'),
     run: () => ipcRenderer.invoke('saves:run'),

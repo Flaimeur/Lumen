@@ -239,6 +239,46 @@ function quitCurrentGame() {
   return true;
 }
 
+// ---------- Télécommande sur téléphone (réseau local, code à 6 chiffres) ----------
+const remote = require('./remote');
+let remoteLib = []; // envoyée par l'interface : [{ path, name, sys, cover, recent, fav }]
+const newPin = () => String(require('crypto').randomInt(0, 1000000)).padStart(6, '0');
+function remoteHooks() {
+  return {
+    library: () => remoteLib,
+    launch: (p) => { if (win && !win.isDestroyed()) win.webContents.send('remote:launch', p); },
+    media: (cmd) => require('./mediactl').ask(cmd, path.join(app.getPath('userData'), 'media-covers')),
+    companionRun: (id, a) => require('./companions').run(id, a),
+    quitGame: () => quitCurrentGame(),
+    state: async () => {
+      let media = null, cos = [];
+      try { media = await require('./mediactl').ask('state', path.join(app.getPath('userData'), 'media-covers')); } catch { /* indisponible */ }
+      try { cos = (await require('./companions').list()).map((c) => ({ id: c.id, name: c.name, color: c.color, status: c.status, actions: c.actions.map((a) => ({ id: a.id, label: a.label })) })); } catch { /* aucune */ }
+      const g = currentGame && remoteLib.find((x) => x.path === currentGame.path);
+      return { playing: currentGame ? (g ? g.name : path.parse(currentGame.path).name) : null, media: media && { active: media.active, title: media.title, artist: media.artist, status: media.status, vol: media.vol }, companions: cos };
+    },
+  };
+}
+function remoteInfo() {
+  const c = loadConfig().remote || {};
+  return { enabled: !!c.enabled, pin: c.pin || '', port: remote.PORT, addresses: remote.lanAddresses() };
+}
+function remoteApply() {
+  const cfg = loadConfig();
+  const c = cfg.remote || {};
+  if (c.enabled) {
+    if (!c.pin) { c.pin = newPin(); cfg.remote = c; saveConfig(cfg); }
+    remote.start(remoteHooks(), c.pin);
+  } else remote.stop();
+  return remoteInfo();
+}
+app.whenReady().then(() => setTimeout(remoteApply, 3000));
+ipcMain.handle('remote:info', () => remoteInfo());
+ipcMain.handle('remote:set', (_e, on) => { const cfg = loadConfig(); cfg.remote = { ...(cfg.remote || {}), enabled: !!on }; saveConfig(cfg); return remoteApply(); });
+ipcMain.handle('remote:newPin', () => { const cfg = loadConfig(); cfg.remote = { ...(cfg.remote || {}), pin: newPin() }; saveConfig(cfg); remote.setPin(cfg.remote.pin); return remoteInfo(); });
+ipcMain.on('remote:library', (_e, list) => { if (Array.isArray(list)) remoteLib = list.slice(0, 20000).map((g) => ({ path: String(g.path), name: String(g.name).slice(0, 120), sys: String(g.sys || '').slice(0, 20), cover: g.cover ? String(g.cover) : '', recent: Number(g.recent) || 0, fav: !!g.fav })); });
+app.on('will-quit', () => remote.stop());
+
 // ---------- Sauvegardes des émulateurs vers le cloud ----------
 const saves = require('./saves');
 function backupSaves(reason) {

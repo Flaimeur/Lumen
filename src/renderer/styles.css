@@ -1389,3 +1389,5 @@ body.home-clock #topbar .status { visibility: hidden; }
 .tpv-row i { min-height: 30px; }
 .tpv-name { position: absolute; right: 12px; bottom: 10px; font-size: 13px; font-weight: 750; padding: 4px 10px; border-radius: 99px; background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(6px); }
 @media (prefers-reduced-motion: reduce) { .tpv-blobs { animation: none; } }
+
+.remote-pin { font-size: 22px; letter-spacing: 0.25em; font-variant-numeric: tabular-nums; color: var(--accent); }

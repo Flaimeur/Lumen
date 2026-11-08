@@ -2812,6 +2812,21 @@
       row('Ouvrir le dossier cloud', 'Ouvrir', () => api.saves.open());
     }
     cat('controls');
+    if (api.remote) {
+      const ri = S.remoteInfo;
+      if (!ri) api.remote.info().then((x) => { S.remoteInfo = x; if (S.route.view === 'settings' && !S.overlay) rerender(); });
+      section('Télécommande sur téléphone');
+      row('Activer la télécommande', toggle(!!(ri && ri.enabled)), async () => {
+        S.remoteInfo = await api.remote.set(!(ri && ri.enabled));
+        S.cfg.remote = { ...(S.cfg.remote || {}), enabled: S.remoteInfo.enabled, pin: S.remoteInfo.pin };
+        if (S.remoteInfo.enabled) { pushRemoteLibrary(); toast('Télécommande active · Windows peut demander d’autoriser Lumen sur le réseau privé'); }
+        rerender();
+      }, 'Depuis ton téléphone, sur le même Wi-Fi : choisir et lancer un jeu, la musique, Lueur, quitter le jeu. Rien n’est accessible hors de ton réseau.');
+      if (ri && ri.enabled) {
+        row('Adresse à ouvrir sur le téléphone', ri.addresses.length ? ri.addresses.map((a) => `http://${a}:${ri.port}`).join('  ou  ') : 'Pas de réseau', null, 'Tape-la dans le navigateur du téléphone, puis entre le code ci-dessous.');
+        row('Code', h('b', { class: 'remote-pin' }, ri.pin), async () => { S.remoteInfo = await api.remote.newPin(); toast('Nouveau code : les téléphones connectés devront le retaper'); rerender(); }, 'A : changer de code.');
+      }
+    }
     section('Manettes connectées');
     const pads = Input.pads ? Input.pads() : [];
     const PAD_LABEL = { ps4: 'PlayStation 4', ps5: 'PlayStation 5', xbox: 'Xbox', switch: 'Nintendo Switch', generic: 'Manette' };
@@ -4092,6 +4107,7 @@
     }
     S.byPath = new Map();
     for (const s of S.lib.systems) for (const g of s.games) S.byPath.set(g.path, g);
+    pushRemoteLibrary();
     {
       const seen = S.cfg.firstSeen || (S.cfg.firstSeen = {});
       const first = !Object.keys(seen).length; // première fois : toute la bibliothèque existante compte comme « ancienne »
@@ -4419,6 +4435,20 @@
     if (lum < 0.45) { const k = Math.min(0.75, (0.6 - lum) / 0.6 + 0.15); [r, g, b] = [r, g, b].map((v) => Math.round(v + (255 - v) * k)); }
     return '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
   }
+  // Télécommande : la liste des jeux (nom, console, jaquette, dernière partie) part vers le serveur local.
+  function pushRemoteLibrary() {
+    if (!api.remote || !(S.cfg.remote && S.cfg.remote.enabled)) return;
+    const last = S.cfg.lastPlayed || {};
+    const favs = new Set(S.cfg.favorites || []);
+    const list = [];
+    for (const s of S.lib.systems) for (const g of s.games) {
+      if (s.apps) continue;
+      const c = g.cover || '';
+      list.push({ path: g.path, name: g.name, sys: s.short || s.name, cover: c && !c.startsWith('romm-cover:') ? c : '', recent: Math.max(last[g.path] || 0, g.storeLastPlayed || 0), fav: favs.has(g.path) });
+    }
+    api.remote.library(list);
+  }
+
   function setAccent(color) {
     const c = (S.cfg.consoleAccent !== false && readableAccent(color)) || S.cfg.accent;
     if (S.accentNow === c) return;
@@ -4560,6 +4590,7 @@
     Input.onDevice(() => { setHints(S.hintKind); renderDock(); });
     api.onGameExit(onGameExit);
     // Jaquettes iiDB revérifiées en arrière-plan : on recharge la bibliothèque sans interrompre.
+    if (api.remote) api.remote.onLaunch((p) => { const g = S.byPath.get(p); if (!g || S.inGame || S.launching) return; if (S.overlay) closeOverlay(true); toast('Lancé depuis le téléphone : ' + g.name); launch(g); });
     if (api.saves) api.saves.onDone((r) => { if (r && r.ok && r.copied) toast(`Sauvegardes : ${plural(r.copied, 'fichier copié', 'fichiers copiés')} dans le cloud`); else if (r && !r.ok) toast(r.error || 'Copie des sauvegardes impossible', 'error'); });
     if (api.onAchievementsChanged) api.onAchievementsChanged(() => { S.ach = null; if (!S.inGame) loadAchievements(true); });
     if (api.onLibraryChanged) api.onLibraryChanged(async () => { try { applyLib(await api.scan({ romm: false })); if (!document.querySelector('.overlay')) rerender(); } catch { /* rien */ } });
