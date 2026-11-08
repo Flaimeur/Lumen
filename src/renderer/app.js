@@ -3206,6 +3206,11 @@
       items.push(['Jouer', run(() => launch(g)), { icon: '▶' }]);
       items.push([isFav(g) ? 'Retirer des favoris' : 'Ajouter aux favoris', run(() => toggleFav(g)), { icon: isFav(g) ? '★' : '☆' }]);
       items.push(['Ranger dans un dossier', run(() => openCollectionPicker(g)), { icon: '📁' }]);
+      if ((S.cfg.recent || []).includes(g.path)) items.push(['Retirer des joués récemment', run(() => {
+        S.cfg.recent = S.cfg.recent.filter((p) => p !== g.path);
+        saveCfg(); S.keepAnim = true; rerender();
+        toast(`« ${g.name} » retiré des joués récemment`);
+      }), { icon: '✕' }]);
       items.push([myRating(g) ? `Ma note : ${'★'.repeat(myRating(g))}` : 'Noter ce jeu', () => openRatingMenu(g, reopen), { icon: '✩', sub: true }]);
       if (g.source === 'app') items.push(...appMenuItems(g.path.slice(4)));
       else items.push(['Détails', run(() => openDetails(g)), { icon: 'ℹ' }]);
@@ -3273,6 +3278,7 @@
     const library = [
       ['Télécharger les jaquettes manquantes', run(() => openThumbs()), { icon: '⤓' }],
       ['Rescanner la bibliothèque', run(rescan), { icon: '⟳' }],
+      ['Effacer les joués récemment', run(() => { S.cfg.recent = []; saveCfg(); S.keepAnim = true; rerender(); toast('Liste des joués récemment vidée'); }), { icon: '✕' }],
     ];
     if (!g && !sysCard && !folder) items.push(['Bibliothèque…', () => openSubMenu('Bibliothèque', library, reopen), { icon: '📚', sub: true }]);
 
