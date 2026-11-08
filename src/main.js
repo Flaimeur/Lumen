@@ -239,8 +239,24 @@ function quitCurrentGame() {
   return true;
 }
 
+// ---------- Sauvegardes des émulateurs vers le cloud ----------
+const saves = require('./saves');
+function backupSaves(reason) {
+  const cfg = loadConfig();
+  if (!(cfg.cloudSaves && cfg.cloudSaves.enabled)) return Promise.resolve(null);
+  return saves.backup(cfg).then((r) => {
+    if (r && r.ok) { const c = loadConfig(); c.cloudSaves = { ...(c.cloudSaves || {}), last: { at: r.at, copied: r.copied, reason } }; saveConfig(c); }
+    if (win && !win.isDestroyed()) win.webContents.send('saves:done', r);
+    return r;
+  }).catch(() => null);
+}
+ipcMain.handle('saves:info', () => { const cfg = loadConfig(); return { sources: saves.sources(cfg), dest: (cfg.cloudSaves && cfg.cloudSaves.dest) || saves.defaultDest(), last: (cfg.cloudSaves || {}).last || null }; });
+ipcMain.handle('saves:run', async () => { const cfg = loadConfig(); const r = await saves.backup(cfg); if (r && r.ok) { const c = loadConfig(); c.cloudSaves = { ...(c.cloudSaves || {}), last: { at: r.at, copied: r.copied, reason: 'manuel' } }; saveConfig(c); } return r; });
+ipcMain.handle('saves:open', () => { const d = (loadConfig().cloudSaves || {}).dest || saves.defaultDest(); if (!d) return 'Aucun dossier'; fs.mkdirSync(d, { recursive: true }); return shell.openPath(d); });
+
 function onGameEnded(gamePath, code, started) {
   currentGame = null;
+  setTimeout(() => backupSaves('après une partie'), 3000);
   stopRaWatch();
   globalShortcut.unregister(QUIT_SHORTCUT);
   if (!win) return;

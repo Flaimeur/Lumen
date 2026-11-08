@@ -2787,6 +2787,30 @@
       row(sys.name, alt ? alt.label + (custom ? '' : ' (défaut)') : custom ? 'Personnalisée' : 'Par défaut', () => editCommand(sys));
     }
 
+    if (api.saves) {
+      const cs = c.cloudSaves || (c.cloudSaves = { enabled: false });
+      const info = S.savesInfo;
+      if (!info) api.saves.info().then((x) => { S.savesInfo = x; if (S.route.view === 'settings' && !S.overlay) rerender(); });
+      section('Sauvegardes dans le cloud');
+      row('Copier mes sauvegardes après chaque partie', toggle(!!cs.enabled), () => { cs.enabled = !cs.enabled; saveCfg(); rerender(); if (cs.enabled) toast('Les sauvegardes seront copiées à la fin de chaque partie'); },
+        'Lumen copie les sauvegardes nouvelles ou modifiées des émulateurs dans ton dossier cloud. Il ne supprime et ne remplace jamais rien côté émulateurs.');
+      row('Dossier cloud', info ? (info.dest || 'À choisir') : '…', async () => {
+        const d = await api.pickFolder('Dossier où copier les sauvegardes (OneDrive, Google Drive…)', cs.dest || (info && info.dest) || '');
+        if (d) { cs.dest = d; await saveCfg(); S.savesInfo = null; rerender(); }
+      }, 'Par défaut : OneDrive › Lumen › Sauvegardes (ou Google Drive s’il est installé).');
+      row('Sauvegardes trouvées', info ? plural(info.sources.length, 'dossier', 'dossiers') : '…', () => {
+        if (!info || !info.sources.length) { toast('Aucun dossier de sauvegarde trouvé pour tes émulateurs'); return; }
+        openMenu('Sauvegardes trouvées', info.sources.map((x) => [x.name + (x.sub ? ' · ' + x.sub : ''), () => {}, { icon: '📁' }]));
+      }, info ? info.sources.map((x) => x.name).filter((v, i, a) => a.indexOf(v) === i).join(', ') || 'Aucune pour l’instant' : null);
+      row('Copier maintenant', cs.last ? 'Dernière : ' + new Date(cs.last.at).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Jamais', async () => {
+        toast('Copie des sauvegardes…', 'info', 30000);
+        const r = await api.saves.run();
+        if (r && r.ok) { cs.last = { at: r.at, copied: r.copied }; toast(r.copied ? `${plural(r.copied, 'fichier copié', 'fichiers copiés')} dans le cloud` : 'Tout était déjà à jour'); }
+        else toast((r && r.error) || 'Copie impossible', 'error');
+        rerender();
+      });
+      row('Ouvrir le dossier cloud', 'Ouvrir', () => api.saves.open());
+    }
     cat('controls');
     section('Manettes connectées');
     const pads = Input.pads ? Input.pads() : [];
@@ -4536,6 +4560,7 @@
     Input.onDevice(() => { setHints(S.hintKind); renderDock(); });
     api.onGameExit(onGameExit);
     // Jaquettes iiDB revérifiées en arrière-plan : on recharge la bibliothèque sans interrompre.
+    if (api.saves) api.saves.onDone((r) => { if (r && r.ok && r.copied) toast(`Sauvegardes : ${plural(r.copied, 'fichier copié', 'fichiers copiés')} dans le cloud`); else if (r && !r.ok) toast(r.error || 'Copie des sauvegardes impossible', 'error'); });
     if (api.onAchievementsChanged) api.onAchievementsChanged(() => { S.ach = null; if (!S.inGame) loadAchievements(true); });
     if (api.onLibraryChanged) api.onLibraryChanged(async () => { try { applyLib(await api.scan({ romm: false })); if (!document.querySelector('.overlay')) rerender(); } catch { /* rien */ } });
     startClock();
