@@ -266,11 +266,40 @@
     master.connect(lp).connect(audio.destination);
   }
 
+  // ---------- Mode soirée ----------
+  // Entre deux heures choisies : écran plus sombre et plus chaud, sons de Lumen moins forts, et Lueur en
+  // lumière chaude (si Lueur est là). Rien n'est « défait » le matin : on revient simplement à l'affichage normal.
+  const eveCfg = () => S.cfg.evening || (S.cfg.evening = { enabled: false, start: '22:00', end: '07:00', dim: 0.8, volume: 0.5, lueur: true });
+  const toMin = (t) => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(t || '')); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+  function eveningNow() {
+    const e = eveCfg();
+    if (S.eveningForced !== undefined) return S.eveningForced;
+    if (!e.enabled) return false;
+    const a = toMin(e.start), b = toMin(e.end);
+    if (a == null || b == null || a === b) return false;
+    const d = new Date(); const n = d.getHours() * 60 + d.getMinutes();
+    return a < b ? n >= a && n < b : n >= a || n < b;
+  }
+  const vol = () => (S.cfg ? (S.cfg.volume ?? 0.7) * (S.evening ? (eveCfg().volume ?? 0.5) : 1) : 0.7);
+  function applyEvening(announce) {
+    if (!S.cfg) return;
+    const on = eveningNow();
+    if (on === !!S.evening) return;
+    S.evening = on;
+    const e = eveCfg();
+    document.documentElement.style.setProperty('--eve-dim', String(e.dim ?? 0.8));
+    document.body.classList.toggle('evening', on);
+    updateMusic();
+    if (on && e.lueur !== false && api.companions && (S.companions || []).some((c) => c.id === 'lueur' && c.actions.some((a) => a.id === 'warm'))) api.companions.run('lueur', 'warm');
+    if (announce) toast(on ? 'Mode soirée : écran adouci, sons plus bas' : 'Mode soirée terminé');
+  }
+  setInterval(() => applyEvening(true), 30000);
+
   function sfx(kind) {
     if (!S.cfg || !S.cfg.sounds || S.cfg.muted) return;
     try {
       ensureAudio();
-      master.gain.value = 0.9 * (S.cfg.volume ?? 0.7);
+      master.gain.value = 0.9 * vol();
       if (playSample(kind)) return;
       // Pas de fichier pour ces actions : on retombe sur le son synthétisé le plus proche.
       if (kind === 'menu' || kind === 'enter') kind = 'select';
@@ -321,7 +350,7 @@
     const play = m.enabled && musicList.length && !S.cfg.muted && !S.inGame && !musicDucked && !windowAway && !(S.media && S.media.status === 'Playing');
     if (!play) { music.pause(); return; }
     if (!music.getAttribute('src')) music.src = api.mediaUrl(musicList[musicIdx]);
-    music.volume = Math.min(1, (m.volume ?? 0.35) * (S.cfg.volume ?? 0.7));
+    music.volume = Math.min(1, (m.volume ?? 0.35) * vol());
     music.play().catch(() => {});
   }
   function nextTrack() {
@@ -805,7 +834,7 @@
     if (g.soundbite && S.cfg.soundbites && !S.cfg.muted) {
       biteTimer = setTimeout(() => {
         bite.src = api.mediaUrl(g.soundbite);
-        bite.volume = S.cfg.volume ?? 0.7;
+        bite.volume = vol();
         bite.currentTime = 0;
         bite.play().catch(() => {});
       }, 450);
@@ -2918,6 +2947,24 @@
       c.accent = ACCENTS[(ACCENTS.indexOf(c.accent) + 1) % ACCENTS.length];
       applyCfg(); saveCfg(); rerender();
     });
+    {
+      const e = eveCfg();
+      section('Mode soirée');
+      row('Mode soirée', toggle(!!e.enabled), () => { e.enabled = !e.enabled; S.eveningForced = undefined; saveCfg(); applyEvening(true); rerender(); },
+        'À l’heure choisie : écran plus sombre et plus chaud, sons de Lumen plus bas, et Lueur en lumière chaude.');
+      const askTime = (key, title) => async () => {
+        const v = await openPrompt({ title, value: e[key], help: 'Format heures:minutes, par exemple 22:00.' });
+        if (v === null) return;
+        if (toMin(v.trim()) == null) { toast('Heure non reconnue (ex. 22:30)', 'error'); return; }
+        e[key] = v.trim().padStart(5, '0'); await saveCfg(); applyEvening(true); rerender();
+      };
+      row('Début', e.start, askTime('start', 'Début du mode soirée'));
+      row('Fin', e.end, askTime('end', 'Fin du mode soirée'));
+      row('Luminosité de l’écran', Math.round((e.dim ?? 0.8) * 100) + ' %', () => { const st = [0.9, 0.8, 0.7, 0.6]; e.dim = st[(st.indexOf(e.dim ?? 0.8) + 1) % st.length]; document.documentElement.style.setProperty('--eve-dim', String(e.dim)); saveCfg(); rerender(); });
+      row('Volume des sons', Math.round((e.volume ?? 0.5) * 100) + ' %', () => { const st = [0.7, 0.5, 0.3, 0]; e.volume = st[(st.indexOf(e.volume ?? 0.5) + 1) % st.length]; saveCfg(); updateMusic(); rerender(); });
+      row('Lueur en lumière chaude', toggle(e.lueur !== false), () => { e.lueur = e.lueur === false; saveCfg(); rerender(); }, 'Envoie la commande « Soirée » à Lueur au début du mode (Lueur à jour nécessaire).');
+      row(S.evening ? 'Arrêter pour ce soir' : 'Essayer maintenant', S.evening ? 'Actif' : 'Inactif', () => { S.eveningForced = !S.evening; applyEvening(true); rerender(); });
+    }
     row('Couleur selon la console', toggle(c.consoleAccent !== false), () => { c.consoleAccent = c.consoleAccent === false; saveCfg(); applyCfg(); rerender(); },
       'Sur une console, l’interface prend sa couleur (rouge pour Switch, bleu pour PlayStation…).');
 
@@ -3306,7 +3353,7 @@
     bar.push(['⛶', 'Écran', run(() => api.toggleFullscreen())]);
     bar.push(['⚙', 'Réglages', run(() => openTab('settings'))]);
     bar.push(['👤', profiles().length > 1 ? activeProfile().name.slice(0, 9) : 'Profil', () => openProfileMenu(reopen)]);
-    bar.push(['⏻', 'Quitter', () => api.quit()]);
+    bar.push(['⏻', 'Éteindre', () => openPowerMenu(reopen)]);
     openMenu(g ? g.name : sysCard ? ((S.lib.systems.find((x) => x.id === sysCard) || {}).name || 'Menu') : folder ? folderName(folder) : sysId ? ((S.lib.systems.find((x) => x.id === sysId) || {}).name || 'Menu') : 'Menu', items, 'menu', { subtitle, bar });
   }
 
@@ -4575,6 +4622,40 @@
     if (back) openSubMenu('Profils', items, back); else openMenu('Profils', items);
   }
 
+  // Quitter Lumen, mettre le PC en veille, le redémarrer ou l'éteindre (avec confirmation).
+  function openPowerMenu(back) {
+    const confirmThen = (title, help, action) => async () => {
+      closeOverlay(true);
+      openOverlay(h('div', { class: 'modal update-modal' }, h('h2', {}, title), h('p', { class: 'muted' }, help),
+        h('div', { class: 'actions' },
+          actionButton(title, async () => {
+            closeOverlay(true);
+            const r = await api.power(action);
+            if (!r || !r.ok) { toast('Impossible', 'error'); return; }
+            if (action === 'sleep') { toast('Mise en veille…'); return; }
+            openOverlay(h('div', { class: 'modal update-modal' }, h('h2', {}, action === 'shutdown' ? 'Extinction dans 5 secondes' : 'Redémarrage dans 5 secondes'),
+              h('div', { class: 'actions' }, actionButton('Annuler', () => { api.power('cancel'); closeOverlay(); toast('Annulé'); }, true))));
+          }, true),
+          actionButton('Annuler', () => closeOverlay()))));
+    };
+    const items = [
+      ['Quitter Lumen', () => api.quit(), { icon: '✕' }],
+      api.power ? ['Mettre le PC en veille', confirmThen('Mettre en veille', 'Le PC se met en veille tout de suite. Un appui sur la manette ou la souris le réveille.', 'sleep'), { icon: '🌙' }] : null,
+      api.power ? ['Redémarrer le PC', confirmThen('Redémarrer', 'Le PC redémarre dans 5 secondes. Pense à sauvegarder ta partie.', 'restart'), { icon: '⟳' }] : null,
+      api.power ? ['Éteindre le PC', confirmThen('Éteindre', 'Le PC s’éteint dans 5 secondes. Pense à sauvegarder ta partie.', 'shutdown'), { icon: '⏻', danger: true }] : null,
+    ].filter(Boolean);
+    if (back) openSubMenu('Éteindre', items, back); else openMenu('Éteindre', items);
+  }
+
+  function renderPadBattery() {
+    const el = document.getElementById('pad-battery');
+    if (!el) return;
+    const list = Object.values(S.padBattery || {});
+    el.hidden = !list.length;
+    el.replaceChildren(...list.map((b) => h('span', { class: 'pb' + (b.charging ? ' chg' : b.level <= 20 ? ' low' : ''), title: (b.type === 'xbox' ? 'Manette Xbox' : b.type === 'ps5' ? 'DualSense' : 'DualShock 4') + ` · ${b.level} %${b.charging ? ' · en charge' : ''}` },
+      h('i', { class: 'pb-cell' }, h('i', { style: `width:${Math.max(6, b.level)}%` })), h('span', {}, b.charging && window.LumenGlyphs ? window.LumenGlyphs.svg('bolt') : `${b.level} %`))));
+  }
+
   function setAccent(color) {
     const c = (S.cfg.consoleAccent !== false && readableAccent(color)) || S.cfg.accent;
     if (S.accentNow === c) return;
@@ -4691,6 +4772,7 @@
     renderProfileBadge();
     syncCustomWidgets();
     loadCompanions();
+    setTimeout(() => applyEvening(false), 4000);
     setInterval(() => { if (document.hasFocus() && S.route.view === 'home' && homeCfg().widgets.some((x) => x.startsWith('co-'))) loadCompanions(true); }, 60000);
     S.defs = await api.systems();
     await refreshRommStatus();
@@ -4719,6 +4801,17 @@
     api.onGameExit(onGameExit);
     // Jaquettes iiDB revérifiées en arrière-plan : on recharge la bibliothèque sans interrompre.
     if (api.remote) api.remote.onLaunch((p) => { const g = S.byPath.get(p); if (!g || S.inGame || S.launching) return; if (S.overlay) closeOverlay(true); toast('Lancé depuis le téléphone : ' + g.name); launch(g); });
+    // Batterie des manettes (PlayStation lue en HID, Xbox via XInput) : dans la barre du haut, alerte sous 20 %.
+    if (api.onNativePad) api.onNativePad((ev) => {
+      if (!ev || ev.kind !== 'battery') { if (ev && ev.kind === 'disconnect' && S.padBattery) { delete S.padBattery['ps' + ev.id]; renderPadBattery(); } return; }
+      const b = S.padBattery || (S.padBattery = {});
+      if (ev.gone) delete b[ev.key]; else {
+        const was = b[ev.key];
+        b[ev.key] = ev;
+        if (!ev.charging && ev.level <= 20 && (!was || was.level > 20)) toast(`Batterie de la manette faible : ${ev.level} %`, 'error', 7000);
+      }
+      renderPadBattery();
+    });
     if (api.saves) api.saves.onDone((r) => { if (r && r.ok && r.copied) toast(`Sauvegardes : ${plural(r.copied, 'fichier copié', 'fichiers copiés')} dans le cloud`); else if (r && !r.ok) toast(r.error || 'Copie des sauvegardes impossible', 'error'); });
     if (api.onAchievementsChanged) api.onAchievementsChanged(() => { S.ach = null; if (!S.inGame) loadAchievements(true); });
     if (api.onLibraryChanged) api.onLibraryChanged(async () => { try { applyLib(await api.scan({ romm: false })); if (!document.querySelector('.overlay')) rerender(); } catch { /* rien */ } });

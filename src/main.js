@@ -254,6 +254,23 @@ function quitCurrentGame() {
   return true;
 }
 
+// ---------- Veille / redémarrage / extinction du PC ----------
+function powerAction(action) {
+  const { execFile } = require('child_process');
+  if (action === 'sleep') {
+    // Veille (pas l'hibernation) via l'API Windows.
+    execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Application]::SetSuspendState([System.Windows.Forms.PowerState]::Suspend, $false, $false)'], { windowsHide: true }, () => {});
+    return { ok: true };
+  }
+  if (action === 'shutdown' || action === 'restart') {
+    execFile('shutdown.exe', [action === 'shutdown' ? '/s' : '/r', '/t', '5', '/c', 'Lumen : ' + (action === 'shutdown' ? 'extinction' : 'redémarrage') + ' du PC'], { windowsHide: true }, () => {});
+    return { ok: true };
+  }
+  if (action === 'cancel') { execFile('shutdown.exe', ['/a'], { windowsHide: true }, () => {}); return { ok: true }; }
+  return { ok: false, error: 'Action inconnue' };
+}
+ipcMain.handle('power:action', (_e, action) => powerAction(String(action || '')));
+
 // ---------- Télécommande sur téléphone (réseau local, code à 6 chiffres) ----------
 const remote = require('./remote');
 let remoteLib = []; // envoyée par l'interface : [{ path, name, sys, cover, recent, fav }]
@@ -265,6 +282,7 @@ function remoteHooks() {
     media: (cmd) => require('./mediactl').ask(cmd, path.join(app.getPath('userData'), 'media-covers')),
     companionRun: (id, a) => require('./companions').run(id, a),
     quitGame: () => quitCurrentGame(),
+    power: (a) => (['sleep', 'shutdown', 'restart'].includes(a) ? powerAction(a) : { ok: false }),
     state: async () => {
       let media = null, cos = [];
       try { media = await require('./mediactl').ask('state', path.join(app.getPath('userData'), 'media-covers')); } catch { /* indisponible */ }

@@ -1399,3 +1399,19 @@ body.home-clock #topbar .status { visibility: hidden; }
 
 .fact.hltb-src { background: none; padding-left: 4px; }
 .fact.hltb-src span { font-size: 11.5px; }
+
+/* ---------- Batterie des manettes (barre du haut) ---------- */
+#pad-battery { display: inline-flex; gap: 10px; margin-left: 10px; }
+#pad-battery[hidden] { display: none; }
+#pad-battery .pb { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 750; font-variant-numeric: tabular-nums; }
+#pad-battery .pb-cell { position: relative; display: block; width: 20px; height: 10px; border-radius: 3px; box-shadow: inset 0 0 0 1.5px currentColor; padding: 2px; }
+#pad-battery .pb-cell::after { content: ""; position: absolute; right: -3px; top: 3px; width: 2px; height: 4px; border-radius: 0 1px 1px 0; background: currentColor; }
+#pad-battery .pb-cell i { display: block; height: 100%; border-radius: 1px; background: currentColor; }
+#pad-battery .pb.low { color: #f87171; }
+#pad-battery .pb.chg { color: var(--accent); }
+#pad-battery .pb .gi { width: 12px; height: 12px; margin: 0; }
+
+/* ---------- Mode soirée : écran plus sombre et plus chaud ---------- */
+body.evening::after { content: ""; position: fixed; inset: 0; z-index: 9999; pointer-events: none;
+  background: rgba(40, 18, 0, calc((1 - var(--eve-dim, 0.8)) * 1.6)); mix-blend-mode: multiply; transition: background 1.2s ease; }
+body.evening::before { content: ""; position: fixed; inset: 0; z-index: 9998; pointer-events: none; background: rgba(255, 140, 40, 0.05); mix-blend-mode: soft-light; }

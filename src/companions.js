@@ -57,6 +57,7 @@ async function lueur() {
       { id: 'off', label: 'Éteindre', args: ['--off'], icon: '🌙' },
       { id: 'toggle', label: 'Basculer', args: ['--toggle'], icon: '⟳' },
       { id: 'screen', label: 'Mode écran', args: ['--screen'], icon: '⛶' },
+      { id: 'warm', label: 'Soirée', args: ['--warm'], icon: '🌙' },
     ],
     open: [],
   };

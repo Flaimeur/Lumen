@@ -73,6 +73,7 @@ async function handle(req, res) {
     if (url.pathname === '/api/volume' && typeof b.v === 'number') return send(res, 200, await hooks.media('vol ' + Math.max(0, Math.min(1, b.v)).toFixed(2)));
     if (url.pathname === '/api/companion') return send(res, 200, await hooks.companionRun(String(b.id || ''), String(b.a || '')));
     if (url.pathname === '/api/quit') { hooks.quitGame(); return send(res, 200, { ok: true }); }
+    if (url.pathname === '/api/power' && hooks.power) return send(res, 200, hooks.power(String(b.a || '')));
   }
   return send(res, 404, { error: 'Inconnu' });
 }
@@ -134,7 +135,8 @@ nav button.on{color:var(--accent)}
   <section id="music" class="hidden"><div class="card"><div class="np"><div><b id="title">Rien en lecture</b><small id="artist"></small></div></div>
     <div class="row"><button data-m="prev">⏮</button><button data-m="toggle" class="primary">⏯</button><button data-m="next">⏭</button></div>
     <input type="range" id="vol" min="0" max="100" value="50" class="hidden"></div>
-    <div class="card" id="ingame"><b>Jeu en cours</b><div id="playing" style="color:var(--muted);margin-top:4px">Aucun</div><div class="row"><button id="quit">Quitter le jeu</button></div></div></section>
+    <div class="card" id="ingame"><b>Jeu en cours</b><div id="playing" style="color:var(--muted);margin-top:4px">Aucun</div><div class="row"><button id="quit">Quitter le jeu</button></div></div>
+    <div class="card"><b>PC</b><div class="row"><button data-p="sleep">Veille</button><button data-p="restart">Redémarrer</button><button data-p="shutdown">Éteindre</button></div></div></section>
   <section id="light" class="hidden"><div id="cos"></div></section>
 </main>
 <nav class="hidden" id="nav"><button data-t="games" class="on">Jeux</button><button data-t="music">Musique</button><button data-t="light">Lumière</button></nav>
@@ -179,6 +181,7 @@ async function state() {
 }
 document.querySelectorAll('[data-m]').forEach((b) => (b.onclick = async () => { await api('/api/media', { cmd: b.dataset.m }); setTimeout(state, 500); }));
 $('vol').onchange = async (e) => { await api('/api/volume', { v: e.target.value / 100 }); };
+document.querySelectorAll('[data-p]').forEach((b) => (b.onclick = async () => { const n = { sleep: 'Mettre le PC en veille', restart: 'Redémarrer le PC', shutdown: 'Éteindre le PC' }[b.dataset.p]; if (!confirm(n + ' ?')) return; await api('/api/power', { a: b.dataset.p }); toast(n + '…'); }));
 $('quit').onclick = async () => { if (confirm('Quitter le jeu en cours ?')) { await api('/api/quit', {}); toast('Jeu fermé'); setTimeout(state, 1500); } };
 async function lights() {
   const s = await api('/api/state'); const box = $('cos'); box.innerHTML = '';
