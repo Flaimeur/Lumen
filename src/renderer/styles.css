@@ -1363,3 +1363,29 @@ body.home-clock #topbar .status { visibility: hidden; }
 .fin-bar .xp-fill { background: linear-gradient(90deg, #f59e0b, #facc15); }
 .widget .w-xp { color: var(--muted); font-size: 12px; }
 @media (prefers-reduced-motion: reduce) { .w-favs > * { transition: none; } }
+
+/* ---------- Menu des thèmes : aperçu animé ---------- */
+.menu:has(.tpv) { width: min(560px, 94vw); max-width: 560px; }
+.tpv { position: relative; height: 210px; border-radius: 16px; overflow: hidden; isolation: isolate; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 12px 30px rgba(0, 0, 0, 0.45); transition: background 240ms ease; }
+.tpv-blobs { position: absolute; inset: -30%; opacity: 0.62; z-index: -1; background:
+  radial-gradient(32% 38% at 28% 32%, var(--b1), transparent 70%), radial-gradient(30% 34% at 74% 30%, var(--b2), transparent 70%), radial-gradient(38% 36% at 52% 78%, var(--b3), transparent 70%);
+  animation: wp-drift 16s ease-in-out infinite alternate; }
+.tpv-fx { position: absolute; inset: 0; z-index: -1; background: rgba(5, 6, 12, var(--wp-dim, 0.25)); }
+.tpv-fx[data-fx="stars"] { background: radial-gradient(circle at 20% 20%, rgba(255,255,255,0.85) 0 1px, transparent 2px) 0 0 / 60px 60px, radial-gradient(circle at 70% 60%, rgba(255,255,255,0.6) 0 1px, transparent 2px) 0 0 / 90px 90px, rgba(5, 6, 12, var(--wp-dim, 0.25)); }
+.tpv-fx[data-fx="grid"] { background: linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px) 0 0 / 24px 24px, linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px) 0 0 / 24px 24px, rgba(5, 6, 12, var(--wp-dim, 0.25)); }
+/* Accueil miniature : juste des formes, pour juger la lisibilité sur ce fond. */
+.tpv-ui { position: absolute; inset: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.tpv-ui i { display: block; border-radius: 6px; background: rgba(255, 255, 255, 0.09); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
+.tpv-top { display: flex; justify-content: space-between; align-items: center; }
+.tpv-top .tpv-logo { width: 46px; height: 10px; background: rgba(255, 255, 255, 0.5); }
+.tpv-top .tpv-pill { width: 70px; height: 12px; border-radius: 99px; }
+.tpv-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.tpv-cards i { height: 34px; }
+.tpv-hero { position: relative; height: 54px; border-radius: 8px; background: rgba(255, 255, 255, 0.07); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
+.tpv-hero .tpv-t1 { position: absolute; left: 10px; top: 12px; width: 110px; height: 10px; background: rgba(255, 255, 255, 0.55); }
+.tpv-hero .tpv-t2 { position: absolute; left: 10px; top: 27px; width: 70px; height: 6px; background: rgba(255, 255, 255, 0.25); }
+.tpv-hero .tpv-btn { position: absolute; left: 10px; bottom: 7px; width: 34px; height: 9px; border-radius: 99px; background: var(--accent); box-shadow: none; }
+.tpv-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; flex: 1; }
+.tpv-row i { min-height: 30px; }
+.tpv-name { position: absolute; right: 12px; bottom: 10px; font-size: 13px; font-weight: 750; padding: 4px 10px; border-radius: 99px; background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(6px); }
+@media (prefers-reduced-motion: reduce) { .tpv-blobs { animation: none; } }

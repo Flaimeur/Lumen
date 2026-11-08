@@ -2110,10 +2110,36 @@
       w.mode = id;
       reopen('Type de fond');
     }])));
-    if (w.mode === 'theme') add('Thème', (WALL_THEMES[w.theme] || WALL_THEMES.aurore).name, () => openMenu('Thème', Object.entries(WALL_THEMES).map(([id, t]) => [t.name + (id === w.theme ? '  ✓' : ''), () => { w.theme = id; reopen('Thème'); }, {
-      icon: h('span', { class: 'wp-swatch', style: `background: radial-gradient(circle at 30% 30%, ${t.blobs[0]}, transparent 60%), radial-gradient(circle at 75% 70%, ${t.blobs[1]}, transparent 60%), ${t.blobs[2]}` }),
-      focus: () => applyWallpaper(id),
-    }]), 'select', { onClose: () => applyWallpaper() }));
+    // Thème : aperçu animé en tête du menu (fond, nappes de couleur, effet, et un accueil miniature par-dessus).
+    const themePreview = () => {
+      const blobs = h('div', { class: 'tpv-blobs' });
+      const fxl = h('div', { class: 'tpv-fx' });
+      const name = h('div', { class: 'tpv-name' });
+      const el = h('div', { class: 'tpv' }, blobs, fxl,
+        h('div', { class: 'tpv-ui' },
+          h('div', { class: 'tpv-top' }, h('i', { class: 'tpv-logo' }), h('i', { class: 'tpv-pill' })),
+          h('div', { class: 'tpv-cards' }, h('i'), h('i'), h('i'), h('i')),
+          h('div', { class: 'tpv-hero' }, h('i', { class: 'tpv-t1' }), h('i', { class: 'tpv-t2' }), h('i', { class: 'tpv-btn' })),
+          h('div', { class: 'tpv-row' }, h('i'), h('i'), h('i'), h('i'), h('i'))),
+        name);
+      el.paint = (id) => {
+        const t = WALL_THEMES[id] || WALL_THEMES.aurore;
+        el.style.background = t.base;
+        blobs.style.cssText = `--b1:${t.blobs[0]};--b2:${t.blobs[1]};--b3:${t.blobs[2]}`;
+        fxl.dataset.fx = t.fx || '';
+        el.style.setProperty('--wp-dim', String(w.dim ?? 0.25));
+        name.textContent = t.name;
+      };
+      return el;
+    };
+    if (w.mode === 'theme') add('Thème', (WALL_THEMES[w.theme] || WALL_THEMES.aurore).name, () => {
+      const pv = themePreview();
+      pv.paint(w.theme);
+      openMenu('Thème', Object.entries(WALL_THEMES).map(([id, t]) => [t.name + (id === w.theme ? '  ✓' : ''), () => { w.theme = id; reopen('Thème'); }, {
+        icon: h('span', { class: 'wp-swatch', style: `background: radial-gradient(circle at 30% 30%, ${t.blobs[0]}, transparent 60%), radial-gradient(circle at 75% 70%, ${t.blobs[1]}, transparent 60%), ${t.blobs[2]}` }),
+        focus: () => { applyWallpaper(id); pv.paint(id); },
+      }]), 'select', { onClose: () => applyWallpaper(), preview: pv });
+    });
     if (w.mode === 'image') add('Image', w.image ? w.image.split(/[\\/]/).pop() : 'Aucune', async () => {
       const file = api.pickImage && await api.pickImage('Image de fond');
       if (!file) return;
