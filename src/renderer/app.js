@@ -1990,19 +1990,19 @@
 
   // Styles tout prêts : fond, couleur, widgets et ordre de l'accueil en un clic.
   const STYLE_PRESETS = {
-    portable: { name: 'Console portable (3DS)', desc: 'Horloge, météo, jeu surprise et mémo en haut, couleurs douces.', accent: '#5eead4',
+    portable: { name: 'Cocon', desc: 'Horloge, météo, jeu surprise et mémo en haut, couleurs douces.', accent: '#5eead4',
       wall: { mode: 'theme', theme: 'ocean', dim: 0.35 }, widgets: ['clock', 'weather', 'surprise', 'note'], wide: {},
       order: ['widgets', 'recent', 'systems', 'folders', 'hero', 'favorites', 'discover'], blocks: { hero: false, recent: true, favorites: true, systems: true, folders: true, discover: true } },
-    salon: { name: 'Salon (Switch)', desc: 'Gros bandeau du jeu en cours et jeux récents d’abord, peu de widgets.', accent: '#fb7185',
+    salon: { name: 'Grand écran', desc: 'Gros bandeau du jeu en cours et jeux récents d’abord, peu de widgets.', accent: '#fb7185',
       wall: { mode: 'auto' }, widgets: ['nowplaying', 'achievements'], wide: { nowplaying: true, achievements: true },
       order: ['hero', 'recent', 'widgets', 'systems', 'favorites', 'folders', 'discover'], blocks: { hero: true, recent: true, favorites: false, systems: true, folders: true, discover: true } },
-    nextgen: { name: 'Next-gen (PS5)', desc: 'Images des jeux en fond, rang et musique en cours, tout en grand.', accent: '#60a5fa',
+    nextgen: { name: 'Immersion', desc: 'Images des jeux en fond, rang et musique en cours, tout en grand.', accent: '#60a5fa',
       wall: { mode: 'auto' }, widgets: ['achievements', 'nowplaying', 'surprise'], wide: { nowplaying: true },
       order: ['hero', 'widgets', 'recent', 'favorites', 'systems', 'folders', 'discover'], blocks: { hero: true, recent: true, favorites: true, systems: true, folders: true, discover: true } },
-    synthwave: { name: 'Rétro synthwave', desc: 'Grille néon animée, rose et violet.', accent: '#f472b6',
+    synthwave: { name: 'Rétro néon', desc: 'Grille néon animée, rose et violet.', accent: '#f472b6',
       wall: { mode: 'theme', theme: 'synthwave', dim: 0.15 }, widgets: ['clock', 'nowplaying', 'surprise', 'achievements'], wide: {},
       order: ['widgets', 'hero', 'recent', 'systems', 'favorites', 'folders', 'discover'], blocks: { hero: true, recent: true, favorites: false, systems: true, folders: true, discover: true } },
-    minimal: { name: 'Minimal', desc: 'Pas de widgets ni de bandeau : seulement tes jeux.', accent: '#a78bfa',
+    minimal: { name: 'Épuré', desc: 'Pas de widgets ni de bandeau : seulement tes jeux.', accent: '#a78bfa',
       wall: { mode: 'theme', theme: 'nuit', dim: 0.4 }, widgets: [], wide: {},
       order: ['recent', 'favorites', 'systems', 'folders', 'discover', 'widgets', 'hero'], blocks: { hero: false, recent: true, favorites: true, systems: true, folders: true, discover: false } },
   };
