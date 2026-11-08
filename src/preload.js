@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('lumen', {
   steamAccounts: () => ipcRenderer.invoke('steam:accounts'),
   openStore: (store, mode) => ipcRenderer.invoke('store:open', store, mode),
   gameHistory: (p) => ipcRenderer.invoke('game:history', p),
+  hltb: (name) => ipcRenderer.invoke('hltb:get', name),
   remote: {
     info: () => ipcRenderer.invoke('remote:info'),
     set: (on) => ipcRenderer.invoke('remote:set', !!on),

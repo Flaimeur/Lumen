@@ -3035,6 +3035,22 @@
     if (!exact && hist.firstAchievement) add('Première partie', 'au plus tard le ' + fmtLong(hist.firstAchievement));
     if (hist.installed) add('Installé le', fmtLong(hist.installed));
     if (seen) add('Ajouté à Lumen', fmtLong(seen));
+    // Durée de vie d'après HowLongToBeat, et où tu en es par rapport à l'histoire.
+    if (api.hltb && g.source !== 'app' && S.cfg.hltb !== false) {
+      let v = null;
+      try { v = await api.hltb(g.name); } catch { v = null; }
+      if (!v || !factsEl || !factsEl.isConnected) return;
+      const hh = (x) => (x >= 1 ? `${String(x).replace('.', ',')} h` : `${Math.round(x * 60)} min`);
+      if (v.main) add('Histoire', '≈ ' + hh(v.main));
+      if (v.plus && v.plus !== v.main) add('Histoire + annexes', '≈ ' + hh(v.plus));
+      if (v.full) add('100 %', '≈ ' + hh(v.full));
+      const played = playtimeOf(g) / 3600;
+      if (played > 0 && v.main) {
+        const pct = Math.round((played / v.main) * 100);
+        add('Ta progression', pct >= 100 ? `histoire dépassée (${pct} %)` : `≈ ${pct} % de l’histoire`);
+      }
+      factsEl.append(h('div', { class: 'fact hltb-src' }, h('span', {}, 'Durées : HowLongToBeat')));
+    }
   }
 
   function openDetails(g) {

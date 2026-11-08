@@ -553,6 +553,8 @@ ipcMain.handle('achievements:summary', async () => {
 });
 // Historique d'un jeu pour la fiche : premier succès débloqué (indice de la première partie) et date d'installation Steam.
 // Steam ne garde pas la date de première partie : le premier succès en donne une estimation (au plus tard ce jour-là).
+// Durée de vie (HowLongToBeat), mise en cache 30 jours.
+ipcMain.handle('hltb:get', (_e, name) => require('./hltb').lookup(String(name || ''), (u, o) => net.fetch(u, o), app.getPath('userData')));
 ipcMain.handle('game:history', async (_e, gamePath) => {
   const out = { firstAchievement: 0, installed: 0 };
   const m = /^steam:(\d+)$/.exec(String(gamePath || ''));
