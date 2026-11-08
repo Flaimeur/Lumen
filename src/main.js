@@ -122,6 +122,21 @@ async function steamTagNames() {
 }
 const scanPc = async (cfg) => { setSteamAccountMode((cfg.pcStores || {}).steamAccount); return scanPcStores(cfg.pcStores, readSgdbArt(), await steamTagNames()); };
 const steamAcc = async (dir) => { setSteamAccountMode((loadConfig().pcStores || {}).steamAccount); return steamAccountFilter(dir); };
+// Ouvrir un launcher : Steam (normal ou Big Picture), Epic Games, GOG Galaxy.
+ipcMain.handle('store:open', async (_e, store, mode) => {
+  try {
+    if (store === 'steam') { await shell.openExternal(mode === 'bigpicture' ? 'steam://open/bigpicture' : 'steam://open/main'); return { ok: true }; }
+    if (store === 'epic') { await shell.openExternal('com.epicgames.launcher://store'); return { ok: true }; }
+    if (store === 'gog') {
+      const pf = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+      const exe = [path.join(pf, 'GOG Galaxy', 'GalaxyClient.exe'), path.join(process.env.ProgramFiles || '', 'GOG Galaxy', 'GalaxyClient.exe')].find((p) => fs.existsSync(p));
+      if (exe) { const err = await shell.openPath(exe); return err ? { ok: false, error: err } : { ok: true }; }
+      await shell.openExternal('goggalaxy://');
+      return { ok: true };
+    }
+    return { ok: false, error: 'Launcher inconnu' };
+  } catch (err) { return { ok: false, error: `Impossible d'ouvrir le launcher : ${err.message}` }; }
+});
 ipcMain.handle('steam:accounts', async () => { const dir = await getSteamDir(); return dir ? steamAccounts(dir) : []; });
 
 // ---------- RomM : secret chiffré par Windows (DPAPI via safeStorage) ----------

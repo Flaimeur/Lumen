@@ -2343,6 +2343,22 @@
       h('div', { class: 'grid systems' }, sortedSystems().map(systemCard), addSystemCard()));
   }
 
+  // Boutons pour ouvrir le launcher depuis sa page (Steam, Epic, GOG).
+  const STORE_NAMES = { steam: 'Steam', epic: 'Epic Games', gog: 'GOG Galaxy' };
+  const storeOf = (s) => { const m = /^pc-(steam|epic|gog)$/.exec((s && s.id) || ''); return m ? m[1] : null; };
+  async function openStore(store, mode) {
+    if (!api.openStore) return;
+    sfx('launchApp');
+    const r = await api.openStore(store, mode);
+    toast(r && r.ok ? `Ouverture de ${mode === 'bigpicture' ? 'Steam Big Picture' : STORE_NAMES[store]}…` : (r && r.error) || 'Launcher introuvable', r && r.ok ? 'info' : 'error');
+  }
+  function storeChips(s) {
+    const st = storeOf(s);
+    if (!st || !api.openStore) return null;
+    const chip = (label, mode) => focusable(h('div', { class: 'chip' }, label), { a: () => openStore(st, mode), focus: () => { setTitle(label.replace(/^\S+\s/, ''), 'Ouvre le launcher'); setHints('action'); } });
+    return [chip(`▶ Ouvrir ${STORE_NAMES[st]}`), st === 'steam' ? chip('⛶ Big Picture', 'bigpicture') : null];
+  }
+
   function sortChip() {
     return focusable(h('div', { class: 'chip' }, '⇅ ', sortLabel()), {
       a: () => openSortMenu(null),
@@ -2364,6 +2380,7 @@
           : h('div', { class: 'vh-badge', '--c': s.color }, s.short),
         h('div', { class: 'vh-text' }, h('h1', {}, s.name), h('p', { class: 'muted' }, shown.length === s.games.length ? plural(s.games.length, 'jeu', 'jeux') : `${shown.length} / ${plural(s.games.length, 'jeu', 'jeux')}`)),
         filterChip(s),
+        storeChips(s),
         sortChip()),
       grid);
   }
@@ -3168,6 +3185,10 @@
 
     if (sysCard) {
       const s = S.lib.systems.find((x) => x.id === sysCard);
+      if (s && storeOf(s)) {
+        items.push([`Ouvrir ${STORE_NAMES[storeOf(s)]}`, run(() => openStore(storeOf(s))), { icon: '▶' }]);
+        if (storeOf(s) === 'steam') items.push(['Ouvrir Steam Big Picture', run(() => openStore('steam', 'bigpicture')), { icon: '⛶' }]);
+      }
       if (s) {
         subtitle = 'Console';
         items.push([`Ouvrir ${s.name}`, run(() => go({ view: 'games', systemId: s.id })), { icon: '▶' }]);
@@ -3232,6 +3253,10 @@
     if (sysId) {
       const cur = S.lib.systems.find((x) => x.id === sysId);
       const view = [];
+      if (storeOf(cur)) {
+        items.push([`Ouvrir ${STORE_NAMES[storeOf(cur)]}`, run(() => openStore(storeOf(cur))), { icon: '▶' }]);
+        if (storeOf(cur) === 'steam') view.push(['Ouvrir Steam Big Picture', run(() => openStore('steam', 'bigpicture')), { icon: '⛶' }]);
+      }
       if (cur && filterChip(cur)) view.push([`Afficher : ${filterLabel(filterOf(sysId))}`, run(() => openFilterMenu(cur)), { icon: '⏷' }]);
       if (api.iidb && S.cfg.iidb && S.cfg.iidb.enabled !== false && !(cur && cur.apps)) view.push(['Images iiDB de cette console', run(() => openIidb({ systemId: sysId })), { icon: '🖼' }]);
       if (cur && cur.pc && !cur.apps) view.push(['Images SteamGridDB', run(openSgdb), { icon: '🖼' }]);
