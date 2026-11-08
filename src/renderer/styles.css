@@ -1296,3 +1296,37 @@ body.home-clock #topbar .status { visibility: hidden; }
 .arc-score { margin-left: auto; font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; color: #facc15; }
 .arcade canvas { display: block; width: 100%; aspect-ratio: 16 / 10; border-radius: 14px; image-rendering: auto; }
 .arc-foot { display: flex; justify-content: space-between; gap: 12px; margin: 12px 4px 0; font-size: 13px; color: var(--muted); }
+
+/* ---------- Éditeur d'accueil : aperçu complet à droite ---------- */
+.art-editor.home-editor { max-width: min(1500px, 96vw); width: min(1500px, 96vw); }
+.he-grid { display: grid; grid-template-columns: minmax(420px, 0.9fr) minmax(0, 1.1fr); gap: 22px; align-items: start; }
+.he-side { position: sticky; top: 0; align-self: start; min-width: 0; }
+.hpv { position: relative; width: 100%; overflow: hidden; contain: layout paint; border-radius: 18px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.08); background: #06070d; }
+.hpv-wall { position: absolute; inset: 0; overflow: hidden; }
+.hpv-wall::after { content: ""; position: absolute; inset: 0; background: rgba(5, 6, 12, var(--wp-dim, 0.25)); }
+.hpv-blobs { position: absolute; inset: -30%; opacity: 0.62; background:
+  radial-gradient(32% 38% at 28% 32%, var(--b1), transparent 70%), radial-gradient(30% 34% at 74% 30%, var(--b2), transparent 70%), radial-gradient(38% 36% at 52% 78%, var(--b3), transparent 70%); }
+.hpv-inner { position: absolute; left: 0; top: 0; transform-origin: top left; pointer-events: none; padding-top: 10px; transition: transform 220ms cubic-bezier(0.23, 1, 0.32, 1); }
+.hpv-inner .home { margin: 0; }
+.hpv-inner .hpv-hl { outline: 6px solid var(--accent); outline-offset: 8px; border-radius: 22px; }
+.hpv-inner .home:has(.hpv-hl) > :not(.hpv-hl) { opacity: 0.4; }
+.hpv-label { position: absolute; left: 12px; top: 10px; z-index: 2; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; padding: 4px 9px; border-radius: 99px; color: #fff; background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(6px); }
+@media (max-width: 1100px) { .he-grid { grid-template-columns: 1fr; } .he-side { display: none; } }
+@media (min-width: 1101px) { .home-editor .w-preview { position: relative; top: auto; } }
+
+/* ---------- Widgets des applis connectées (Lueur…) ---------- */
+.co-wrap { display: flex; flex-direction: column; gap: 12px; height: 100%; justify-content: space-between; }
+.co-top { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.co-orb { width: 46px; height: 46px; flex: none; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff 0 8%, var(--co) 45%, color-mix(in srgb, var(--co) 40%, #000) 100%);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--co) 70%, transparent); margin: 6px; }
+.co-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.co-text b { font-size: clamp(15px, 1.1vw, 20px); }
+.co-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.co-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border: 0; border-radius: 99px; cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 700;
+  color: var(--text, #fff); background: rgba(255, 255, 255, 0.08); transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), background-color 160ms ease; }
+.co-btn:active { transform: scale(0.95); }
+@media (hover: hover) and (pointer: fine) { .co-btn:hover { background: color-mix(in srgb, var(--co) 30%, rgba(255, 255, 255, 0.06)); } }
+.co-btn .gi { width: 14px; height: 14px; margin: 0; }
+.widget:not(.wide) .co-btn .co-lbl { display: none; }
+.widget:not(.wide) .co-btn { width: 40px; height: 40px; padding: 0; justify-content: center; }
+.widget:not(.wide) .co-btn .gi { width: 18px; height: 18px; }

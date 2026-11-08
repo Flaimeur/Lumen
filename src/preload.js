@@ -12,6 +12,10 @@ contextBridge.exposeInMainWorld('lumen', {
   testAchNotify: () => ipcRenderer.invoke('achnotify:test'),
   steamAccounts: () => ipcRenderer.invoke('steam:accounts'),
   openFolder: (p) => ipcRenderer.invoke('shell:folder', p),
+  companions: {
+    list: (force) => ipcRenderer.invoke('companions:list', !!force),
+    run: (id, action) => ipcRenderer.invoke('companions:run', id, action),
+  },
   openUrl: (u) => ipcRenderer.invoke('shell:url', u),
   capture: {
     arm: (game) => ipcRenderer.invoke('capture:arm', game || null),

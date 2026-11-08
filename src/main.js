@@ -569,6 +569,10 @@ ipcMain.handle('capture:arm', (_e, game) => {
   return true;
 });
 ipcMain.handle('capture:take', () => doCapture());
+// ---------- Applis connectées (Lueur, ou toute appli avec lumen-widget.json) ----------
+const companions = require('./companions');
+ipcMain.handle('companions:list', (_e, force) => companions.list(!!force));
+ipcMain.handle('companions:run', (_e, id, action) => companions.run(String(id || ''), String(action || '')));
 // Widgets perso : ouvrir un dossier existant, ou un site web (http/https seulement) dans le navigateur.
 ipcMain.handle('shell:folder', async (_e, p) => { const d = String(p || ''); if (!d || !fs.existsSync(d) || !fs.statSync(d).isDirectory()) return 'Dossier introuvable'; return shell.openPath(d); });
 ipcMain.handle('shell:url', async (_e, u) => { const s = String(u || ''); if (!/^https?:\/\//i.test(s)) return false; await shell.openExternal(s); return true; });

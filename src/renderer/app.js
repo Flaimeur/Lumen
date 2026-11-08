@@ -1770,6 +1770,45 @@
     }
     return [h('div', { class: 'w-sub' }, 'Widget')];
   }
+  // ---------- Applis connectées : un widget par appli détectée (Lueur…) ----------
+  async function loadCompanions(force) {
+    if (!api.companions) return;
+    let list = [];
+    try { list = await api.companions.list(force); } catch { list = []; }
+    S.companions = list;
+    for (const id of Object.keys(WIDGETS)) if (WIDGETS[id].companion) delete WIDGETS[id];
+    for (const co of list) {
+      const wid = 'co-' + co.id;
+      const main = co.actions.find((a) => a.id === 'toggle') || co.actions[0];
+      WIDGETS[wid] = {
+        companion: co, name: co.name,
+        render: () => companionBody(co),
+        act: () => (main ? companionRun(co, main) : companionRun(co, { id: '__open', label: 'Ouvrir' })),
+        x: co.actions[0] ? () => companionRun(co, co.actions[0]) : undefined,
+        y: co.actions[1] ? () => companionRun(co, co.actions[1]) : undefined,
+      };
+      WIDGET_ICONS[wid] = co.id === 'lueur' ? '☀' : '⚡';
+    }
+    if (S.route.view === 'home' && !S.overlay && S.companionsPainted !== JSON.stringify(list)) { S.companionsPainted = JSON.stringify(list); S.keepAnim = true; rerender(); }
+  }
+  async function companionRun(co, a) {
+    sfx('select');
+    const r = await api.companions.run(co.id, a.id);
+    if (!r || !r.ok) { toast((r && r.error) || 'Action impossible', 'error'); return; }
+    toast(`${co.name} · ${a.label}`);
+    setTimeout(() => loadCompanions(true), 1800);
+  }
+  function companionBody(co) {
+    const GL = { '☀': 'sun', '🌙': 'moon', '⟳': 'refresh', '⛶': 'fullscreen', '▶': 'play', '⚡': 'bolt', '✕': 'close', '★': 'starFill' };
+    const ico = (g) => (window.LumenGlyphs ? window.LumenGlyphs.svg(GL[g] || 'play') : h('span', {}, g || '▶'));
+    const btns = co.actions.slice(0, 4).map((a) => h('button', { class: 'co-btn', title: a.label, 'aria-label': a.label, onClick: (e) => { e.stopPropagation(); companionRun(co, a); } }, ico(a.icon), h('span', { class: 'co-lbl' }, a.label)));
+    return [h('div', { class: 'co-wrap', style: `--co:${co.color}` },
+      h('div', { class: 'co-top' },
+        h('div', { class: 'co-orb' }),
+        h('div', { class: 'co-text' }, h('b', {}, co.name), h('div', { class: 'w-sub' }, co.status || (co.running ? 'Ouverte' : 'Fermée')))),
+      h('div', { class: 'co-actions' }, btns))];
+  }
+
   // Ajoute (ou retire) les widgets perso dans le registre commun.
   function syncCustomWidgets() {
     for (const id of Object.keys(WIDGETS)) if (WIDGETS[id].custom) delete WIDGETS[id];
@@ -1947,7 +1986,69 @@
     const rows = [];
     const add = (label, value, act, desc, extra = {}) => rows.push(focusable(h('div', { class: 'set-row' },
       h('div', { class: 'set-text' }, h('div', { class: 'set-label' }, label), desc ? h('div', { class: 'set-desc' }, desc) : null),
-      h('div', { class: 'set-value' }, value)), { a: act, x: extra.x, y: extra.y, focus: () => { setHints('settings'); if (extra.focus) extra.focus(); else if (rows.paintPreview) rows.paintPreview(null); } }));
+      h('div', { class: 'set-value' }, value)), { a: act, x: extra.x, y: extra.y, focus: () => { setHints('settings'); if (extra.focus) extra.focus(); else { if (rows.paintPreview) rows.paintPreview(null); paintHome({}); } } }));
+    // ---- Aperçu de l'accueil (colonne de droite) ----
+    // Styles : l'accueil tel qu'il serait avec ce style, sans l'appliquer. Blocs et ordre : le bloc choisi est entouré.
+    const hpvInner = h('div', { class: 'hpv-inner' });
+    const hpvWall = h('div', { class: 'hpv-wall' });
+    const hpvLabel = h('div', { class: 'hpv-label' }, 'Aperçu de l’accueil');
+    const hpv = h('div', { class: 'hpv', 'aria-hidden': 'true' }, hpvWall, hpvInner, hpvLabel);
+    // Même largeur que le vrai accueil (ses tailles dépendent de la largeur de l'écran), puis réduit.
+    const HPV_W = Math.max(1200, (document.getElementById('view') || document.body).clientWidth);
+    let hpvTimer = 0;
+    const paintHome = (o = {}) => { clearTimeout(hpvTimer); hpvTimer = setTimeout(() => paintHomeNow(o), 60); };
+    const paintHomeNow = (o) => {
+      if (!hpv.isConnected) return;
+      const saved = o.preset ? JSON.stringify({ home: S.cfg.home, wallpaper: S.cfg.wallpaper, accent: S.cfg.accent }) : null;
+      let view;
+      try {
+        if (o.preset) {
+          const p = STYLE_PRESETS[o.preset];
+          const hc = homeCfg();
+          Object.assign(hc, { widgets: p.widgets.slice(), wide: { ...p.wide }, order: p.order.slice(), blocks: { ...hc.blocks, ...p.blocks } });
+          S.cfg.wallpaper = { ...wallCfg(), ...p.wall };
+          S.cfg.accent = p.accent;
+        }
+        view = viewHome();
+        // Fond : thème animé, image perso ou image du jeu mis en avant.
+        const wl = wallCfg();
+        hpvWall.replaceChildren();
+        hpvWall.removeAttribute('style');
+        if (wl.mode === 'theme') {
+          const t = WALL_THEMES[wl.theme] || WALL_THEMES.aurore;
+          hpvWall.style.background = t.base;
+          hpvWall.append(h('div', { class: 'hpv-blobs', style: `--b1:${t.blobs[0]};--b2:${t.blobs[1]};--b3:${t.blobs[2]}` }));
+        } else if (wl.mode === 'image' && wl.image) hpvWall.style.background = `center / cover no-repeat url("${api.mediaUrl(wl.image)}")`;
+        else { const g = S.byPath.get(S.featured); const art = g && (g.hero || g.background); hpvWall.style.background = art ? `center / cover no-repeat url("${api.mediaUrl(art)}")` : 'linear-gradient(160deg, #10162b, #06070d)'; }
+        hpv.style.setProperty('--accent', S.cfg.accent);
+        hpv.style.setProperty('--wp-dim', String(wl.dim ?? 0.25));
+      } catch { view = h('div', {}); } finally {
+        if (saved) { const b = JSON.parse(saved); S.cfg.home = b.home; S.cfg.wallpaper = b.wallpaper; S.cfg.accent = b.accent; }
+      }
+      view.querySelectorAll('.f').forEach((e) => { e.classList.remove('f', 'focused'); });
+      view.querySelectorAll('[id]').forEach((e) => e.removeAttribute('id'));
+      if (o.block) { const b = view.querySelector(`[data-block="${o.block}"]`); if (b) b.classList.add('hpv-hl'); }
+      hpvLabel.textContent = o.preset ? `Aperçu · ${STYLE_PRESETS[o.preset].name}` : 'Aperçu de l’accueil';
+      hpvInner.replaceChildren(view);
+      hpvInner.style.width = HPV_W + 'px';
+      requestAnimationFrame(() => {
+        const k = hpv.clientWidth / HPV_W;
+        const tall = hpvInner.scrollHeight;
+        const box = Math.min(tall * k, hpv.clientWidth * 0.9);
+        hpv.style.height = Math.round(box) + 'px';
+        // Bloc sélectionné hors du cadre : on fait défiler l'aperçu jusqu'à lui.
+        let shift = 0;
+        const hl = hpvInner.querySelector('.hpv-hl');
+        if (hl) {
+          const ir = hpvInner.getBoundingClientRect(), br = hl.getBoundingClientRect();
+          const cur = new DOMMatrix(getComputedStyle(hpvInner).transform).m42 || 0;
+          const top = br.top - ir.top, bottom = br.bottom - ir.top;
+          if (bottom > box - 10) shift = Math.min(tall * k - box, top - 24);
+          void cur;
+        }
+        hpvInner.style.transform = `translateY(${-Math.max(0, shift)}px) scale(${k})`;
+      });
+    };
     // Rouvre l'éditeur à la même position de défilement (sinon il repart en haut et la souris sélectionne une autre ligne).
     const reopen = async (label) => {
       const m = document.querySelector('#overlay .modal.profile-editor');
@@ -1958,7 +2059,7 @@
     const section = (t) => rows.push(h('div', { class: 'set-section' }, t));
 
     section('Styles tout prêts');
-    for (const [id, p] of Object.entries(STYLE_PRESETS)) add(p.name, 'Appliquer', async () => { await applyStylePreset(id); openHomeEditor(p.name); }, p.desc);
+    for (const [id, p] of Object.entries(STYLE_PRESETS)) add(p.name, 'Appliquer', async () => { await applyStylePreset(id); openHomeEditor(p.name); }, p.desc, { focus: () => paintHome({ preset: id }) });
 
     section('Fond d’écran');
     const MODES = { auto: 'Automatique (image du jeu)', theme: 'Thème animé', image: 'Mon image' };
@@ -2043,11 +2144,11 @@
           [home.wide[id] ? 'Taille normale' : 'Grand (double largeur)', () => { home.wide[id] = !home.wide[id]; reopen(WIDGETS[id].name); }],
           ['↑ Monter', () => move(-1)], ['↓ Descendre', () => move(1)],
         ]);
-      }, null, { x: () => move(-1), y: () => move(1), focus: () => rows.paintPreview(id) });
+      }, null, { x: () => move(-1), y: () => move(1), focus: () => { rows.paintPreview(id); paintHome({ block: 'widgets' }); } });
     }
 
     section('Blocs de l’accueil');
-    for (const [id, label] of HOME_BLOCKS) add(label, tog(home.blocks[id]), () => { home.blocks[id] = !home.blocks[id]; reopen(label); });
+    for (const [id, label] of HOME_BLOCKS) add(label, tog(home.blocks[id]), () => { home.blocks[id] = !home.blocks[id]; reopen(label); }, null, { focus: () => paintHome({ block: id }) });
 
     section('Ordre de l’accueil');
     rows.push(h('p', { class: 'muted small', style: 'margin: 0 6px 6px' }, 'X : monter · Y : descendre · ou « Réorganiser à la souris » depuis le menu de l’accueil'));
@@ -2060,11 +2161,13 @@
         reopen(`${j + 1}. ${HOME_ORDER_NAMES[home.order[j]]}`);
       };
       add(`${i + 1}. ${HOME_ORDER_NAMES[id]}`, '⇅', () => openMenu(HOME_ORDER_NAMES[id], [['↑ Monter', () => moveBlock(-1)], ['↓ Descendre', () => moveBlock(1)]]), null,
-        { x: () => moveBlock(-1), y: () => moveBlock(1) });
+        { x: () => moveBlock(-1), y: () => moveBlock(1), focus: () => paintHome({ block: id }) });
     });
 
-    openOverlay(h('div', { class: 'modal art-editor profile-editor' },
-      h('div', { class: 'eyebrow' }, 'Personnaliser'), h('h2', {}, 'Accueil et fond d’écran'), ...rows));
+    openOverlay(h('div', { class: 'modal art-editor profile-editor home-editor' },
+      h('div', { class: 'eyebrow' }, 'Personnaliser'), h('h2', {}, 'Accueil et fond d’écran'),
+      h('div', { class: 'he-grid' }, h('div', { class: 'he-list' }, ...rows), h('div', { class: 'he-side' }, hpv))));
+    requestAnimationFrame(() => paintHome({}));
     const modal = document.querySelector('#overlay .modal.profile-editor');
     if (modal && S.homeEdScroll != null) { modal.scrollTop = S.homeEdScroll; S.homeEdScroll = null; S.mouseHoldUntil = performance.now() + 400; }
     if (modal) modal.addEventListener('scroll', () => { S.homeEdLast = modal.scrollTop; }, { passive: true });
@@ -3684,15 +3787,16 @@
         if (v === null || !v.trim()) return;
         await api.apps.update(id, { name: v });
         await syncApps();
-      }],
-      ['Choisir une image…', async () => { closeOverlay(true); if (await api.apps.update(id, { pickImage: true })) await syncApps(); }],
-      a.image ? ['Revenir à l’icône du programme', async () => { closeOverlay(true); await api.apps.update(id, { resetImage: true }); await syncApps(); }] : null,
+      }, { icon: '✎' }],
+      ['Chercher une image (iiDB)', () => { closeOverlay(true); const g = S.byPath.get('app:' + id); if (g) openArtEditor(artTarget('game', g)); }, { icon: '🔍' }],
+      ['Choisir une image sur le PC…', async () => { closeOverlay(true); if (await api.apps.update(id, { pickImage: true })) await syncApps(); }, { icon: '🖼' }],
+      a.image ? ['Revenir à l’icône du programme', async () => { closeOverlay(true); await api.apps.update(id, { resetImage: true }); await syncApps(); }, { icon: '⟳' }] : null,
       ['Retirer des applications', async () => {
         closeOverlay(true);
         await api.apps.remove(id);
         await syncApps();
         toast(`« ${a.name} » retirée`);
-      }],
+      }, { icon: '✕', danger: true }],
     ].filter(Boolean);
   }
 
@@ -4284,6 +4388,8 @@
     Input.lock(reduceMotion ? 0 : 1400);
     S.cfg = await api.getConfig();
     syncCustomWidgets();
+    loadCompanions();
+    setInterval(() => { if (document.hasFocus() && S.route.view === 'home' && homeCfg().widgets.some((x) => x.startsWith('co-'))) loadCompanions(true); }, 60000);
     S.defs = await api.systems();
     await refreshRommStatus();
     if (api.sgdb) S.sgdbStatus = await api.sgdb.status();
