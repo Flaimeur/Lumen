@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('lumen', {
   onAchievementsChanged: (cb) => ipcRenderer.on('achievements:changed', () => cb()),
   testAchNotify: () => ipcRenderer.invoke('achnotify:test'),
   steamAccounts: () => ipcRenderer.invoke('steam:accounts'),
+  gameHistory: (p) => ipcRenderer.invoke('game:history', p),
   openFolder: (p) => ipcRenderer.invoke('shell:folder', p),
   companions: {
     list: (force) => ipcRenderer.invoke('companions:list', !!force),

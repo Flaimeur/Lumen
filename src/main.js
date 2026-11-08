@@ -480,6 +480,37 @@ ipcMain.handle('achievements:summary', async () => {
   const games = [...pcLaunchers.values()].filter((l) => l.store === 'steam' && l.appid).map((l) => ({ path: l.id, appid: l.appid }));
   return achievements.steamSummary(dir, games, await steamAcc(dir));
 });
+// Historique d'un jeu pour la fiche : premier succès débloqué (indice de la première partie) et date d'installation Steam.
+// Steam ne garde pas la date de première partie : le premier succès en donne une estimation (au plus tard ce jour-là).
+ipcMain.handle('game:history', async (_e, gamePath) => {
+  const out = { firstAchievement: 0, installed: 0 };
+  const m = /^steam:(\d+)$/.exec(String(gamePath || ''));
+  if (!m) return out;
+  const dir = await getSteamDir();
+  if (!dir) return out;
+  const appid = Number(m[1]);
+  try {
+    const r = await achievements.steamGame(dir, appid, await steamAcc(dir));
+    const times = ((r && r.list) || []).filter((a) => a.unlocked && a.time > 0).map((a) => a.time);
+    if (times.length) out.firstAchievement = Math.min(...times);
+  } catch { /* pas de succès */ }
+  try {
+    const { parseVdf } = require('./pcstores');
+    const libs = new Set([dir]);
+    const vdf = parseVdf(fs.readFileSync(path.join(dir, 'steamapps', 'libraryfolders.vdf'), 'utf8'));
+    for (const v of Object.values(vdf.libraryfolders || vdf.LibraryFolders || {})) if (v && typeof v === 'object' && v.path) libs.add(path.normalize(v.path));
+    for (const lib of libs) {
+      const mf = path.join(lib, 'steamapps', `appmanifest_${appid}.acf`);
+      if (!fs.existsSync(mf)) continue;
+      const st = (parseVdf(fs.readFileSync(mf, 'utf8')).AppState) || {};
+      const folder = st.installdir ? path.join(lib, 'steamapps', 'common', st.installdir) : '';
+      const t = folder && fs.existsSync(folder) ? fs.statSync(folder).birthtimeMs : fs.statSync(mf).birthtimeMs;
+      if (t > 0) out.installed = Math.round(t);
+      break;
+    }
+  } catch { /* bibliothèque illisible */ }
+  return out;
+});
 ipcMain.handle('achievements:game', async (_e, gamePath) => {
   const m = /^steam:(\d+)$/.exec(String(gamePath || ''));
   const dir = m && await getSteamDir();

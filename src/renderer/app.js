@@ -2953,7 +2953,21 @@
     if (!silent) sfx('back');
   }
 
+  const fmtLong = (t) => new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  // Dates du jeu qui demandent une lecture sur le disque (Steam) : ajoutées à la fiche dès qu'elles arrivent.
+  async function fillGameHistory(g, factsEl) {
+    const add = (k, v) => factsEl && factsEl.isConnected && factsEl.append(h('div', { class: 'fact' }, h('span', {}, k), h('b', {}, v)));
+    const exact = (S.cfg.firstPlayed || {})[g.path];
+    const seen = (S.cfg.firstSeen || {})[g.path];
+    let hist = { firstAchievement: 0, installed: 0 };
+    if (api.gameHistory && /^steam:/.test(g.path)) { try { hist = await api.gameHistory(g.path); } catch { /* hors Steam */ } }
+    if (!exact && hist.firstAchievement) add('Première partie', 'au plus tard le ' + fmtLong(hist.firstAchievement));
+    if (hist.installed) add('Installé le', fmtLong(hist.installed));
+    if (seen) add('Ajouté à Lumen', fmtLong(seen));
+  }
+
   function openDetails(g) {
+    let factsEl = null;
     const sys = sysById(g.system);
     const played = playtimeOf(g);
     const meta = [sys && sys.name, g.year, g.developer].filter(Boolean).join(' · ');
@@ -2962,6 +2976,7 @@
       ['Joueurs', g.players], ['Éditeur', g.publisher],
       ['Note (base)', g.rating != null ? `${g.rating} / 5` : null],
       ['Temps de jeu', played ? formatTime(played) : null],
+      ['Première partie', (() => { const t = (S.cfg.firstPlayed || {})[g.path]; return t ? fmtLong(t) : null; })(), 'first'],
       ['Dernière session', (() => { const t = Math.max((S.cfg.lastPlayed || {})[g.path] || 0, g.storeLastPlayed || 0); return t ? new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : null; })()],
       ['Source', g.source === 'romm' ? (g.downloaded ? 'RomM · sur ce PC' : `RomM · ${fmtSize(g.size) || 'à télécharger'}`) : null],
       ['État', g.source === 'pc' ? (g.installed === false ? 'Non installé · s’installe via le launcher' : `Installé${g.size ? ' · ' + fmtSize(g.size) : ''}`) : null],
@@ -2982,7 +2997,7 @@
       h('div', { class: 'details-main' },
         h('div', { class: 'eyebrow' }, meta),
         titleEl,
-        facts.length ? h('div', { class: 'facts' }, facts.map(([k, v]) => h('div', { class: 'fact' }, h('span', {}, k), h('b', {}, v)))) : null,
+        (factsEl = h('div', { class: 'facts' }, facts.map(([k, v]) => h('div', { class: 'fact' }, h('span', {}, k), h('b', {}, v))))),
         g.desc
           ? h('p', { class: 'desc' }, g.desc)
           : g.source === 'pc' || g.source === 'app' ? null
@@ -2993,6 +3008,7 @@
           actionButton('⋯ Plus', () => { closeOverlay(true); const el = [...document.querySelectorAll('.tile')].find((t) => t._game === g); if (el) setFocus(el, { silent: true }); S.menuGame = g; openQuickMenu(); })),
         capturesStrip(g),
         h('div', { class: 'file muted' }, g.source === 'romm' && !g.downloaded ? `RomM · ${g.rommFile}` : g.target || g.path))));
+    fillGameHistory(g, factsEl);
     sfx('select');
   }
 
@@ -4259,6 +4275,8 @@
     S.cfg.recent = [g.path, ...S.cfg.recent.filter((p) => p !== g.path)].slice(0, 30);
     S.cfg.lastPlayed = S.cfg.lastPlayed || {};
     S.cfg.lastPlayed[g.path] = Date.now();
+    const fp = S.cfg.firstPlayed || (S.cfg.firstPlayed = {});
+    if (!fp[g.path]) fp[g.path] = Date.now();
     saveCfg();
     S.launchFx = fx;
     const prof = profileOf(g);
