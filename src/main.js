@@ -569,6 +569,9 @@ ipcMain.handle('capture:arm', (_e, game) => {
   return true;
 });
 ipcMain.handle('capture:take', () => doCapture());
+// Widgets perso : ouvrir un dossier existant, ou un site web (http/https seulement) dans le navigateur.
+ipcMain.handle('shell:folder', async (_e, p) => { const d = String(p || ''); if (!d || !fs.existsSync(d) || !fs.statSync(d).isDirectory()) return 'Dossier introuvable'; return shell.openPath(d); });
+ipcMain.handle('shell:url', async (_e, u) => { const s = String(u || ''); if (!/^https?:\/\//i.test(s)) return false; await shell.openExternal(s); return true; });
 ipcMain.handle('capture:list', (_e, name) => capture.list(String(name || '')));
 ipcMain.handle('capture:open', (_e, name) => { const d = name ? capture.gameDir(String(name)) : capture.root(); fs.mkdirSync(d, { recursive: true }); return shell.openPath(d); });
 
@@ -815,7 +818,8 @@ ipcMain.handle('update:check', async () => {
   try { await updater.checkForUpdates(); } catch (err) { Object.assign(updateState, { status: 'error', error: err.message }); }
   return updateState;
 });
-ipcMain.handle('update:install', () => { if (updater && updateState.status === 'ready') setImmediate(() => updater.quitAndInstall(false, true)); return true; });
+// Installation silencieuse (pas d'assistant Windows), puis Lumen se relance tout seul.
+ipcMain.handle('update:install', () => { if (updater && updateState.status === 'ready') setTimeout(() => updater.quitAndInstall(true, true), 900); return true; });
 
 // Sauvegarde / restauration : la config (favoris, dossiers, profils manette, images et sons choisis,
 // accueil, applications…) dans un fichier .json. Les clés et mots de passe chiffrés n'y sont jamais.

@@ -1716,6 +1716,123 @@
     }, 3600);
   }
 
+  // ---------- Widgets perso (créés par l'utilisateur) ----------
+  // home.custom = [{ id, type: 'shortcut' | 'text' | 'web' | 'countdown', title, icon, color, image, text, target, url, date }]
+  const CW_TYPES = {
+    shortcut: { label: 'Raccourci', desc: 'Lance un jeu, une appli, ouvre un dossier ou un site.', icon: '▶' },
+    text: { label: 'Texte et image', desc: 'Un titre, un texte libre et une image.', icon: '📝' },
+    web: { label: 'Page web', desc: 'Affiche un site directement dans le widget.', icon: '☁' },
+    countdown: { label: 'Compte à rebours', desc: 'Les jours restants avant une date (sortie d’un jeu, vacances…).', icon: '⏱' },
+  };
+  const CW_COLORS = [['Turquoise', '#5eead4'], ['Violet', '#a78bfa'], ['Rose', '#f472b6'], ['Orange', '#fb923c'], ['Jaune', '#facc15'], ['Bleu', '#60a5fa'], ['Vert', '#4ade80'], ['Rouge', '#f87171'], ['Gris', '#94a3b8']];
+  const CW_ICONS = [['▶', 'Lecture'], ['🎮', 'Manette'], ['🕹', 'Arcade'], ['🏆', 'Trophée'], ['📝', 'Note'], ['🎵', 'Musique'], ['📁', 'Dossier'], ['☁', 'Web'], ['⏱', 'Chrono'], ['★', 'Étoile'], ['🎲', 'Dé'], ['🖼', 'Image'], ['⚡', 'Éclair'], ['🎨', 'Palette'], ['📊', 'Stats'], ['⚙', 'Réglages']];
+  const cwList = () => homeCfg().custom || (homeCfg().custom = []);
+  const cwTarget = (t) => {
+    if (!t) return 'Rien';
+    if (t.kind === 'game') { const g = S.byPath.get(t.value); return g ? g.name : 'Jeu introuvable'; }
+    if (t.kind === 'folder') return 'Dossier · ' + String(t.value).split(/[\\/]/).filter(Boolean).pop();
+    if (t.kind === 'url') return 'Site · ' + String(t.value).replace(/^https?:\/\//, '').split('/')[0];
+    return '';
+  };
+  function cwOpen(cw) {
+    const t = cw.target;
+    if (!t) return editCustomWidget(cw);
+    if (t.kind === 'game') { const g = S.byPath.get(t.value); if (g) launch(g); else toast('Ce jeu n’est plus dans ta bibliothèque', 'error'); return; }
+    if (t.kind === 'folder') { api.openFolder && api.openFolder(t.value).then((e) => { if (e) toast(e, 'error'); }); return; }
+    if (t.kind === 'url') { api.openUrl && api.openUrl(t.value); toast('Ouverture dans le navigateur…'); }
+  }
+  function cwRender(cw) {
+    const img = cw.image ? h('img', { class: 'cw-img', src: api.mediaUrl(cw.image), alt: '' }) : null;
+    if (cw.type === 'shortcut') {
+      const g = cw.target && cw.target.kind === 'game' ? S.byPath.get(cw.target.value) : null;
+      const art = cw.image || (g && (g.cover || g.icon));
+      return [h('div', { class: 'cw-short' },
+        art ? h('img', { class: 'cw-art', src: api.mediaUrl(art), alt: '' }) : h('div', { class: 'cw-art cw-art-ico', style: `--wc:${cw.color}` }, cw.icon || '▶'),
+        h('div', { class: 'cw-text' }, h('b', {}, cw.label || (g ? g.name : cwTarget(cw.target))), h('div', { class: 'w-sub' }, cw.target && cw.target.kind === 'game' ? 'A : jouer' : 'A : ouvrir')))];
+    }
+    if (cw.type === 'text') {
+      return [h('div', { class: 'cw-note' }, img, h('div', { class: 'cw-body' }, cw.text ? String(cw.text).split('\n').map((l) => h('p', {}, l)) : h('p', { class: 'muted' }, 'A : écrire le texte')))];
+    }
+    if (cw.type === 'web') {
+      if (!cw.url) return [h('div', { class: 'w-sub' }, 'A : choisir le site')];
+      return [h('div', { class: 'cw-web' }, h('iframe', { src: cw.url, sandbox: 'allow-scripts allow-same-origin allow-forms', referrerpolicy: 'no-referrer', loading: 'lazy', title: cw.title || 'Page web' }),
+        h('div', { class: 'cw-web-hint' }, 'A : ouvrir dans le navigateur'))];
+    }
+    if (cw.type === 'countdown') {
+      const d = cw.date ? new Date(cw.date + 'T00:00:00') : null;
+      if (!d || isNaN(d)) return [h('div', { class: 'w-sub' }, 'A : choisir la date')];
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const days = Math.round((d - today) / 864e5);
+      return [h('div', { class: 'w-big' }, days > 0 ? String(days) : days === 0 ? 'Aujourd’hui !' : 'Passé'),
+        h('div', { class: 'w-sub' }, days > 0 ? `${days > 1 ? 'jours' : 'jour'} avant le ${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}` : d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }))];
+    }
+    return [h('div', { class: 'w-sub' }, 'Widget')];
+  }
+  // Ajoute (ou retire) les widgets perso dans le registre commun.
+  function syncCustomWidgets() {
+    for (const id of Object.keys(WIDGETS)) if (WIDGETS[id].custom) delete WIDGETS[id];
+    for (const cw of cwList()) {
+      WIDGETS[cw.id] = {
+        custom: cw, name: cw.title || CW_TYPES[cw.type].label,
+        render: () => cwRender(cw),
+        bg: () => (cw.type === 'shortcut' && cw.image) || null,
+        act: () => (cw.type === 'web' ? (cw.url ? (api.openUrl(cw.url), toast('Ouverture dans le navigateur…')) : editCustomWidget(cw)) : cw.type === 'shortcut' ? cwOpen(cw) : editCustomWidget(cw)),
+        x: () => editCustomWidget(cw),
+      };
+      WIDGET_ICONS[cw.id] = cw.icon || CW_TYPES[cw.type].icon;
+    }
+  }
+  // Créateur / éditeur : un menu qui montre chaque réglage et l'aperçu du widget au-dessus.
+  async function editCustomWidget(cw, isNew) {
+    const save = async (label) => { syncCustomWidgets(); await saveCfg(); S.dirty = true; editCustomWidget(cw, false, label); };
+    const pickGame = async (pool, title) => {
+      const q = await openPrompt({ title, value: '', help: 'Tape une partie du nom.' });
+      if (q === null) return null;
+      const f = fold(q);
+      const hits = pool.filter((g) => fold(g.name).includes(f)).slice(0, 14);
+      if (!hits.length) { toast('Aucun résultat', 'error'); return null; }
+      let done = false;
+      return new Promise((res) => openMenu(title, hits.map((g) => [g.name, () => { done = true; closeOverlay(true); res(g); }, { icon: '▶' }]), 'select', { onClose: () => { if (!done) res(null); } }));
+    };
+    const items = [];
+    items.push(['Titre : ' + (cw.title || '—'), async () => { closeOverlay(true); const v = await openPrompt({ title: 'Titre du widget', value: cw.title || '' }); if (v !== null) cw.title = v.trim(); save(); }, { icon: '✎' }]);
+    if (cw.type === 'shortcut') {
+      items.push(['Ouvre : ' + cwTarget(cw.target), () => openSubMenu('Le widget ouvre…', [
+        ['Un jeu', async () => { closeOverlay(true); const g = await pickGame(S.lib.systems.filter((x) => !x.apps).flatMap((x) => x.games), 'Quel jeu ?'); if (g) { cw.target = { kind: 'game', value: g.path }; if (!cw.title) cw.title = g.name; } save(); }, { icon: '🎮' }],
+        ['Une application', async () => { closeOverlay(true); const g = await pickGame(S.lib.systems.filter((x) => x.apps).flatMap((x) => x.games), 'Quelle application ?'); if (g) { cw.target = { kind: 'game', value: g.path }; if (!cw.title) cw.title = g.name; } save(); }, { icon: '⚙' }],
+        ['Un dossier', async () => { closeOverlay(true); const d = await api.pickFolder('Dossier à ouvrir', ''); if (d) { cw.target = { kind: 'folder', value: d }; if (!cw.title) cw.title = d.split(/[\\/]/).filter(Boolean).pop(); } save(); }, { icon: '📁' }],
+        ['Un site web', async () => { closeOverlay(true); const u = await openPrompt({ title: 'Adresse du site', value: 'https://', keyboard: 'url' }); if (u && /^https?:\/\/./i.test(u.trim())) { cw.target = { kind: 'url', value: u.trim() }; if (!cw.title) cw.title = u.trim().replace(/^https?:\/\//, '').split('/')[0]; } save(); }, { icon: '☁' }],
+      ], () => editCustomWidget(cw)), { icon: '▶', sub: true }]);
+    }
+    if (cw.type === 'text') items.push(['Texte', async () => { closeOverlay(true); const v = await openPrompt({ title: 'Texte du widget', value: cw.text || '', help: 'Une ligne vide sépare les paragraphes.' }); if (v !== null) cw.text = v; save(); }, { icon: '📝' }]);
+    if (cw.type === 'web') items.push(['Site : ' + (cw.url ? cw.url.replace(/^https?:\/\//, '') : '—'), async () => { closeOverlay(true); const u = await openPrompt({ title: 'Adresse du site', value: cw.url || 'https://', keyboard: 'url', help: 'Certains sites refusent d’être affichés ailleurs que dans un navigateur : le widget reste alors vide.' }); if (u && /^https:\/\/./i.test(u.trim())) cw.url = u.trim(); else if (u) toast('Adresse en https:// uniquement', 'error'); save(); }, { icon: '☁' }]);
+    if (cw.type === 'countdown') items.push(['Date : ' + (cw.date ? new Date(cw.date + 'T00:00:00').toLocaleDateString('fr-FR') : '—'), async () => { closeOverlay(true); const v = await openPrompt({ title: 'Date (jour/mois/année)', value: cw.date ? cw.date.split('-').reverse().join('/') : '', help: 'Par exemple 25/12/2026' }); const m = v && /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(v.trim()); if (m) cw.date = `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`; else if (v) toast('Date non reconnue (jj/mm/aaaa)', 'error'); save(); }, { icon: '⏱' }]);
+    if (cw.type !== 'web' && cw.type !== 'countdown') items.push([cw.image ? 'Changer l’image' : 'Ajouter une image', async () => { closeOverlay(true); const p = await api.pickImage('Image du widget'); if (p) cw.image = p; save(); }, { icon: '🖼' }]);
+    if (cw.image) items.push(['Retirer l’image', () => { closeOverlay(true); cw.image = ''; save(); }, { icon: '✕' }]);
+    items.push(['Couleur', () => openSubMenu('Couleur', CW_COLORS.map(([n, c]) => [n, () => { closeOverlay(true); cw.color = c; save(); }, { icon: h('span', { class: 'wp-swatch', style: `background:${c}` }) }]), () => editCustomWidget(cw)), { icon: '🎨', sub: true }]);
+    items.push(['Icône', () => openSubMenu('Icône', CW_ICONS.map(([g, n]) => [n + (g === cw.icon ? '  ✓' : ''), () => { closeOverlay(true); cw.icon = g; save(); }, { icon: g }]), () => editCustomWidget(cw)), { icon: cw.icon || '★', sub: true }]);
+    items.push([homeCfg().wide[cw.id] ? 'Taille normale' : 'Grand (double largeur)', () => { closeOverlay(true); homeCfg().wide[cw.id] = !homeCfg().wide[cw.id]; save(); }, { icon: '⛶' }]);
+    items.push(['Supprimer ce widget', () => { closeOverlay(true); const home = homeCfg(); home.custom = cwList().filter((x) => x !== cw); home.widgets = home.widgets.filter((x) => x !== cw.id); syncCustomWidgets(); saveCfg(); S.dirty = true; toast('Widget supprimé'); openHomeEditor(); }, { icon: '✕', danger: true }]);
+    items.push(['Terminé', () => { closeOverlay(true); openHomeEditor(cw.title || CW_TYPES[cw.type].label); }, { icon: '✓' }]);
+    // Aperçu du widget en tête du menu.
+    let card;
+    try { card = widgetCard(cw.id); card.classList.remove('f'); card._act = {}; } catch { card = null; }
+    openMenu(isNew ? 'Nouveau widget' : (cw.title || CW_TYPES[cw.type].label), items, 'select', { subtitle: CW_TYPES[cw.type].label, preview: card });
+  }
+  async function createCustomWidget() {
+    openMenu('Créer un widget', Object.entries(CW_TYPES).map(([type, t]) => [t.label + ' · ' + t.desc, async () => {
+      closeOverlay(true);
+      const cw = { id: 'cw-' + Date.now().toString(36), type, title: '', icon: t.icon, color: CW_COLORS[Math.floor(Math.random() * CW_COLORS.length)][1], image: '', text: '', target: null, url: '', date: '' };
+      cwList().push(cw);
+      homeCfg().widgets.push(cw.id);
+      if (type === 'web') homeCfg().wide[cw.id] = true;
+      syncCustomWidgets();
+      await saveCfg();
+      S.dirty = true;
+      editCustomWidget(cw, true);
+    }, { icon: t.icon }]));
+  }
+
   const WIDGET_ICONS = { clock: '🕒', weather: '🌤️', achievements: '🏆', playtime: '⏱️', music: '🎵', nowplaying: '🎧', favorites: '⭐', surprise: '🎲', note: '📝', stats: '📚' };
   function widgetCard(id) {
     const w = WIDGETS[id];
@@ -1899,6 +2016,7 @@
     };
     rows.push(pv);
     requestAnimationFrame(() => rows.paintPreview(null));
+    add('＋ Créer un widget', 'Raccourci, texte, page web…', () => createCustomWidget(), 'Un widget à toi : il lance un jeu ou une appli, affiche ton texte, une image, un site ou un compte à rebours.');
     const ordered = [...home.widgets.filter((id) => WIDGETS[id]), ...Object.keys(WIDGETS).filter((id) => !home.widgets.includes(id))];
     for (const id of ordered) {
       const on = home.widgets.includes(id);
@@ -1912,6 +2030,7 @@
       };
       add(WIDGETS[id].name, on ? h('span', {}, `n°${home.widgets.indexOf(id) + 1}${home.wide[id] ? ' · large' : ''} `, tog(true)) : tog(false), () => {
         if (!on) { home.widgets.push(id); return reopen(WIDGETS[id].name); }
+        if (WIDGETS[id].custom) { closeOverlay(true); return editCustomWidget(WIDGETS[id].custom); }
         openMenu(WIDGETS[id].name, [
           ['Retirer de l’accueil', () => { home.widgets = home.widgets.filter((x) => x !== id); reopen(WIDGETS[id].name); }],
           [home.wide[id] ? 'Taille normale' : 'Grand (double largeur)', () => { home.wide[id] = !home.wide[id]; reopen(WIDGETS[id].name); }],
@@ -2567,7 +2686,7 @@
       const label = { checking: 'Recherche…', downloading: `Téléchargement ${u.version || ''} · ${u.progress || 0} %`, ready: `${u.version} prête · redémarrer`,
         uptodate: 'À jour', error: 'Erreur · réessayer', dev: 'Version de développement' }[u.status] || 'Vérifier';
       row('Mises à jour', label, async () => {
-        if (u.status === 'ready') { toast('Installation de la mise à jour…'); api.update.install(); return; }
+        if (u.status === 'ready') { installUpdateNow(); return; }
         toast('Recherche de mises à jour…');
         S.update = await api.update.check();
         rerender();
@@ -2773,6 +2892,7 @@
     openOverlay(h('div', { class: 'modal menu' },
       opts.subtitle ? h('div', { class: 'menu-sub' }, opts.subtitle) : null,
       h('h2', {}, title),
+      opts.preview ? h('div', { class: 'menu-preview' }, opts.preview) : null,
       h('div', { class: 'menu-list' }, list),
       bar), opts.onClose ? { onClose: opts.onClose } : {});
     sfx(sound);
@@ -3992,9 +4112,20 @@
       notes.length ? h('ul', { class: 'upd-notes' }, notes.map((l) => h('li', {}, l))) : h('p', { class: 'muted' }, 'Une nouvelle version est téléchargée.'),
       h('p', { class: 'muted upd-hint' }, 'Le redémarrage prend quelques secondes. « Plus tard » : elle s’installera quand tu fermeras Lumen.'),
       h('div', { class: 'actions' },
-        actionButton('⟳ Redémarrer maintenant', () => { toast('Installation de la mise à jour…'); api.update.install(); }, true),
+        actionButton('⟳ Redémarrer maintenant', () => installUpdateNow(), true),
         actionButton('Plus tard', () => closeOverlay()))));
     sfx('select');
+  }
+  // Écran plein « Mise à jour en cours » : l'installation est silencieuse, Lumen revient tout seul.
+  function installUpdateNow() {
+    const u = S.update || {};
+    if (S.overlay) closeOverlay(true);
+    document.body.append(h('div', { class: 'upd-screen' },
+      h('span', { class: 'logo-mark big' }),
+      h('h2', {}, `Mise à jour vers Lumen ${u.version || ''}`),
+      h('p', { class: 'muted' }, 'Lumen redémarre tout seul dans quelques secondes.'),
+      h('div', { class: 'upd-bar' }, h('i'))));
+    api.update.install();
   }
   // Au lancement qui suit une mise à jour : ce qui a changé.
   async function showWhatsNew() {
@@ -4126,6 +4257,7 @@
     document.body.classList.add('has-cursor');
     Input.lock(reduceMotion ? 0 : 1400);
     S.cfg = await api.getConfig();
+    syncCustomWidgets();
     S.defs = await api.systems();
     await refreshRommStatus();
     if (api.sgdb) S.sgdbStatus = await api.sgdb.status();
