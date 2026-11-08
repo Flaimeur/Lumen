@@ -4202,7 +4202,9 @@
       },
       playing() {
         root.classList.add('playing');
-        sub.replaceChildren(h('span', { class: 'lf-dot' }), h('span', {}, 'En jeu · maintiens Select + Start pour quitter'));
+        sub.replaceChildren(h('span', { class: 'lf-dot' }), h('span', {}, Input.lastDevice === 'keyboard'
+          ? 'En jeu. Pour quitter : Ctrl + Maj + Q (ou Select + Start maintenus à la manette)'
+          : 'En jeu. Pour quitter : maintiens Select + Start (ou Ctrl + Maj + Q au clavier)'));
       },
       close() {
         root.classList.add('out');
