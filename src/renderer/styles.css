@@ -1330,3 +1330,36 @@ body.home-clock #topbar .status { visibility: hidden; }
 .widget:not(.wide) .co-btn .co-lbl { display: none; }
 .widget:not(.wide) .co-btn { width: 40px; height: 40px; padding: 0; justify-content: center; }
 .widget:not(.wide) .co-btn .gi { width: 18px; height: 18px; }
+
+/* ---------- Widgets v2 : vitrine de salon ----------
+   Le contenu porte l'identité (jaquette, pochette, couleur) ; la légende reste discrète, en minuscules. */
+.widget .w-title { text-transform: none; letter-spacing: 0; font-size: 12.5px; font-weight: 650; color: var(--muted); }
+.widget .w-head { opacity: 0.8; }
+.widget .w-ico .gi { width: 13px; height: 13px; }
+/* Art en plein cadre, plus présent : c'est le seul élément « fort » de l'accueil. */
+.widget.has-bg .w-bgimg img { filter: blur(6px) saturate(1.25) brightness(0.62); transform: scale(1.08); }
+.widget.has-bg .w-bgimg::after { background: linear-gradient(100deg, rgba(6, 8, 14, 0.86) 10%, rgba(6, 8, 14, 0.35) 70%, rgba(6, 8, 14, 0.1)); }
+.focused.widget.has-bg .w-bgimg img { filter: blur(3px) saturate(1.35) brightness(0.72); }
+/* Horloge : chiffres grands et fins, contraste de graisse avec le reste. */
+.wg-clock .w-time { font-weight: 250; font-size: clamp(46px, 3.8vw, 78px); letter-spacing: -0.04em; line-height: 0.95; }
+.wg-clock .w-date { font-size: 14px; font-weight: 600; margin-top: 4px; }
+.wg-clock .w-date::first-letter { text-transform: uppercase; }
+/* Temps de jeu : la semaine en barres. */
+.w-pt { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; }
+.w-week { display: flex; align-items: flex-end; gap: 5px; height: 56px; flex: 0 1 150px; }
+.w-day { flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; }
+.w-day i { display: block; width: 100%; max-width: 14px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 38%, transparent); }
+.w-day.today i { background: var(--accent); box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 55%, transparent); }
+.w-day span { font-size: 10px; font-weight: 700; color: var(--muted); }
+/* Favoris : jaquettes en éventail. */
+.w-favs { gap: 0 !important; padding-left: 4px; }
+.w-favs > * { box-shadow: 0 8px 18px rgba(0, 0, 0, 0.5); transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1); }
+.w-favs > :nth-child(n + 2) { margin-left: -14px; }
+.w-favs > :nth-child(1) { transform: rotate(-6deg); } .w-favs > :nth-child(2) { transform: rotate(-2deg) translateY(-3px); }
+.w-favs > :nth-child(3) { transform: rotate(2deg) translateY(-3px); } .w-favs > :nth-child(4) { transform: rotate(6deg); }
+.focused.widget .w-favs > :nth-child(n + 2) { margin-left: -6px; }
+/* Presque fini : barre de progression dorée. */
+.fin-bar { --rc: #facc15; margin: 6px 0 2px; height: 6px; max-width: 220px; }
+.fin-bar .xp-fill { background: linear-gradient(90deg, #f59e0b, #facc15); }
+.widget .w-xp { color: var(--muted); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { .w-favs > * { transition: none; } }

@@ -1475,14 +1475,30 @@
   const WEATHER_ICONS = (code, day) => (code === 0 ? (day ? '☀️' : '🌙') : code <= 2 ? (day ? '🌤️' : '☁️') : code === 3 ? '☁️' : code <= 48 ? '🌫️'
     : code <= 57 ? '🌦️' : code <= 67 ? '🌧️' : code <= 77 ? '🌨️' : code <= 82 ? '🌧️' : code <= 86 ? '🌨️' : '⛈️');
 
+  // Temps joué depuis minuit (et pour chacun des 7 derniers jours), d'après les sessions lancées depuis Lumen.
+  function dayStart(offset = 0) { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - offset); return d.getTime(); }
+  function playedOn(offset) { const a = dayStart(offset), b = a + 864e5; return (S.cfg.sessions || []).reduce((n, x) => n + (x.t >= a && x.t < b ? x.s : 0), 0); }
+  const shortTime = (sec) => (sec >= 3600 ? `${Math.floor(sec / 3600)} h ${String(Math.round((sec % 3600) / 60)).padStart(2, '0')}` : `${Math.round(sec / 60)} min`);
+  // Jeu le plus proche du 100 % (au moins 5 succès, pas encore fini).
+  function almostDone() {
+    const list = ((S.ach && S.ach.games) || []).filter((x) => x.total >= 5 && x.unlocked > 0 && x.unlocked < x.total);
+    list.sort((a, b) => (b.unlocked / b.total - a.unlocked / a.total) || (b.last - a.last));
+    const x = list[0];
+    if (!x) return null;
+    const g = x.path ? S.byPath.get(x.path) : null;
+    return { x, g, art: (g && (g.hero || g.background || g.cover)) || x.icon, cover: (g && g.cover) || x.icon, name: (g && g.name) || x.title };
+  }
+
   // Chaque widget : nom, puis rendu (contenu) et action (bouton A).
   const WIDGETS = {
     clock: { name: 'Horloge', render: () => {
       const now = new Date();
       const hh = now.getHours();
       const hello = hh < 6 ? 'Bonne nuit' : hh < 12 ? 'Bonjour' : hh < 18 ? 'Bon après-midi' : 'Bonsoir';
-      return [h('div', { class: 'w-big', 'data-clock': '1' }, now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })),
-        h('div', { class: 'w-sub' }, `${hello} · ${now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}`)];
+      const today = playedOn(0);
+      return [h('div', { class: 'w-big w-time', 'data-clock': '1' }, now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })),
+        h('div', { class: 'w-date' }, `${hello}, ${now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}`),
+        h('div', { class: 'w-sub' }, today ? `${shortTime(today)} de jeu aujourd’hui` : 'Pas encore joué aujourd’hui')];
     } },
     weather: { name: 'Météo', render: () => {
       const w = S.weather;
@@ -1504,14 +1520,21 @@
       const st = achStats(S.ach);
       return [h('div', { class: 'w-rank', '--rc': st.rank.color }, rankEmblem(st), h('div', { class: 'w-rank-text' }, h('b', {}, `Rang ${st.rank.name}`), h('div', { class: 'w-sub' }, `Niveau ${st.lvl} · ${st.unlocked} succès`),
         h('div', { class: 'xp-bar', '--rc': st.rank.color }, h('div', { class: 'xp-fill', style: `width:${Math.max(3, Math.round((st.into / st.need) * 100))}%` })),
-        h('div', { class: 'w-xp' }, `${st.into} / ${st.need} XP`)))];
+        h('div', { class: 'w-xp' }, `Encore ${st.need - st.into} XP pour le niveau ${st.lvl + 1}${st.next ? ` · rang ${st.next.name} au niveau ${st.next.min}` : ''}`)))];
     }, act: () => openTab('achievements') },
     playtime: { name: 'Temps de jeu', render: () => {
       const pt = {};
       for (const sys of S.lib.systems) for (const g of sys.games) { const t = playtimeOf(g); if (t) pt[g.path] = t; }
       const total = Object.values(pt).reduce((n, v) => n + v, 0);
       const best = Object.entries(pt).sort((a, b) => b[1] - a[1]).map(([p]) => S.byPath.get(p)).find(Boolean);
-      return [h('div', { class: 'w-big' }, total ? formatTime(total) : '0 min'), h('div', { class: 'w-sub' }, best ? `Le plus joué : ${best.name}` : 'Temps passé en jeu depuis Lumen')];
+      const days = Array.from({ length: 7 }, (_, i) => playedOn(6 - i));
+      const week = days.reduce((n, v) => n + v, 0);
+      const max = Math.max(1, ...days);
+      const labels = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+      const bars = h('div', { class: 'w-week', title: 'Les 7 derniers jours' }, days.map((v, i) => h('div', { class: 'w-day' + (i === 6 ? ' today' : '') },
+        h('i', { style: `height:${v ? Math.max(8, (v / max) * 100) : 4}%` }), h('span', {}, labels[new Date(dayStart(6 - i)).getDay()]))));
+      return [h('div', { class: 'w-pt' }, h('div', {}, h('div', { class: 'w-big' }, week ? shortTime(week) : (total ? formatTime(total) : '0 min')),
+        h('div', { class: 'w-sub' }, week ? 'cette semaine' : (best ? `au total · le plus joué : ${best.name}` : 'au total'))), week ? bars : null)];
     } },
     music: { name: 'Musique', render: () => {
       const m = musicCfg();
@@ -1532,7 +1555,11 @@
       const g = S.surprise && S.byPath.get(S.surprise);
       if (!g) return [h('div', { class: 'w-big' }, '🎲'), h('div', { class: 'w-sub' }, 'Aucun jeu')];
       return [h('div', { class: 'w-surprise' }, h('img', { src: api.mediaUrl(g.cover), alt: '' }),
-        h('div', { class: 'w-surprise-text' }, h('b', {}, g.name), h('div', { class: 'w-sub' }, (sysById(g.system) || {}).name || ''), h('div', { class: 'w-hint' }, '🎲 A : roulette · X : autre')))];
+        h('div', { class: 'w-surprise-text' }, h('b', {}, g.name), h('div', { class: 'w-sub' }, (() => {
+          const last = Math.max((S.cfg.lastPlayed || {})[g.path] || 0, g.storeLastPlayed || 0);
+          const why = !last ? 'Jamais lancé' : (() => { const d = Math.floor((Date.now() - last) / 864e5); return d < 2 ? 'Joué récemment' : `Pas joué depuis ${d} jours`; })();
+          return [(sysById(g.system) || {}).name, why, myRating(g) ? '★ ' + myRating(g) : null].filter(Boolean).join(', ');
+        })()), h('div', { class: 'w-hint' }, '🎲 A : roulette, X : un autre')))];
     }, act: () => openRoll(), x: () => { S.surprise = null; rerender(); } },
     note: { name: 'Mémo', render: () => [h('div', { class: 'w-note' }, (S.cfg.homeNote || '').trim() || 'Écris un petit mot ici (bouton A)')], act: async () => {
       const v = await openPrompt({ title: 'Mémo', value: S.cfg.homeNote || '', help: 'Un rappel, une liste de jeux à finir…' });
@@ -1545,6 +1572,17 @@
       const n = totalGames();
       return [h('div', { class: 'w-big' }, String(n)), h('div', { class: 'w-sub' }, `${plural(n, 'jeu', 'jeux')} · ${plural(S.lib.systems.length, 'console', 'consoles')} · ${plural((S.cfg.favorites || []).length, 'favori', 'favoris')}`)];
     }, act: () => openTab('systems') },
+    finish: { name: 'Presque fini', bg: () => { const a = almostDone(); return a ? a.art : null; }, render: () => {
+      if (!S.ach) return [h('div', { class: 'w-big' }, '🏆'), h('div', { class: 'w-sub' }, 'Lecture des succès…')];
+      const a = almostDone();
+      if (!a) return [h('div', { class: 'w-big' }, '🏆'), h('div', { class: 'w-sub' }, 'Aucun jeu en cours de 100 % pour l’instant')];
+      const left = a.x.total - a.x.unlocked;
+      return [h('div', { class: 'w-surprise' }, a.cover ? h('img', { src: api.mediaUrl(a.cover), alt: '' }) : null,
+        h('div', { class: 'w-surprise-text' }, h('b', {}, a.name),
+          h('div', { class: 'w-sub' }, left === 1 ? 'Plus qu’un succès avant le 100 %' : `Plus que ${left} succès avant le 100 %`),
+          h('div', { class: 'xp-bar fin-bar' }, h('div', { class: 'xp-fill', style: `width:${Math.round((a.x.unlocked / a.x.total) * 100)}%` })),
+          h('div', { class: 'w-hint' }, `${a.x.unlocked} sur ${a.x.total} · A : voir les succès`)))];
+    }, act: () => { const a = almostDone(); if (a && a.g) openAchievements(a.g); else openTab('achievements'); } },
   };
 
   // ---------- Lecture en cours (Spotify, YouTube…) ----------
@@ -1874,7 +1912,7 @@
     }, { icon: t.icon }]));
   }
 
-  const WIDGET_ICONS = { clock: '🕒', weather: '🌤️', achievements: '🏆', playtime: '⏱️', music: '🎵', nowplaying: '🎧', favorites: '⭐', surprise: '🎲', note: '📝', stats: '📚' };
+  const WIDGET_ICONS = { finish: '🏆', clock: '🕒', weather: '🌤️', achievements: '🏆', playtime: '⏱️', music: '🎵', nowplaying: '🎧', favorites: '⭐', surprise: '🎲', note: '📝', stats: '📚' };
   function widgetCard(id) {
     const w = WIDGETS[id];
     let body;
