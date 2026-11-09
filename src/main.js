@@ -910,8 +910,14 @@ function setupUpdater() {
     try { fs.writeFileSync(path.join(app.getPath('userData'), 'update-notes.json'), JSON.stringify({ version: i.version, notes: updateState.notes })); } catch { /* facultatif */ }
     sendUpdate();
   });
-  updater.on('error', (err) => { Object.assign(updateState, { status: 'error', error: String(err && err.message || err).slice(0, 200) }); sendUpdate(); });
-  let lastCheck = 0;
+  let lastCheck = 0, retry = null;
+  // Erreur réseau / GitHub indisponible (5xx, délai dépassé, hors ligne) : message court et nouvel essai dans 3 min.
+  updater.on('error', (err) => {
+    const { text, temporary } = updateError(err);
+    Object.assign(updateState, { status: 'error', error: text });
+    sendUpdate();
+    if (temporary && !retry) retry = setTimeout(() => { retry = null; check(); }, 3 * 60 * 1000);
+  });
   const check = () => {
     if (updateState.status === 'downloading' || updateState.status === 'ready') return;
     lastCheck = Date.now();
@@ -921,6 +927,17 @@ function setupUpdater() {
   setInterval(check, 60 * 60 * 1000);
   // Retour sur Lumen (après un jeu, une autre appli…) : nouvelle vérification si la dernière date de plus de 20 min.
   app.on('browser-window-focus', () => { if (Date.now() - lastCheck > 20 * 60 * 1000) check(); });
+}
+// Message d'erreur de mise à jour lisible (electron-updater renvoie la réponse HTTP complète).
+function updateError(err) {
+  const raw = String(err && err.message || err || '');
+  const code = /^(\d{3})\b/.exec(raw) || /status(?:Code)?[":\s]+(\d{3})/i.exec(raw);
+  const status = code ? Number(code[1]) : 0;
+  if (status >= 500 || /timed? ?out|ETIMEDOUT|ESOCKETTIMEDOUT/i.test(raw)) return { temporary: true, text: 'GitHub ne répond pas pour le moment. Nouvel essai automatique dans quelques minutes.' };
+  if (/ENOTFOUND|EAI_AGAIN|ECONNRESET|ECONNREFUSED|ENETUNREACH|ERR_INTERNET_DISCONNECTED|ERR_NETWORK|net::/i.test(raw)) return { temporary: true, text: 'Pas de connexion à Internet. Nouvel essai automatique dans quelques minutes.' };
+  if (status === 404) return { temporary: false, text: 'Fichier de mise à jour introuvable sur GitHub.' };
+  if (status === 403 || status === 429) return { temporary: true, text: 'GitHub limite les requêtes. Nouvel essai automatique plus tard.' };
+  return { temporary: false, text: raw.split('\n')[0].replace(/\s*Data:.*$/, '').slice(0, 140) };
 }
 // Notes de version GitHub (HTML ou liste) → lignes de texte simples.
 function notesText(n) {
@@ -941,7 +958,7 @@ ipcMain.handle('update:state', () => ({ ...updateState, current: app.getVersion(
 ipcMain.handle('update:check', async () => {
   if (!app.isPackaged) return { ...updateState, status: 'dev' };
   setupUpdater();
-  try { await updater.checkForUpdates(); } catch (err) { Object.assign(updateState, { status: 'error', error: err.message }); }
+  try { await updater.checkForUpdates(); } catch (err) { Object.assign(updateState, { status: 'error', error: updateError(err).text }); }
   return updateState;
 });
 // Installation silencieuse (pas d'assistant Windows), puis Lumen se relance tout seul.
