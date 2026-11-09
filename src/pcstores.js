@@ -389,6 +389,7 @@ async function scanGog() {
       exe: galaxy ? path.join(galaxy, 'GalaxyClient.exe') : exe,
       args: galaxy ? ['/command=runGame', `/gameId=${gameId}`, `/path=${dir}`] : [],
       cwd: galaxy || dir,
+      dir,
     });
   }
   return games;
@@ -441,6 +442,7 @@ async function scanItch() {
         exe,
         args: [],
         cwd: path.dirname(exe),
+        dir,
         installedAt: mtime,
       });
     }
@@ -576,4 +578,5 @@ async function fetchSteamGridDB({ key, systems, art, signal, onProgress, fetchIm
   return stats;
 }
 
-module.exports = { scanPcStores, parseVdf, STORES, fetchSteamGridDB, getSteamDir, steamAccounts, setSteamAccountMode, steamAccountFilter };
+module.exports = {
+  itchInstallDirs, scanPcStores, parseVdf, STORES, fetchSteamGridDB, getSteamDir, steamAccounts, setSteamAccountMode, steamAccountFilter };

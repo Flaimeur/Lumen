@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('lumen', {
   testAchNotify: () => ipcRenderer.invoke('achnotify:test'),
   steamAccounts: () => ipcRenderer.invoke('steam:accounts'),
   openStore: (store, mode) => ipcRenderer.invoke('store:open', store, mode),
+  pcUninstall: (id) => ipcRenderer.invoke('pc:uninstall', id),
   power: (action) => ipcRenderer.invoke('power:action', action),
   gameHistory: (p) => ipcRenderer.invoke('game:history', p),
   hltb: (name) => ipcRenderer.invoke('hltb:get', name),

@@ -144,6 +144,38 @@ ipcMain.handle('store:open', async (_e, store, mode) => {
     return { ok: false, error: 'Launcher inconnu' };
   } catch (err) { return { ok: false, error: `Impossible d'ouvrir le launcher : ${err.message}` }; }
 });
+// Désinstaller un jeu PC : chaque launcher a sa façon de faire.
+//  Steam : sa propre fenêtre de confirmation (steam://uninstall). GOG : le désinstalleur du jeu (unins000.exe).
+//  itch : dossier du jeu mis à la Corbeille (récupérable). Epic : pas de commande publique, on ouvre la bibliothèque.
+ipcMain.handle('pc:uninstall', async (_e, id) => {
+  id = String(id || '');
+  if (!/^(steam|epic|gog|itch):/.test(id)) return { ok: false, error: 'Jeu PC inconnu.' };
+  try {
+    if (!pcLaunchers.has(id)) pcLaunchers = (await scanPc(loadConfig())).launchers;
+    const l = pcLaunchers.get(id);
+    if (!l) return { ok: false, error: 'Jeu introuvable : il est peut-être déjà désinstallé.' };
+    const store = id.split(':')[0];
+    if (store === 'steam') { await shell.openExternal(`steam://uninstall/${id.slice(6)}`); return { ok: true, how: 'steam' }; }
+    if (store === 'epic') { await shell.openExternal('com.epicgames.launcher://library'); return { ok: true, how: 'epic' }; }
+    if (store === 'gog') {
+      let un = null;
+      try { un = l.dir && fs.readdirSync(l.dir).filter((f) => /^unins\d*\.exe$/i.test(f)).sort()[0]; } catch { /* dossier absent */ }
+      if (!un) return { ok: false, error: 'Désinstalleur introuvable : passe par GOG Galaxy.' };
+      spawn(path.join(l.dir, un), [], { cwd: l.dir, detached: true, stdio: 'ignore' }).unref();
+      return { ok: true, how: 'gog' };
+    }
+    if (store === 'itch') {
+      // Garde-fou : seulement un dossier de jeu itch (avec son reçu), rangé dans un dossier d'installation itch.
+      const dir = l.dir && path.resolve(l.dir);
+      const inside = dir && require('./pcstores').itchInstallDirs().some((b) => path.dirname(dir) === path.resolve(b));
+      if (!inside || !fs.existsSync(path.join(dir, '.itch', 'receipt.json.gz'))) return { ok: false, error: 'Dossier du jeu introuvable.' };
+      await shell.trashItem(dir);
+      pcLaunchers.delete(id);
+      return { ok: true, how: 'itch' };
+    }
+  } catch (err) { return { ok: false, error: `Impossible de désinstaller : ${err.message}` }; }
+  return { ok: false, error: 'Launcher inconnu.' };
+});
 ipcMain.handle('steam:accounts', async () => { const dir = await getSteamDir(); return dir ? steamAccounts(dir) : []; });
 
 // ---------- RomM : secret chiffré par Windows (DPAPI via safeStorage) ----------

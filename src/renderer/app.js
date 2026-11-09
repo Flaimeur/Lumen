@@ -3295,6 +3295,7 @@
       items.push([myRating(g) ? `Ma note : ${'★'.repeat(myRating(g))}` : 'Noter ce jeu', () => openRatingMenu(g, reopen), { icon: '✩', sub: true }]);
       if (g.source === 'app') items.push(...appMenuItems(g.path.slice(4)));
       else items.push(['Détails', run(() => openDetails(g)), { icon: 'ℹ' }]);
+      if (api.pcUninstall && g.source === 'pc' && g.installed !== false && /^(steam|epic|gog|itch):/.test(g.path)) items.push(['Désinstaller', run(() => uninstallPc(g)), { icon: '🗑', danger: true }]);
       if (achInfo(g) || (/^steam:/.test(g.path) && api.achievements)) items.push(['Succès', run(() => openAchievements(g)), { icon: '🏆' }]);
       if (api.capture) items.push(['Mes captures', run(async () => { const l = await api.capture.list(g.name); if (l.length) openCaptureViewer(g, l, 0); else toast('Pas encore de capture : Ctrl+Maj+S ou Select + R1 pendant le jeu'); }), { icon: '🖼' }]);
       // Tout le reste : dans « Personnaliser… ».
@@ -3417,6 +3418,32 @@
     S.byPath.set(g.path, g);
     S.dirty = true;
     return true;
+  }
+
+  // Désinstaller un jeu PC (confirmation d'abord ; Steam et GOG reconfirment dans leur propre fenêtre).
+  function uninstallPc(g) {
+    const store = g.path.split(':')[0];
+    const help = {
+      steam: 'Steam va ouvrir sa fenêtre de désinstallation pour confirmer.',
+      epic: 'Epic Games ne permet pas de désinstaller depuis une autre appli : sa bibliothèque s’ouvre, clic sur « … » à côté du jeu puis « Désinstaller ».',
+      gog: 'Le désinstalleur du jeu va s’ouvrir pour confirmer.',
+      itch: 'Le dossier du jeu part à la Corbeille (récupérable tant qu’elle n’est pas vidée). Tes sauvegardes dans AppData ne sont pas touchées.',
+    }[store];
+    openOverlay(h('div', { class: 'modal update-modal' }, h('h2', {}, `Désinstaller « ${g.name} » ?`), h('p', { class: 'muted' }, help),
+      h('div', { class: 'actions' },
+        actionButton('Désinstaller', async () => {
+          closeOverlay(true);
+          const r = await api.pcUninstall(g.path);
+          if (!r || !r.ok) { toast((r && r.error) || 'Impossible de désinstaller', 'error'); return; }
+          if (r.how === 'itch') {
+            S.cfg.recent = (S.cfg.recent || []).filter((p) => p !== g.path);
+            await saveCfg();
+            applyLib(await api.scan({ romm: false }));
+            rerender();
+            toast(`« ${g.name} » désinstallé (dans la Corbeille)`);
+          } else toast(r.how === 'epic' ? 'Bibliothèque Epic ouverte' : 'Confirme dans la fenêtre qui s’ouvre · la liste se mettra à jour au prochain scan');
+        }, true),
+        actionButton('Annuler', () => closeOverlay()))));
   }
 
   async function deleteRommCopy(g) {
