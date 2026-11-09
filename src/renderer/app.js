@@ -2051,6 +2051,13 @@
     toast(`Style « ${p.name} » appliqué`);
   }
 
+  // « fond : thème Océan », « fond : image du jeu sélectionné »…
+  function wallLabel(w) {
+    if (!w || w.mode === 'auto') return 'fond : image du jeu sélectionné';
+    if (w.mode === 'image') return 'fond : ton image';
+    return 'fond : thème ' + ((WALL_THEMES[w.theme] || WALL_THEMES.aurore).name);
+  }
+
   function openHomeEditor(focusLabel) {
     const home = homeCfg();
     const w = wallCfg();
@@ -2072,6 +2079,7 @@
     const paintHomeNow = (o) => {
       if (!hpv.isConnected) return;
       const saved = o.preset ? JSON.stringify({ home: S.cfg.home, wallpaper: S.cfg.wallpaper, accent: S.cfg.accent }) : null;
+      let wallTxt = '';
       let view;
       try {
         if (o.preset) {
@@ -2091,7 +2099,12 @@
           hpvWall.style.background = t.base;
           hpvWall.append(h('div', { class: 'hpv-blobs', style: `--b1:${t.blobs[0]};--b2:${t.blobs[1]};--b3:${t.blobs[2]}` }));
         } else if (wl.mode === 'image' && wl.image) hpvWall.style.background = `center / cover no-repeat url("${api.mediaUrl(wl.image)}")`;
-        else { const g = S.byPath.get(S.featured); const art = g && (g.hero || g.background); hpvWall.style.background = art ? `center / cover no-repeat url("${api.mediaUrl(art)}")` : 'linear-gradient(160deg, #10162b, #06070d)'; }
+        else {
+          const g = (S.cfg.recent || []).map((p) => S.byPath.get(p)).find(Boolean) || S.byPath.get(S.featured);
+          const art = g && (g.hero || g.background || g.cover);
+          hpvWall.style.background = art ? `center / cover no-repeat url("${api.mediaUrl(art)}")` : 'linear-gradient(160deg, #10162b, #06070d)';
+        }
+        wallTxt = wallLabel(wl);
         hpv.style.setProperty('--accent', S.cfg.accent);
         hpv.style.setProperty('--wp-dim', String(wl.dim ?? 0.25));
       } catch { view = h('div', {}); } finally {
@@ -2100,7 +2113,7 @@
       view.querySelectorAll('.f').forEach((e) => { e.classList.remove('f', 'focused'); });
       view.querySelectorAll('[id]').forEach((e) => e.removeAttribute('id'));
       if (o.block) { const b = view.querySelector(`[data-block="${o.block}"]`); if (b) b.classList.add('hpv-hl'); }
-      hpvLabel.textContent = o.preset ? `Aperçu · ${STYLE_PRESETS[o.preset].name}` : 'Aperçu de l’accueil';
+      hpvLabel.textContent = (o.preset ? `Aperçu · ${STYLE_PRESETS[o.preset].name}` : 'Aperçu de l’accueil') + (wallTxt ? ' · ' + wallTxt : '');
       hpvInner.replaceChildren(view);
       hpvInner.style.width = HPV_W + 'px';
       requestAnimationFrame(() => {
@@ -2131,7 +2144,7 @@
     const section = (t) => rows.push(h('div', { class: 'set-section' }, t));
 
     section('Styles tout prêts');
-    for (const [id, p] of Object.entries(STYLE_PRESETS)) add(p.name, 'Appliquer', async () => { await applyStylePreset(id); openHomeEditor(p.name); }, p.desc, { focus: () => paintHome({ preset: id }) });
+    for (const [id, p] of Object.entries(STYLE_PRESETS)) add(p.name, 'Appliquer', async () => { await applyStylePreset(id); openHomeEditor(p.name); }, `${p.desc} ${wallLabel({ ...wallCfg(), ...p.wall }).replace(/^f/, 'F')}.`, { focus: () => paintHome({ preset: id }) });
 
     section('Fond d’écran');
     const MODES = { auto: 'Automatique (image du jeu)', theme: 'Thème animé', image: 'Mon image' };
