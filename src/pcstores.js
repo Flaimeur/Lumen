@@ -1,5 +1,5 @@
 'use strict';
-// Jeux PC installés : Steam, Epic Games Launcher et GOG Galaxy.
+// Jeux PC installés : Steam, Epic Games Launcher, GOG Galaxy et itch.
 // Lecture seule des fichiers et du registre de ces launchers ; le lancement passe par le launcher lui-même.
 const fs = require('fs');
 const fsp = fs.promises;
@@ -394,10 +394,65 @@ async function scanGog() {
   return games;
 }
 
+// ---------- itch ----------
+// Chaque jeu installé par l'appli itch a un reçu « .itch/receipt.json.gz » dans son dossier : titre, image,
+// liste des fichiers. Les jeux itch sont sans DRM : on lance directement leur exécutable.
+const ITCH_SKIP_EXE = /unitycrashhandler|crashpad|unins\d*|setup|vc_?redist|dxsetup|ue4prereq|notification_helper|uninstall|crash_?report/i;
+function itchInstallDirs() {
+  const appdata = process.env.APPDATA || '';
+  const dirs = [path.join(appdata, 'itch', 'apps')];
+  try {
+    const prefs = JSON.parse(fs.readFileSync(path.join(appdata, 'itch', 'preferences.json'), 'utf8'));
+    for (const loc of Object.values(prefs.installLocations || {})) if (loc && loc.path) dirs.push(String(loc.path));
+  } catch { /* itch absent */ }
+  return [...new Set(dirs)];
+}
+function itchExe(dir, files) {
+  const exes = (files || []).filter((f) => /\.exe$/i.test(f) && !ITCH_SKIP_EXE.test(path.basename(f)));
+  // Le moins profond d'abord, puis le plus gros (le vrai jeu plutôt qu'un outil).
+  const scored = exes.map((f) => { let size = 0; try { size = fs.statSync(path.join(dir, f)).size; } catch { return null; } return { f, depth: f.split(/[\\/]/).length, size }; }).filter(Boolean);
+  scored.sort((a, b) => a.depth - b.depth || b.size - a.size);
+  return scored.length ? path.join(dir, scored[0].f) : '';
+}
+async function scanItch() {
+  const zlib = require('zlib');
+  const games = [];
+  for (const base of itchInstallDirs()) {
+    let entries = [];
+    try { entries = await fsp.readdir(base, { withFileTypes: true }); } catch { continue; }
+    for (const e of entries) {
+      if (!e.isDirectory()) continue;
+      const dir = path.join(base, e.name);
+      let r;
+      try { r = JSON.parse(zlib.gunzipSync(await fsp.readFile(path.join(dir, '.itch', 'receipt.json.gz'))).toString('utf8')); } catch { continue; }
+      const g = r && r.game;
+      if (!g || !g.id || (g.classification && g.classification !== 'game')) continue;
+      const exe = itchExe(dir, r.files);
+      if (!exe) continue;
+      let mtime = 0; try { mtime = (await fsp.stat(dir)).mtimeMs; } catch { /* rien */ }
+      games.push({
+        id: `itch:${g.id}`,
+        store: 'itch',
+        name: g.title || e.name,
+        cover: null,
+        // Images en ligne (format paysage, GIF animé parfois : on prend la version fixe).
+        webCover: (g.stillCoverUrl || g.coverUrl) ? 'web-cover:' + (g.stillCoverUrl || g.coverUrl) : null,
+        background: null,
+        exe,
+        args: [],
+        cwd: path.dirname(exe),
+        installedAt: mtime,
+      });
+    }
+  }
+  return games;
+}
+
 const STORES = {
   steam: { name: 'Steam', short: 'Steam', color: '#2a475e', scan: scanSteam },
   epic: { name: 'Epic Games', short: 'Epic', color: '#3a3a3a', scan: scanEpic },
   gog: { name: 'GOG', short: 'GOG', color: '#6b2fa6', scan: scanGog },
+  itch: { name: 'itch', short: 'itch', color: '#fa5c5c', scan: scanItch },
 };
 
 // enabled : { steam, epic, gog, steamUninstalled } ; art : images SteamGridDB en cache, par id de jeu ;

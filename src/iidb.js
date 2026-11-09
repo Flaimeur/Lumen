@@ -31,7 +31,7 @@ function consoleKeysFor(s) {
   if (!s) return null;
   if (s.apps) return [];
   const store = /^pc-(\w+)$/.exec(s.id || '');
-  if (store) return { steam: ['steam'], epic: ['epic', 'epicgames', 'egs'], gog: ['gog', 'goggalaxy'] }[store[1]] || [];
+  if (store) return { steam: ['steam'], epic: ['epic', 'epicgames', 'egs'], gog: ['gog', 'goggalaxy'], itch: ['itch', 'itchio'] }[store[1]] || [];
   return [s.id, ...(s.folders || []), s.iidbKey].filter(Boolean).map((k) => String(k).toLowerCase());
 }
 

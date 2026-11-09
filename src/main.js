@@ -16,7 +16,7 @@ const { fetchIidb, applyIidb, iidbOptions, listCollections, gameIcons } = requir
 const { STORES } = require('./pcstores');
 
 let pcLaunchers = new Map(); // id « steam:123 » → infos de lancement (rempli à chaque scan)
-const WEB_COVER_HOSTS = /^https:\/\/(cdn\.cloudflare\.steamstatic\.com|shared\.cloudflare\.steamstatic\.com|steamcdn-a\.akamaihd\.net|cdn2\.steamgriddb\.com|assets\.iisu\.network|media\.retroachievements\.org|cdn[0-9]*\.epicgames\.com|cdn[0-9]*\.unrealengine\.com)\//;
+const WEB_COVER_HOSTS = /^https:\/\/(cdn\.cloudflare\.steamstatic\.com|shared\.cloudflare\.steamstatic\.com|steamcdn-a\.akamaihd\.net|cdn2\.steamgriddb\.com|assets\.iisu\.network|media\.retroachievements\.org|cdn[0-9]*\.epicgames\.com|cdn[0-9]*\.unrealengine\.com|img\.itch\.zone)\//;
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'lumen-media', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
@@ -56,7 +56,7 @@ function defaultConfig() {
     playtime: {},
     lastPlayed: {},
     romm: { enabled: false, url: '', username: '', downloadDir: path.join(home, 'Documents', 'Lumen', 'RomM') },
-    pcStores: { steam: true, epic: true, gog: true, steamUninstalled: true },
+    pcStores: { steam: true, epic: true, gog: true, itch: true, steamUninstalled: true },
     retroachievements: { username: '' }, // la clé Web API est chiffrée à part
     // Musique de fond et sons d'interface : dossiers de Documents\Lumen pris par défaut s'ils existent.
     music: (() => { const d = path.join(home, 'Documents', 'Lumen', 'Musique iiSU'); const ok = fs.existsSync(d); return { enabled: ok, dir: ok ? d : '', volume: 0.35 }; })(),
@@ -81,7 +81,7 @@ function scanPlatformArt(dir) {
     for (const f of files) {
       if (!['.png', '.jpg', '.jpeg', '.webp'].includes(path.extname(f).toLowerCase())) continue;
       const stem = path.parse(f).name.toLowerCase();
-      const store = /^(pc-)?(steam|epic|gog)$/.exec(stem);
+      const store = /^(pc-)?(steam|epic|gog|itch)$/.exec(stem);
       const sys = store ? null : SYSTEMS.find((s) => s.id === stem) || findSystem(stem);
       const id = store ? `pc-${store[2]}` : sys && sys.id;
       if (!id) continue;
@@ -132,6 +132,13 @@ ipcMain.handle('store:open', async (_e, store, mode) => {
       const exe = [path.join(pf, 'GOG Galaxy', 'GalaxyClient.exe'), path.join(process.env.ProgramFiles || '', 'GOG Galaxy', 'GalaxyClient.exe')].find((p) => fs.existsSync(p));
       if (exe) { const err = await shell.openPath(exe); return err ? { ok: false, error: err } : { ok: true }; }
       await shell.openExternal('goggalaxy://');
+      return { ok: true };
+    }
+    if (store === 'itch') {
+      // Le lanceur officiel (itch-setup --prefer-launch) ouvre la dernière version installée.
+      const setup = path.join(process.env.LOCALAPPDATA || '', 'itch', 'itch-setup.exe');
+      if (!fs.existsSync(setup)) return { ok: false, error: 'itch introuvable sur ce PC.' };
+      spawn(setup, ['--prefer-launch', '--appname', 'itch'], { detached: true, stdio: 'ignore' }).unref();
       return { ok: true };
     }
     return { ok: false, error: 'Launcher inconnu' };
@@ -1122,7 +1129,7 @@ ipcMain.handle('game:launch', async (_e, game) => {
   }
 
   // Jeux PC (Steam, Epic, GOG) : lancés par leur launcher, à partir de nos propres données de scan.
-  if (/^(steam|epic|gog):/.test(String(game?.path))) {
+  if (/^(steam|epic|gog|itch):/.test(String(game?.path))) {
     if (!pcLaunchers.has(game.path)) pcLaunchers = (await scanPc(cfg)).launchers;
     const l = pcLaunchers.get(game.path);
     if (!l) return { ok: false, error: 'Jeu PC introuvable : il a peut-être été désinstallé.' };

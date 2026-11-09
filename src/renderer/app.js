@@ -2297,7 +2297,7 @@
   }
 
   // Fabricant et année d'une console (fiches de systems.js ; les launchers PC ont les leurs).
-  const PC_META = { 'pc-steam': ['Valve', 2003], 'pc-epic': ['Epic Games', 2018], 'pc-gog': ['CD Projekt', 2008] };
+  const PC_META = { 'pc-steam': ['Valve', 2003], 'pc-epic': ['Epic Games', 2018], 'pc-gog': ['CD Projekt', 2008], 'pc-itch': ['itch.io', 2013] };
   function sysMetaOf(s) {
     const d = (S.defs || []).find((x) => x.id === s.id);
     if (d && d.maker) return { maker: d.maker, year: d.year };
@@ -2390,9 +2390,9 @@
       h('div', { class: 'grid systems' }, sortedSystems().map(systemCard), addSystemCard()));
   }
 
-  // Boutons pour ouvrir le launcher depuis sa page (Steam, Epic, GOG).
-  const STORE_NAMES = { steam: 'Steam', epic: 'Epic Games', gog: 'GOG Galaxy' };
-  const storeOf = (s) => { const m = /^pc-(steam|epic|gog)$/.exec((s && s.id) || ''); return m ? m[1] : null; };
+  // Boutons pour ouvrir le launcher depuis sa page (Steam, Epic, GOG, itch).
+  const STORE_NAMES = { steam: 'Steam', epic: 'Epic Games', gog: 'GOG Galaxy', itch: 'itch' };
+  const storeOf = (s) => { const m = /^pc-(steam|epic|gog|itch)$/.exec((s && s.id) || ''); return m ? m[1] : null; };
   async function openStore(store, mode) {
     if (!api.openStore) return;
     sfx('launchApp');
@@ -2633,7 +2633,7 @@
 
   const SET_CATS = [
     ['library', 'Bibliothèque', 'Dossiers, scan, jeux masqués'],
-    ['pc', 'Jeux PC', 'Steam, Epic, GOG'],
+    ['pc', 'Jeux PC', 'Steam, Epic, GOG, itch'],
     ['images', 'Images', 'iiDB, SteamGridDB, consoles'],
     ['sound', 'Son et musique', 'Volume, musique, sons'],
     ['controls', 'Manettes', 'PS4, PS5, Xbox, Switch'],
@@ -2688,8 +2688,8 @@
     }
     cat('pc');
     section('Launchers');
-    const stores = c.pcStores || (c.pcStores = { steam: true, epic: true, gog: true, steamUninstalled: true });
-    for (const [id, label] of [['steam', 'Jeux Steam'], ['epic', 'Jeux Epic Games'], ['gog', 'Jeux GOG Galaxy']]) {
+    const stores = c.pcStores || (c.pcStores = { steam: true, epic: true, gog: true, itch: true, steamUninstalled: true });
+    for (const [id, label] of [['steam', 'Jeux Steam'], ['epic', 'Jeux Epic Games'], ['gog', 'Jeux GOG Galaxy'], ['itch', 'Jeux itch']]) {
       row(label, toggle(stores[id] !== false), async () => { stores[id] = stores[id] === false; await saveCfg(); rescan(); },
         id === 'steam' ? 'Jeux installés sur ce PC, lancés via leur launcher.' : null);
       if (id === 'steam' && stores.steam !== false) {
@@ -3590,7 +3590,7 @@
       body = [
         h('div', { class: 'logo-mark big' }),
         h('h1', {}, 'Bienvenue dans Lumen'),
-        h('p', { class: 'muted' }, 'Tes ROMs, tes jeux Steam, Epic et GOG et tes applis au même endroit, à piloter à la manette. Lumen n’inclut ni jeux ni émulateurs : il range tes jeux et lance tes émulateurs et launchers. On règle tout en quelques étapes.'),
+        h('p', { class: 'muted' }, 'Tes ROMs, tes jeux Steam, Epic, GOG et itch et tes applis au même endroit, à piloter à la manette. Lumen n’inclut ni jeux ni émulateurs : il range tes jeux et lance tes émulateurs et launchers. On règle tout en quelques étapes.'),
         h('div', { class: 'actions' }, actionButton('Commencer', next, true), actionButton('Plus tard', async () => { closeOverlay(); await done(); toast('Tu pourras relancer l’assistant dans Réglages → Configuration guidée', 'info', 5000); })),
       ];
     } else if (step === 1) {
@@ -3606,8 +3606,8 @@
           actionButton(S.cfg.romsRoot ? 'Continuer' : 'Je n’ai pas de ROMs', next, !!S.cfg.romsRoot)),
       ];
     } else if (step === 2) {
-      // Jeux PC : Steam, Epic, GOG (installés ou non).
-      const stores = S.cfg.pcStores || (S.cfg.pcStores = { steam: true, epic: true, gog: true, steamUninstalled: true });
+      // Jeux PC : Steam, Epic, GOG, itch (installés ou non).
+      const stores = S.cfg.pcStores || (S.cfg.pcStores = { steam: true, epic: true, gog: true, itch: true, steamUninstalled: true });
       const pcGames = S.lib.systems.filter((x) => x.pc && !x.apps).flatMap((x) => x.games);
       const count = (st) => pcGames.filter((g) => g.store === st).length;
       const storeBtn = (id, label) => actionButton(`${stores[id] !== false ? '✓' : '○'} ${label}${stores[id] !== false && count(id) ? ' · ' + count(id) : ''}`, async () => {
@@ -3615,10 +3615,10 @@
       });
       body = [
         h('div', { class: 'eyebrow' }, 'Étape 2 · Jeux PC'),
-        h('h1', {}, 'Steam, Epic et GOG'),
+        h('h1', {}, 'Steam, Epic, GOG et itch'),
         h('p', { class: 'muted' }, 'Lumen trouve tout seul les jeux de tes launchers, installés ou non, avec leur temps de jeu et tes succès Steam. Décoche ceux que tu n’utilises pas.'),
         h('div', { class: 'wiz-status' + (pcGames.length ? ' ok' : '') }, pcGames.length ? plural(pcGames.length, 'jeu PC trouvé', 'jeux PC trouvés') : 'Aucun jeu PC trouvé pour l’instant'),
-        h('div', { class: 'actions wiz-choices' }, storeBtn('steam', 'Steam'), storeBtn('epic', 'Epic Games'), storeBtn('gog', 'GOG Galaxy')),
+        h('div', { class: 'actions wiz-choices' }, storeBtn('steam', 'Steam'), storeBtn('epic', 'Epic Games'), storeBtn('gog', 'GOG Galaxy'), storeBtn('itch', 'itch')),
         h('div', { class: 'actions' }, actionButton('Continuer', next, true)),
       ];
     } else if (step === 3) {
