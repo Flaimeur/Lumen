@@ -1,7 +1,7 @@
 {
   "name": "lumen-frontend",
   "productName": "Lumen",
-  "version": "0.24.3",
+  "version": "0.24.4",
   "description": "Frontend d'émulation pour PC, pensé pour la manette.",
   "author": "Lumen",
   "main": "src/main.js",
