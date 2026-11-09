@@ -4663,7 +4663,14 @@
   function renderPadBattery() {
     const el = document.getElementById('pad-battery');
     if (!el) return;
-    const list = Object.values(S.padBattery || {});
+    // Une manette PlayStation branchée en USB ET appairée en Bluetooth est lue deux fois : une seule pile par modèle.
+    const merged = new Map();
+    for (const b of Object.values(S.padBattery || {})) {
+      const k = b.type === 'xbox' ? b.key : b.type;
+      const m = merged.get(k);
+      merged.set(k, m ? { ...m, level: Math.max(m.level, b.level), charging: m.charging || b.charging } : { ...b });
+    }
+    const list = [...merged.values()];
     el.hidden = !list.length;
     el.replaceChildren(...list.map((b) => h('span', { class: 'pb' + (b.charging ? ' chg' : b.level <= 20 ? ' low' : ''), title: (b.type === 'xbox' ? 'Manette Xbox' : b.type === 'ps5' ? 'DualSense' : 'DualShock 4') + ` · ${b.level} %${b.charging ? ' · en charge' : ''}` },
       h('i', { class: 'pb-cell' }, h('i', { style: `width:${Math.max(6, b.level)}%` })), h('span', {}, b.charging && window.LumenGlyphs ? window.LumenGlyphs.svg('bolt') : `${b.level} %`))));
@@ -4821,7 +4828,8 @@
       if (ev.gone) delete b[ev.key]; else {
         const was = b[ev.key];
         b[ev.key] = ev;
-        if (!ev.charging && ev.level <= 20 && (!was || was.level > 20)) toast(`Batterie de la manette faible : ${ev.level} %`, 'error', 7000);
+        const chargingElsewhere = Object.values(b).some((x) => x.type === ev.type && x.charging);
+        if (!ev.charging && !chargingElsewhere && ev.level <= 20 && (!was || was.level > 20)) toast(`Batterie de la manette faible : ${ev.level} %`, 'error', 7000);
       }
       renderPadBattery();
     });
