@@ -1029,7 +1029,12 @@
       const score = main + (overlap ? 0 : crossRaw * 3) + crossRaw * 0.05;
       if (score < bestScore) { bestScore = score; best = el; }
     }
-    if (best) setFocus(best);
+    // Flèche maintenue ou appuis rapides : défilement instantané, sinon la sélection court devant l’animation
+    // et finit hors de l’écran (grandes bibliothèques).
+    const now = performance.now();
+    const rapid = now - (S.lastMove || 0) < 260;
+    S.lastMove = now;
+    if (best) setFocus(best, { instant: rapid });
   }
 
   // ---------- Routage ----------
