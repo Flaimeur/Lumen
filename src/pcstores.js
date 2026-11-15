@@ -365,6 +365,7 @@ async function scanEpic() {
     games.push({
       id: `epic:${m.AppName}`,
       store: 'epic',
+      dir: m.InstallLocation,
       name: m.DisplayName || m.AppName,
       ...(() => {
         const im = epicImages(catalog.get(m.CatalogItemId));

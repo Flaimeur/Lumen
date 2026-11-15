@@ -532,6 +532,8 @@ async function buildLibrary(cfg, opts = {}) {
   }
   const pc = await scanPc(cfg);
   pcLaunchers = pc.launchers;
+  // Temps de jeu des jeux PC sans compteur (Epic, itch, GOG…) : suivi des programmes lancés depuis leur dossier.
+  require('./pctime').start(() => pcLaunchers, (d) => { if (win && !win.isDestroyed()) win.webContents.send('pctime:tick', d); });
   lib.systems.push(...pc.systems);
   await ensureAppIcons(cfg);
   // Consoles ajoutées par l'utilisateur (plateformes non prévues) : un dossier, des extensions, un émulateur.

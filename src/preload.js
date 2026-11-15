@@ -85,6 +85,7 @@ contextBridge.exposeInMainWorld('lumen', {
   launch: (game) => ipcRenderer.invoke('game:launch', { path: game.path, system: game.system }),
   quitGame: () => ipcRenderer.invoke('game:quit'),
   checkSystems: (ids) => ipcRenderer.invoke('systems:check', ids),
+  onPcTime: (cb) => ipcRenderer.on('pctime:tick', (_e, d) => cb(d)),
   overlayNotify: (d) => ipcRenderer.invoke('overlay:notify', d),
   ingame: {
     show: (data) => ipcRenderer.invoke('ingame:show', data),

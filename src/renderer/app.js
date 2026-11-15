@@ -1276,6 +1276,35 @@
   // Temps de jeu : celui compté par Lumen, ou celui de Steam s'il est plus grand (jeux lancés hors de Lumen).
   const playtimeOf = (g) => Math.max((S.cfg.playtime || {})[g.path] || 0, g.storePlaytime || 0);
 
+  // Jeux PC suivis par leurs programmes (Epic, itch, GOG…) : temps ajouté à chaque relevé (toutes les 30 s),
+  // session enregistrée quand le jeu s'arrête. Lancés depuis Lumen ou non.
+  const PCRUN = new Map(); // id → { start, last }
+  if (api.onPcTime) api.onPcTime(({ running, at }) => {
+    if (!S.cfg) return;
+    const pt = S.cfg.playtime || (S.cfg.playtime = {});
+    const lp = S.cfg.lastPlayed || (S.cfg.lastPlayed = {});
+    const now = new Set(running);
+    let changed = false;
+    for (const id of running) {
+      const r = PCRUN.get(id);
+      if (!r) { PCRUN.set(id, { start: at, last: at }); const fp = S.cfg.firstPlayed || (S.cfg.firstPlayed = {}); if (!fp[id]) fp[id] = at; lp[id] = at; changed = true; continue; }
+      const dt = Math.min(90, Math.round((at - r.last) / 1000)); // un relevé manqué (veille) ne compte pas des heures
+      r.last = at;
+      pt[id] = (pt[id] || 0) + dt;
+      lp[id] = at;
+      changed = true;
+    }
+    for (const [id, r] of PCRUN) {
+      if (now.has(id)) continue;
+      PCRUN.delete(id);
+      const secs = Math.round((r.last - r.start) / 1000);
+      if (secs > 60) { const log = S.cfg.sessions || (S.cfg.sessions = []); log.push({ p: id, t: r.start, s: secs }); if (log.length > 3000) log.splice(0, log.length - 3000); }
+      if (!S.cfg.recent.includes(id)) S.cfg.recent = [id, ...S.cfg.recent].slice(0, 30);
+      changed = true;
+    }
+    if (changed) saveCfg();
+  });
+
   function sortGames(games) {
     const list = sortGamesBy(games);
     return S.cfg.sortDesc ? [...list].reverse() : list;
@@ -4114,7 +4143,7 @@
     const avg = rated.length ? rated.reduce((n, g) => n + myRating(g), 0) / rated.length : 0;
     const head = h('div', { class: 'view-head' },
       h('div', { class: 'vh-badge ach-badge' }, '📊'),
-      h('div', { class: 'vh-text' }, h('h1', {}, 'Statistiques'), h('p', { class: 'muted' }, 'Temps compté par Lumen et lu dans Steam')),
+      h('div', { class: 'vh-text' }, h('h1', {}, 'Statistiques'), h('p', { class: 'muted' }, 'Temps compté par Lumen (émulateurs, Epic, itch, GOG…) et lu dans Steam')),
       focusable(h('div', { class: 'chip' }, '📋 À finir'), { a: () => go({ view: 'backlog' }), focus: () => setHints('action') }),
       focusable(h('div', { class: 'chip' }, '🏆 Succès'), { a: () => go({ view: 'achievements' }), focus: () => setHints('action') }));
     const tile = (big, label) => h('div', { class: 'st-tile' }, h('b', {}, big), h('span', {}, label));
