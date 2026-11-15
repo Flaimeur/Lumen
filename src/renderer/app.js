@@ -1612,8 +1612,11 @@
         h('div', { class: 'w-sub' }, plural(favs.length, 'favori', 'favoris'))];
     }, act: () => go({ view: 'folder', id: '★' }) },
     surprise: { name: 'Jeu surprise', bg: () => { const g = S.surprise && S.byPath.get(S.surprise); return g ? g.hero || g.background || g.cover : null; }, render: () => {
-      const all = S.lib.systems.flatMap((x) => x.games).filter((g) => g.cover);
-      if (!S.surprise || !S.byPath.has(S.surprise)) S.surprise = all.length ? all[Math.floor(Math.random() * all.length)].path : null;
+      // Mêmes règles que la roulette : pas de NSFW sauf si coché dans la roulette, pas d'applis.
+      const nsfw = !!rollCfg().nsfw;
+      const all = S.lib.systems.filter((x) => !x.apps).flatMap((x) => x.games).filter((g) => g.cover && (nsfw || !g.adult));
+      const cur = S.surprise && S.byPath.get(S.surprise);
+      if (!cur || (cur.adult && !nsfw)) S.surprise = all.length ? all[Math.floor(Math.random() * all.length)].path : null;
       const g = S.surprise && S.byPath.get(S.surprise);
       if (!g) return [h('div', { class: 'w-big' }, '🎲'), h('div', { class: 'w-sub' }, 'Aucun jeu')];
       return [h('div', { class: 'w-surprise' }, h('img', { src: api.mediaUrl(g.cover), alt: '' }),
@@ -3368,6 +3371,15 @@
       if (g.source === 'romm' && !g.downloaded) custom.push([`Télécharger sans lancer (${fmtSize(g.size) || 'RomM'})`, run(() => downloadOnly(g)), { icon: '⤓' }]);
       if (g.source === 'romm' && g.downloaded) custom.push(['Supprimer la copie locale', run(() => deleteRommCopy(g)), { icon: '✕', danger: true }]);
       if (coll && coll !== '★') custom.push([`Retirer du dossier « ${coll} »`, run(() => removeFromCollection(coll, g)), { icon: '📁' }]);
+      if (g.source !== 'app') custom.push([g.adult ? 'Ne plus marquer NSFW' : 'Marquer NSFW', run(async () => {
+        const marks = S.cfg.nsfwMarks || (S.cfg.nsfwMarks = {});
+        marks[g.path] = !g.adult;
+        g.adult = marks[g.path];
+        if (g.adult && S.surprise === g.path) S.surprise = null;
+        await saveCfg();
+        S.keepAnim = true; rerender();
+        toast(g.adult ? `« ${g.name} » marqué NSFW (caché de la roulette et du jeu surprise)` : `« ${g.name} » n’est plus marqué NSFW`);
+      }), { icon: '🔞' }]);
       custom.push(['Masquer ce jeu', run(() => hideGame(g)), { icon: '⦸', danger: true }]);
       items.push(['Personnaliser…', () => openSubMenu(g.name, custom, reopen), { icon: '⚙', sub: true }]);
     }
@@ -4426,6 +4438,9 @@
   // ---------- Actions ----------
   function applyLib(lib) {
     S.lib = lib && lib.systems ? lib : { systems: [] };
+    // NSFW choisi à la main (jeux itch, ou détection Steam qui se trompe) : prioritaire sur la détection.
+    const nsfwMarks = S.cfg.nsfwMarks || {};
+    if (Object.keys(nsfwMarks).length) for (const s of S.lib.systems) for (const g of s.games) if (g.path in nsfwMarks) g.adult = !!nsfwMarks[g.path];
     // Jeux masqués par l'utilisateur : retirés de toutes les vues.
     const hidden = new Set(S.cfg.hidden || []);
     if (hidden.size || S.cfg.hideNsfw) {
