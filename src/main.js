@@ -1115,6 +1115,8 @@ ipcMain.handle('systems:check', (_e, ids) => {
     .map((s) => ({ ...s, command: cfg.commands[s.id] || s.command }));
   try { return require('./biocheck').check(list, cfg.emulators, cfg.romsRoot); } catch (err) { return { error: err.message }; }
 });
+// Bannière par-dessus le jeu (limite de temps de jeu…).
+ipcMain.handle('overlay:notify', (_e, d = {}) => { achNotify({ kind: 'capture', kicker: String(d.kicker || ''), name: String(d.name || ''), desc: String(d.desc || ''), icon: null, accent: d.accent || loadConfig().accent, game: String(d.game || '') }); return true; });
 ipcMain.handle('ingame:show', (_e, data) => { if (currentGame) ingame.show(data || {}); return !!currentGame; });
 ipcMain.handle('ingame:update', (_e, data) => { ingame.update(data || {}); return true; });
 ipcMain.handle('ingame:hide', () => { ingame.hide(); return true; });

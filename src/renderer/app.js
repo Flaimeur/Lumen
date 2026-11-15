@@ -2990,6 +2990,24 @@
       applyCfg(); saveCfg(); rerender();
     });
     {
+      const l = limCfg();
+      section('Limite de temps de jeu');
+      row('Limite de temps de jeu', toggle(!!l.enabled), () => { l.enabled = !l.enabled; saveCfg(); rerender(); },
+        'Pour les jeux lancés par un émulateur : alerte par-dessus le jeu après une durée ou une heure choisie.');
+      if (l.enabled) {
+        const STEPS = [0, 30, 60, 90, 120, 180, 240];
+        row('Durée max par partie', l.minutes ? formatTime(l.minutes * 60) : 'Aucune', () => { l.minutes = STEPS[(STEPS.indexOf(Number(l.minutes) || 0) + 1) % STEPS.length]; saveCfg(); rerender(); }, 'Prévenu 10 min avant.');
+        row('Heure de coucher', l.bedtime || 'Aucune', async () => {
+          const v = await openPrompt({ title: 'Heure de coucher', value: l.bedtime || '23:00', help: 'Format heures:minutes (ex. 23:00). Vide = aucune.' });
+          if (v === null) return;
+          if (v.trim() && toMin(v.trim()) == null) { toast('Heure non reconnue (ex. 23:00)', 'error'); return; }
+          l.bedtime = v.trim() ? v.trim().padStart(5, '0') : ''; await saveCfg(); rerender();
+        });
+        row('Quand c’est l’heure', l.mode === 'quit' ? 'Fermer le jeu' : 'Juste prévenir', () => { l.mode = l.mode === 'quit' ? 'alert' : 'quit'; saveCfg(); rerender(); },
+          l.mode === 'quit' ? 'Bannière, puis le jeu se ferme 2 min plus tard ; plus de lancement après l’heure de coucher.' : 'Une bannière s’affiche par-dessus le jeu.');
+      }
+    }
+    {
       const e = eveCfg();
       section('Mode soirée');
       row('Mode soirée', toggle(!!e.enabled), () => { e.enabled = !e.enabled; S.eveningForced = undefined; saveCfg(); applyEvening(true); rerender(); },
@@ -4600,6 +4618,40 @@
 
   // Pendant une partie, Lumen reste ouvert derrière l'émulateur et surveille Select + Start.
   let gameWatch = 0;
+  // ---------- Limite de temps de jeu ----------
+  // Durée max par partie et/ou heure de coucher. « alert » : bannière par-dessus le jeu ; « quit » : bannière puis
+  // fermeture du jeu 2 min plus tard, et plus de lancement après l'heure de coucher.
+  // Jeux lancés par un émulateur seulement (Lumen ne voit pas quand un jeu Steam/Epic… se termine).
+  const limCfg = () => S.cfg.playLimit || (S.cfg.playLimit = { enabled: false, minutes: 120, bedtime: '', mode: 'alert' });
+  const LIM = { warned: {}, quitAt: 0 };
+  function pastBedtime() {
+    const l = limCfg();
+    const b = toMin(l.bedtime);
+    if (!l.enabled || b == null) return false;
+    const d = new Date(); const n = d.getHours() * 60 + d.getMinutes();
+    // Après l'heure de coucher et avant 6 h du matin.
+    return b >= 360 ? n >= b || n < 360 : n >= b && n < 360;
+  }
+  function limitBanner(title, desc) {
+    if (api.overlayNotify) api.overlayNotify({ kicker: '⏳ Temps de jeu', name: title, desc, game: (IG.game && IG.game.name) || '' });
+    else toast(title + ' · ' + desc, 'info', 8000);
+  }
+  function limitTick() {
+    const l = limCfg();
+    if (!l.enabled || !S.inGame) return;
+    const mins = (Date.now() - IG.started) / 60000;
+    const max = Number(l.minutes) || 0;
+    const quit = l.mode === 'quit';
+    if (max && mins >= max - 10 && mins < max && !LIM.warned.soon) { LIM.warned.soon = true; limitBanner('Encore 10 minutes', quit ? 'Le jeu se fermera ensuite : pense à sauvegarder.' : `Tu arrives à ${max} min de jeu.`); }
+    const over = (max && mins >= max) ? 'max' : pastBedtime() ? 'bed' : null;
+    if (over && !LIM.warned[over]) {
+      LIM.warned[over] = true;
+      limitBanner(over === 'max' ? `${formatTime(max * 60)} de jeu` : `Il est plus de ${limCfg().bedtime}`, quit ? 'Sauvegarde : le jeu se ferme dans 2 minutes.' : 'C’est peut-être l’heure de faire une pause.');
+      if (quit && !LIM.quitAt) LIM.quitAt = Date.now() + 2 * 60000;
+    }
+    if (LIM.quitAt && Date.now() >= LIM.quitAt) { LIM.quitAt = 0; api.quitGame && api.quitGame(); }
+  }
+
   // ---------- Menu en jeu (bouton PS / Home, Select + L1, Ctrl+Maj+M) ----------
   // Le panneau est une fenêtre par-dessus le jeu ; on la pilote d'ici avec la manette.
   const IG = { open: false, sel: 0, prev: {}, game: null, started: 0 };
@@ -4673,6 +4725,7 @@
       if (!S.inGame) { clearInterval(gameWatch); igClose(); return; }
       const pads = Input.getPads();
       igPoll(pads);
+      if (++S.limTick % 200 === 0) limitTick(); // toutes les 10 s
       if (IG.open) { heldSince = 0; if (++tick % 20 === 0) api.ingame.update(igData()); return; }
       const combo = pads.some((p) => p.buttons[8] && p.buttons[9] && p.buttons[8].pressed && p.buttons[9].pressed);
       if (!combo) { heldSince = 0; return; }
@@ -4686,6 +4739,7 @@
 
   async function launch(g) {
     if (S.launching || S.inGame) return;
+    if (S.cfg && limCfg().mode === 'quit' && pastBedtime()) { sfx('back'); toast(`Il est plus de ${limCfg().bedtime} : plus de jeux ce soir (Réglages → Limite de temps de jeu).`, 'error', 7000); return; }
     S.launching = true;
     stopPreview();
     sfx(g.source === 'pc' || g.source === 'app' ? 'launchApp' : 'launch');
@@ -4711,6 +4765,7 @@
     saveCfg();
     S.launchFx = fx;
     IG.game = g; IG.started = Date.now(); IG.open = false;
+    LIM.warned = {}; LIM.quitAt = 0; S.limTick = 0;
     const prof = profileOf(g);
     if (prof && prof.enabled) { startMapper(prof); toast('🎮 Profil manette → clavier actif (Select + Start pour le couper)', 'info', 4000); }
     // Pas d'événement de fin pour un jeu PC ouvert par Windows : on referme l'écran après un moment.
