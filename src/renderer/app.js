@@ -1074,6 +1074,7 @@
     else if (v === 'folder') content = viewFolder(S.route.id, focusIndex);
     else if (v === 'achievements') content = viewAchievements();
     else if (v === 'stats') content = viewStats();
+    else if (v === 'backlog') content = viewBacklog();
     else content = viewSettings();
 
     const view = $('#view');
@@ -3311,6 +3312,12 @@
       items.push(['Jouer', run(() => launch(g)), { icon: '▶' }]);
       items.push([isFav(g) ? 'Retirer des favoris' : 'Ajouter aux favoris', run(() => toggleFav(g)), { icon: isFav(g) ? '★' : '☆' }]);
       items.push(['Ranger dans un dossier', run(() => openCollectionPicker(g)), { icon: '📁' }]);
+      if (g.source !== 'app') {
+        const bl = backlogCfg();
+        if (bl.done.includes(g.path)) items.push(['Remettre dans « À finir »', run(() => { bl.done = bl.done.filter((p) => p !== g.path); bl.list = [g.path, ...bl.list.filter((p) => p !== g.path)]; saveCfg(); S.keepAnim = true; rerender(); toast(`« ${g.name} » remis dans « À finir »`); }), { icon: '📋' }]);
+        else if (inBacklog(g)) items.push(['Marquer comme fini', run(() => markFinished(g)), { icon: '✓' }]);
+        else items.push(['Ajouter à « À finir »', run(() => { bl.list = [g.path, ...bl.list.filter((p) => p !== g.path)]; saveCfg(); toast(`« ${g.name} » ajouté à « À finir »`); if (S.route.view === 'backlog') { S.keepAnim = true; rerender(); } }), { icon: '📋' }]);
+      }
       if ((S.cfg.recent || []).includes(g.path)) items.push(['Retirer des joués récemment', run(() => {
         S.cfg.recent = S.cfg.recent.filter((p) => p !== g.path);
         saveCfg(); S.keepAnim = true; rerender();
@@ -3392,6 +3399,7 @@
     if (S.route.view !== 'search') bar.push(['🔍', 'Chercher', run(() => openTab('search'))]);
     bar.push(['🎲', 'Hasard', run(() => openRoll(sysId || undefined))]);
     if (S.route.view !== 'stats') bar.push(['📊', 'Stats', run(() => go({ view: 'stats' }))]);
+    if (S.route.view !== 'backlog') bar.push(['📋', 'À finir', run(() => go({ view: 'backlog' }))]);
     bar.push([S.cfg.muted ? '🔇' : '🔊', S.cfg.muted ? 'Son coupé' : 'Son', run(toggleMute)]);
     bar.push(['⛶', 'Écran', run(() => api.toggleFullscreen())]);
     bar.push(['⚙', 'Réglages', run(() => openTab('settings'))]);
@@ -3907,6 +3915,110 @@
   const achGame = (x) => (x.path && S.byPath.get(x.path)) || { name: x.title || x.gameName || 'Jeu', cover: x.icon, path: x.key, background: null };
 
   // ---------- Statistiques ----------
+  // ---------- À finir : jeux commencés ou ajoutés, triés par temps restant (HowLongToBeat) ----------
+  const backlogCfg = () => {
+    const b = S.cfg.backlog || (S.cfg.backlog = {});
+    if (!Array.isArray(b.list)) b.list = [];
+    if (!Array.isArray(b.done)) b.done = [];
+    return b;
+  };
+  const lastPlayedOf = (g) => Math.max((S.cfg.lastPlayed || {})[g.path] || 0, g.storeLastPlayed || 0);
+  // Commencé = au moins 30 min, joué dans les 6 derniers mois, pas à 100 % ni marqué fini.
+  const startedGame = (g) => playtimeOf(g) >= 1800 && Date.now() - lastPlayedOf(g) < 183 * 86400e3 && !isPerfect(g);
+  function inBacklog(g) {
+    const b = backlogCfg();
+    if (b.done.includes(g.path)) return false;
+    return b.list.includes(g.path) || startedGame(g);
+  }
+  function backlogGames() {
+    const b = backlogCfg();
+    const seen = new Set();
+    const out = [];
+    for (const p of b.list) { const g = S.byPath.get(p); if (g && !b.done.includes(p) && !seen.has(p)) { seen.add(p); out.push(g); } }
+    for (const s of S.lib.systems) {
+      if (s.apps) continue;
+      for (const g of s.games) if (!seen.has(g.path) && !b.done.includes(g.path) && g.installed !== false && startedGame(g)) { seen.add(g.path); out.push(g); }
+    }
+    return out;
+  }
+  function markFinished(g) {
+    const b = backlogCfg();
+    b.list = b.list.filter((p) => p !== g.path);
+    if (!b.done.includes(g.path)) b.done.push(g.path);
+    saveCfg();
+    sfx('launch');
+    toast(`🎉 « ${g.name} » terminé !`);
+    if (S.route.view === 'backlog') { S.keepAnim = true; rerender(); }
+  }
+  // Durées HowLongToBeat chargées une à une (mises en cache par Lumen), puis la vue se redessine.
+  const hltbMem = new Map();
+  let hltbLoading = false;
+  async function loadBacklogHltb(games) {
+    if (!api.hltb || S.cfg.hltb === false) { for (const g of games) if (!hltbMem.has(g.path)) hltbMem.set(g.path, null); return; }
+    if (hltbLoading) return;
+    const todo = games.filter((g) => !hltbMem.has(g.path)).slice(0, 40);
+    if (!todo.length) return;
+    hltbLoading = true;
+    for (const g of todo) {
+      let v = null;
+      try { v = await api.hltb(g.name); } catch { v = null; }
+      hltbMem.set(g.path, v);
+    }
+    hltbLoading = false;
+    if (S.route.view === 'backlog' && !S.overlay) { S.keepAnim = true; rerender(); }
+  }
+  const BUDGETS = [[0, 'Tout'], [1, '1 h'], [2, '2 h'], [4, '4 h'], [10, 'Un week-end']];
+  function viewBacklog() {
+    const b = backlogCfg();
+    const games = backlogGames();
+    loadBacklogHltb(games);
+    const rows = games.map((g) => {
+      const v = hltbMem.get(g.path);
+      const played = playtimeOf(g) / 3600;
+      const target = v ? v.main || v.plus || v.full : 0;
+      const left = target ? Math.max(0.5, Math.round((target - played) * 2) / 2) : null;
+      return { g, v, played, left, pct: target ? Math.min(100, Math.round((played / target) * 100)) : null };
+    });
+    const budget = b.budget || 0;
+    const shown = rows
+      .filter((r) => !budget || (r.left != null && r.left <= budget))
+      .sort((x, y) => (x.left == null) - (y.left == null) || (x.left || 0) - (y.left || 0) || lastPlayedOf(y.g) - lastPlayedOf(x.g));
+    const hh = (x) => (x >= 1 ? `${String(x).replace('.', ',')} h` : `${Math.round(x * 60)} min`);
+    const chips = BUDGETS.map(([n, label]) => focusable(h('div', { class: 'chip' + (budget === n ? ' on' : '') }, n ? '⏳ ' + label : label), {
+      a: () => { b.budget = n; saveCfg(); S.keepAnim = true; rerender(); },
+      focus: () => { setTitle(n ? `Ce soir, j’ai ${label}` : 'Tous les jeux à finir', n ? 'Les jeux que tu peux finir dans ce temps' : ''); setHints('action'); },
+    }));
+    const head = h('div', { class: 'view-head' },
+      h('div', { class: 'vh-badge ach-badge' }, '📋'),
+      h('div', { class: 'vh-text' }, h('h1', {}, 'À finir'),
+        h('p', { class: 'muted' }, games.length ? `${plural(games.length, 'jeu commencé ou ajouté', 'jeux commencés ou ajoutés')} · temps restant d’après HowLongToBeat` : 'Les jeux que tu as commencés apparaissent ici.')),
+      h('div', { class: 'bl-chips' }, chips));
+    if (!games.length) {
+      return h('div', {}, head, h('div', { class: 'empty' }, h('h2', {}, 'Rien à finir pour l’instant'),
+        h('p', {}, 'Joue au moins 30 minutes à un jeu, ou ouvre le menu d’un jeu et choisis « Ajouter à « À finir » ».')));
+    }
+    const list = h('div', { class: 'bl-list' }, shown.map(({ g, v, left, pct }) => {
+      const sys = sysById(g.system);
+      const el = focusable(h('div', { class: 'bl-row' },
+        h('div', { class: 'bl-cover' }, g.cover ? h('img', { src: api.mediaUrl(g.cover), alt: '', loading: 'lazy' }) : fallbackArt(g.name, sys && sys.color, sys && sys.short)),
+        h('div', { class: 'bl-text' },
+          h('b', {}, g.name),
+          h('span', { class: 'muted small' }, [sys && sys.name, playtimeOf(g) ? formatTime(playtimeOf(g)) + ' joué' : 'pas encore commencé'].filter(Boolean).join(' · ')),
+          pct != null ? h('div', { class: 'bl-bar' }, h('i', { style: `width:${Math.max(3, pct)}%` })) : null),
+        h('div', { class: 'bl-left' },
+          left != null ? h('b', {}, '≈ ' + hh(left)) : h('b', { class: 'muted' }, hltbMem.has(g.path) ? '?' : '…'),
+          h('span', { class: 'muted small' }, left != null ? 'restantes' : hltbMem.has(g.path) ? 'durée inconnue' : 'recherche'))), {
+        a: () => launch(g),
+        focus: () => { setTitle(g.name, v && v.main ? `Histoire ≈ ${hh(v.main)}${pct != null ? ` · ${pct} % fait` : ''}` : ''); setHints('game'); },
+      });
+      el._game = g;
+      return el;
+    }));
+    return h('div', {}, head,
+      shown.length ? list : h('div', { class: 'empty' }, h('h2', {}, 'Rien d’assez court'), h('p', {}, 'Aucun jeu ne se finit dans ce temps. Choisis une durée plus longue.')),
+      h('p', { class: 'muted small bl-foot' }, 'Menu d’un jeu → « Marquer comme fini » pour le retirer de la liste.'));
+  }
+
   function viewStats() {
     const games = S.lib.systems.filter((x) => !x.apps).flatMap((x) => x.games);
     const played = games.map((g) => ({ g, t: playtimeOf(g) })).filter((x) => x.t > 0).sort((a, b) => b.t - a.t);
@@ -3917,6 +4029,7 @@
     const head = h('div', { class: 'view-head' },
       h('div', { class: 'vh-badge ach-badge' }, '📊'),
       h('div', { class: 'vh-text' }, h('h1', {}, 'Statistiques'), h('p', { class: 'muted' }, 'Temps compté par Lumen et lu dans Steam')),
+      focusable(h('div', { class: 'chip' }, '📋 À finir'), { a: () => go({ view: 'backlog' }), focus: () => setHints('action') }),
       focusable(h('div', { class: 'chip' }, '🏆 Succès'), { a: () => go({ view: 'achievements' }), focus: () => setHints('action') }));
     const tile = (big, label) => h('div', { class: 'st-tile' }, h('b', {}, big), h('span', {}, label));
     const tiles = h('div', { class: 'st-tiles' },
