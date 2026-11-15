@@ -79,6 +79,15 @@ async function findGame(call, name, platformName, loose = false) {
   return items.find((it) => hasAll(it) && onPlat(it)) || items.find(hasAll) || (plat ? items.find(onPlat) : null) || null;
 }
 
+// Recherche libre (nom tapé par l'utilisateur) : les fiches iiDB trouvées, pour qu'il choisisse la bonne.
+async function searchGames(name, { fetchImpl } = {}) {
+  const call = client({ signal: new AbortController().signal, fetchImpl });
+  const q = String(name || '').trim();
+  if (!q) return [];
+  const res = await call(`/parents/search/enriched/page?q=${encodeURIComponent(q)}&skip=0&limit=20&assets_only=false&search_mode=default`);
+  return ((res && res.items) || []).map((it) => ({ id: it.id, name: it.name, platform: it.primary_platform || '', platforms: it.platform_list || '' }));
+}
+
 // Remplit `cache` ({ games, platforms, collections }) pour ce qui n'a pas encore été cherché.
 // Chaque recherche est mémorisée, même sans résultat, pour ne pas la refaire.
 // refreshOnly : ne revérifie que les jeux déjà trouvés avec l'ancienne règle (pas de nouvelles recherches).
@@ -297,4 +306,5 @@ async function gameIcons(name, { fetchImpl } = {}) {
   return out.sort((a, b) => b.likes - a.likes).slice(0, 40);
 }
 
-module.exports = { fetchIidb, applyIidb, iidbOptions, listCollections, gameIcons, fold };
+module.exports = {
+  searchGames, fetchIidb, applyIidb, iidbOptions, listCollections, gameIcons, fold };

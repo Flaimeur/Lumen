@@ -145,6 +145,8 @@
     setTimeout(() => { const v = document.getElementById('view'); if (v) new MutationObserver(() => { watch(); trackCursor(); }).observe(v, { childList: true, subtree: true }); }, 0);
   }
   window.addEventListener('resize', () => { trackCursor(); renderDock(); });
+  // Retour d'une fenêtre Windows (choix d'un fichier, d'un dossier…) ou d'une autre appli : le cadre se recale.
+  window.addEventListener('focus', () => { trackCursor(); setTimeout(trackCursor, 250); });
 
   function pressFx(el) {
     if (!el || reduceMotion) return;
@@ -437,7 +439,7 @@
   async function openArtEditor(t) {
     if (!t.options && api.artOptions) {
       toast('Recherche des images sur iiDB…', 'info', 8000);
-      t.options = await api.artOptions({ type: t.type, key: t.key, name: t.name, query: t.query, systemId: t.systemId });
+      t.options = await api.artOptions({ type: t.type, key: t.key, name: t.name, query: t.query, iidbId: t.iidbId, systemId: t.systemId });
       document.getElementById('toast').hidden = true;
     }
     const cur = t.type === 'game' ? S.byPath.get(t.key) || t.current : t.type === 'platform' ? platformArt(t.key) : (S.lib.collectionArt || {})[t.key] || {};
@@ -486,8 +488,29 @@
         a: async () => {
           const v = await openPrompt({ title: t.type === 'collection' ? 'Collection iiDB' : 'Nom à chercher sur iiDB', value: t.query || t.name,
             help: t.type === 'collection' ? 'Par exemple Mario, Sonic, Zelda, Pokémon… (nom d’une collection d’iidb.iisu.network)' : 'Le nom du jeu tel qu’il apparaît sur iiDB.' });
-          if (v === null || !v.trim()) return;
-          t.query = v.trim();
+          if (v === null || !v.trim()) return openArtEditor(t);
+          const q = v.trim();
+          // Jeu : on montre les fiches iiDB trouvées (avec leur console) pour choisir la bonne.
+          if (t.type === 'game' && api.iidbSearchGames) {
+            toast('Recherche sur iiDB…', 'info', 8000);
+            const list = await api.iidbSearchGames(q);
+            document.getElementById('toast').hidden = true;
+            if (list === null) { toast('iiDB ne répond pas', 'error'); return openArtEditor(t); }
+            if (!list.length) { toast(`Rien sur iiDB pour « ${q} »`, 'error'); return openArtEditor(t); }
+            const use = (r) => { t.query = r.name; t.iidbId = r.id; t.options = null; closeOverlay(true); openArtEditor(t); };
+            if (list.length === 1) return use(list[0]);
+            // Les fiches de la console du jeu d'abord.
+            const sys = sysById(t.systemId) || {};
+            const words = [sys.name, sys.short].filter(Boolean).map((x) => x.toLowerCase());
+            const onSys = (r) => words.some((w) => `${r.platform}, ${r.platforms}`.toLowerCase().includes(w));
+            const sorted = [...list.filter(onSys), ...list.filter((r) => !onSys(r))];
+            return openMenu(`iiDB · « ${q} »`, [
+              ...sorted.map((r) => [`${r.name}${r.platform ? ' · ' + r.platform : ''}`, () => use(r)]),
+              ['← Retour', () => openArtEditor(t)],
+            ], 'select', { subtitle: 'Choisis le bon jeu' });
+          }
+          t.query = q;
+          t.iidbId = null;
           t.options = null;
           openArtEditor(t);
         },

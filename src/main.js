@@ -488,11 +488,12 @@ ipcMain.handle('art:options', async (_e, target = {}) => {
     if (target.type === 'platform') id = plat && plat.id;
     if (target.type === 'collection' && !target.query) id = ((cache.collections || {})[target.name] || {}).id;
     // Recherche saisie par l'utilisateur : elle remplace le nom pour trouver la fiche iiDB.
-    if (target.query) id = null;
+    if (target.query) id = target.iidbId || null;
     const opts = await iidbOptions({ type: target.type, name: target.query || target.name, query: target.query, sys, id }, { fetchImpl: (u, o) => net.fetch(u, o) });
     return { ok: true, ...opts };
   } catch (err) { return { ok: false, error: err.message, cover: [], icon: [], logo: [], hero: [] }; }
 });
+ipcMain.handle('iidb:searchGames', async (_e, name) => { try { return await require('./iidb').searchGames(String(name || ''), { fetchImpl: (u, o) => net.fetch(u, o) }); } catch { return null; } });
 ipcMain.handle('iidb:collections', async () => { try { return await listCollections({ fetchImpl: (u, o) => net.fetch(u, o) }); } catch { return []; } });
 ipcMain.handle('iidb:gameIcons', async (_e, name) => { try { return await gameIcons(String(name || ''), { fetchImpl: (u, o) => net.fetch(u, o) }); } catch { return []; } });
 ipcMain.handle('dialog:image', async (_e, title) => {
