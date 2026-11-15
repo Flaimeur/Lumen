@@ -414,7 +414,8 @@
   }
 
   function artTarget(type, x) {
-    if (type === 'game') return { type, key: x.path, name: x.name, systemId: x.system, kinds: ['cover', 'icon', 'logo', 'hero'], current: x };
+    // Recherche iiDB choisie auparavant pour ce jeu (« Chercher sous un autre nom ») : gardée d'une fois sur l'autre.
+    if (type === 'game') { const q = (S.cfg.iidbSearch || {})[x.path]; return { type, key: x.path, name: x.name, systemId: x.system, kinds: ['cover', 'icon', 'logo', 'hero'], current: x, query: q && q.q, iidbId: q && q.id }; }
     if (type === 'platform') return { type, key: x.id, name: x.name, kinds: ['icon', 'logo', 'hero'], current: platformArt(x.id) };
     const name = x === '★' ? 'Favoris' : x;
     return { type, key: name, name, kinds: ['icon', 'hero'], current: (S.lib.collectionArt || {})[name] || {} };
@@ -497,7 +498,12 @@
             document.getElementById('toast').hidden = true;
             if (list === null) { toast('iiDB ne répond pas', 'error'); return openArtEditor(t); }
             if (!list.length) { toast(`Rien sur iiDB pour « ${q} »`, 'error'); return openArtEditor(t); }
-            const use = (r) => { t.query = r.name; t.iidbId = r.id; t.options = null; closeOverlay(true); openArtEditor(t); };
+            const use = (r) => {
+              t.query = r.name; t.iidbId = r.id; t.options = null;
+              (S.cfg.iidbSearch || (S.cfg.iidbSearch = {}))[t.key] = { q: r.name, id: r.id };
+              saveCfg();
+              closeOverlay(true); openArtEditor(t);
+            };
             if (list.length === 1) return use(list[0]);
             // Les fiches de la console du jeu d'abord.
             const sys = sysById(t.systemId) || {};

@@ -778,15 +778,15 @@ h1.with-icon { display: flex; align-items: center; gap: 14px; }
 .art-thumb.hero { width: 128px; }
 .art-thumb.logo img, .art-thumb.icon img { object-fit: contain; }
 .art-thumb img { width: 100%; height: 100%; object-fit: cover; }
-.art-gallery { max-width: min(1100px, 94vw); }
-.art-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 10px; }
+.art-gallery { width: min(1100px, 94vw); max-width: min(1100px, 94vw); max-height: 88vh; display: flex; flex-direction: column; }
+.art-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 10px; overflow-y: auto; min-height: 0; padding: 6px; }
 .art-grid.hero { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
 .art-pick {
-  position: relative; aspect-ratio: 1; border-radius: 16px; overflow: hidden; cursor: pointer;
+  position: relative; aspect-ratio: 1; width: 100%; height: auto; min-width: 0; border-radius: 16px; overflow: hidden; cursor: pointer;
   background: repeating-conic-gradient(rgba(255, 255, 255, 0.05) 0 25%, transparent 0 50%) 0 0 / 18px 18px;
 }
 .art-pick.hero { aspect-ratio: 3 / 1; }
-.art-pick img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.art-pick img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 .art-pick.logo img, .art-pick.icon img { object-fit: contain; padding: 8px; }
 .art-credit {
   position: absolute; left: 0; right: 0; bottom: 0; padding: 4px 8px; font-size: 11px; color: rgba(255, 255, 255, 0.85);
