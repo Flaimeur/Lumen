@@ -84,10 +84,20 @@ const STEAM_GENRES = {
   25: 'Aventure', 28: 'Simulation', 29: 'MMO', 37: 'Free-to-play',
 };
 
-// Contenu pour adultes : avertissements Steam 1 (nudité ou contenu sexuel), 3 (contenu sexuel adulte),
-// 4 (nudité ou contenu sexuel fréquents) ; étiquettes Contenu sexuel, Nudité, Hentai, NSFW.
-const ADULT_DESCRIPTORS = new Set([1, 3, 4]);
-const ADULT_TAGS = new Set([12095, 6650, 9130, 24904]);
+// Contenu pour adultes. Avertissements Steam : 1 = un peu de nudité ou de contenu sexuel (beaucoup de jeux grand
+// public : Assassin's Creed, Borderlands…), 3 = contenu sexuel réservé aux adultes, 4 = nudité ou contenu sexuel
+// fréquents. Étiquettes : 12095 Contenu à caractère sexuel, 6650 Nudité, 9130 Hentai, 24904 NSFW (classées par pertinence).
+// Règle : avertissement 3, ou étiquette Hentai / NSFW, ou contenu sexuel / nudité parmi les 6 étiquettes principales,
+// ou avertissement 4 avec contenu sexuel / nudité parmi les 12 principales.
+const TAG_SEX = 12095, TAG_NUDE = 6650, TAG_HENTAI = 9130, TAG_NSFW = 24904;
+function isAdult(descriptors = [], tags = []) {
+  const rank = (t) => { const i = tags.indexOf(t); return i < 0 ? Infinity : i; };
+  const sexual = Math.min(rank(TAG_SEX), rank(TAG_NUDE));
+  if (descriptors.includes(3)) return true;
+  if (tags.includes(TAG_HENTAI) || tags.includes(TAG_NSFW)) return true;
+  if (sexual < 6) return true;
+  return descriptors.includes(4) && sexual < 12;
+}
 
 // Métadonnées depuis le cache binaire de Steam (appcache/appinfo.vdf, versions 27 à 29) :
 // nom, type (game, dlc, tool…), genres, année, développeur, éditeur.
@@ -166,7 +176,8 @@ async function readSteamAppInfo(steamDir, wanted) {
             type: String(c.type || '').toLowerCase(),
             genres,
             tags,
-            adult: descriptors.some((d) => ADULT_DESCRIPTORS.has(d)) || tags.some((t) => ADULT_TAGS.has(t)),
+            adult: isAdult(descriptors, tags),
+            descriptors,
             year: release ? String(new Date(release * 1000).getFullYear()) : '',
             developer: who('developer') || ext.developer || '',
             publisher: who('publisher') || ext.publisher || '',
