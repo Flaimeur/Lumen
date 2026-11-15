@@ -3026,6 +3026,7 @@
         rerender();
       }, u.status === 'error' ? `Dernière erreur : ${u.error}` : 'Automatiques : Lumen vérifie toutes les heures, télécharge en arrière-plan, puis te propose de redémarrer (installation silencieuse). A : vérifier maintenant.');
     }
+    if (api.checkSystems) row('Vérifier mes consoles', '', () => openSystemsCheck(), 'Émulateur, cœur RetroArch et BIOS de chaque console qui a des jeux.');
     row('Menu en jeu', 'Bouton PS / Home', null, 'Ou Select + L1, ou Ctrl + Maj + M au clavier. Temps de jeu, batterie, capture, quitter. Visible sur les jeux en plein écran fenêtré ou sans bordure.');
     row('Quitter un jeu en cours', 'Select + Start (2 s)', null, 'Ou Ctrl + Maj + Q au clavier. Ferme l’émulateur et revient dans Lumen.');
     section('Sauvegarde');
@@ -4019,6 +4020,34 @@
       h('p', { class: 'muted small bl-foot' }, 'Menu d’un jeu → « Marquer comme fini » pour le retirer de la liste.'));
   }
 
+  // ---------- Vérification des consoles (émulateur, cœur RetroArch, BIOS) ----------
+  async function openSystemsCheck() {
+    const ids = S.lib.systems.filter((s) => !s.pc && !s.apps && s.games.some((g) => g.source !== 'romm' || g.downloaded)).map((s) => s.id);
+    const res = await api.checkSystems(ids);
+    if (!Array.isArray(res)) { toast((res && res.error) || 'Vérification impossible', 'error'); return; }
+    const bad = res.filter((r) => r.issues.length);
+    const rows = [...bad, ...res.filter((r) => !r.issues.length)].map((r) => {
+      const sys = sysById(r.id) || {};
+      const sev = !r.ok ? 'bad' : r.issues.length ? 'warn' : 'good';
+      return focusable(h('div', { class: 'chk-row ' + sev },
+        h('div', { class: 'vh-badge chk-badge', '--c': sys.color || '#475569' }, sys.short || r.name.slice(0, 3)),
+        h('div', { class: 'chk-text' },
+          h('b', {}, r.name),
+          r.issues.length
+            ? r.issues.map((i) => h('span', { class: 'small chk-issue' + (i.kind === 'bios' && !i.required ? ' soft' : '') }, (i.kind === 'bios' && !i.required ? '○ ' : '✕ ') + i.text + (i.help ? ' — ' + i.help : '')))
+            : h('span', { class: 'muted small' }, '✓ ' + (r.okList.join(' · ') || 'Prêt'))),
+        h('span', { class: 'chk-state' }, sev === 'good' ? '✓' : sev === 'warn' ? '!' : '✕')), {
+        a: () => { if (r.issues.some((i) => i.fix)) { closeOverlay(true); openTab('settings'); } },
+        focus: () => setHints('action'),
+      });
+    });
+    openOverlay(h('div', { class: 'modal chk-modal' },
+      h('div', { class: 'eyebrow' }, 'Vérification'),
+      h('h2', {}, bad.length ? `${plural(bad.length, 'console à régler', 'consoles à régler')}` : 'Toutes tes consoles sont prêtes'),
+      h('p', { class: 'muted small' }, 'Lumen ne fournit ni BIOS ni jeux : récupère-les depuis tes propres consoles.'),
+      h('div', { class: 'chk-list' }, rows.length ? rows : h('p', { class: 'muted' }, 'Aucune console avec des jeux.'))));
+  }
+
   function viewStats() {
     const games = S.lib.systems.filter((x) => !x.apps).flatMap((x) => x.games);
     const played = games.map((g) => ({ g, t: playtimeOf(g) })).filter((x) => x.t > 0).sort((a, b) => b.t - a.t);
@@ -4672,6 +4701,7 @@
     try { res = await api.launch(g); } catch (err) { res = { ok: false, error: err.message }; }
     S.launching = false;
     if (!res.ok) { fx.close(); toast(res.error, 'error', 6000); return; }
+    if (res.warn) toast('⚠ ' + res.warn, 'error', 8000);
     armCapture(g);
     S.cfg.recent = [g.path, ...S.cfg.recent.filter((p) => p !== g.path)].slice(0, 30);
     S.cfg.lastPlayed = S.cfg.lastPlayed || {};

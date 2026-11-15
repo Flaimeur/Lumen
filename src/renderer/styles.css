@@ -1431,3 +1431,16 @@ body.evening::before { content: ""; position: fixed; inset: 0; z-index: 9998; po
 .bl-left { display: flex; flex-direction: column; align-items: flex-end; text-align: right; min-width: 92px; }
 .bl-left b { font-size: 18px; font-variant-numeric: tabular-nums; }
 .bl-foot { margin-top: 18px; }
+
+/* ---------- Vérification des consoles ---------- */
+.chk-modal { width: min(760px, 92vw); max-height: 84vh; display: flex; flex-direction: column; }
+.chk-list { display: flex; flex-direction: column; gap: 8px; overflow: auto; padding: 4px; margin-top: 8px; }
+.chk-row { display: flex; align-items: center; gap: 14px; padding: 10px 14px 10px 10px; border-radius: 14px; background: rgba(255,255,255,.045); }
+.chk-badge { width: 46px; height: 46px; font-size: 12px; flex: none; }
+.chk-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.chk-issue { color: #fca5a5; }
+.chk-issue.soft { color: #fcd34d; }
+.chk-state { font-weight: 800; font-size: 18px; width: 22px; text-align: center; }
+.chk-row.good .chk-state { color: #4ade80; }
+.chk-row.warn .chk-state { color: #fcd34d; }
+.chk-row.bad .chk-state { color: #f87171; }

@@ -1107,6 +1107,14 @@ ipcMain.handle('app:fullscreen', () => {
 
 ipcMain.handle('game:quit', () => { ingame.hide(); return quitCurrentGame(); });
 // Menu en jeu : affiché seulement pendant une partie lancée par Lumen.
+// Vérification des consoles qui ont des jeux (ids envoyés par le rendu).
+ipcMain.handle('systems:check', (_e, ids) => {
+  const cfg = loadConfig();
+  const all = [...SYSTEMS, ...customSystems(cfg)];
+  const list = (Array.isArray(ids) ? ids : []).map((id) => all.find((s) => s.id === id)).filter(Boolean)
+    .map((s) => ({ ...s, command: cfg.commands[s.id] || s.command }));
+  try { return require('./biocheck').check(list, cfg.emulators, cfg.romsRoot); } catch (err) { return { error: err.message }; }
+});
 ipcMain.handle('ingame:show', (_e, data) => { if (currentGame) ingame.show(data || {}); return !!currentGame; });
 ipcMain.handle('ingame:update', (_e, data) => { ingame.update(data || {}); return true; });
 ipcMain.handle('ingame:hide', () => { ingame.hide(); return true; });
@@ -1216,6 +1224,15 @@ ipcMain.handle('game:launch', async (_e, game) => {
   if (/[\\/]/.test(cmd.exe) && !fs.existsSync(cmd.exe)) {
     return { ok: false, error: `Émulateur introuvable : ${cmd.exe}` };
   }
+  // Vérification avant de lancer : cœur RetroArch absent = refus clair ; BIOS absent = avertissement.
+  let warn = '';
+  try {
+    const [r] = require('./biocheck').check([{ ...sys, command: template }], cfg.emulators, cfg.romsRoot);
+    const core = r && r.issues.find((i) => i.kind === 'core');
+    if (core) return { ok: false, error: `${core.text}. ${core.help}` };
+    const bios = r && r.issues.find((i) => i.kind === 'bios' && i.required);
+    if (bios) warn = `${bios.text} : le jeu risque de ne pas démarrer (Réglages → Vérifier mes consoles).`;
+  } catch { /* vérification facultative */ }
 
   return new Promise((resolve) => {
     const started = Date.now();
@@ -1234,6 +1251,7 @@ ipcMain.handle('game:launch', async (_e, game) => {
       currentGame = { child, path: game.path };
       if (!sys.pc) startRaWatch(path.parse(game.path).name);
       globalShortcut.register(QUIT_SHORTCUT, quitCurrentGame);
+      if (warn) { resolve({ ok: true, warn }); warn = null; }
       try { globalShortcut.register(MENU_SHORTCUT, () => { if (win && !win.isDestroyed()) win.webContents.send('ingame:toggle'); }); } catch { /* raccourci pris */ }
       resolve({ ok: true });
     });
