@@ -3025,6 +3025,7 @@
         rerender();
       }, u.status === 'error' ? `Dernière erreur : ${u.error}` : 'Automatiques : Lumen vérifie toutes les heures, télécharge en arrière-plan, puis te propose de redémarrer (installation silencieuse). A : vérifier maintenant.');
     }
+    row('Menu en jeu', 'Bouton PS / Home', null, 'Ou Select + L1, ou Ctrl + Maj + M au clavier. Temps de jeu, batterie, capture, quitter. Visible sur les jeux en plein écran fenêtré ou sans bordure.');
     row('Quitter un jeu en cours', 'Select + Start (2 s)', null, 'Ou Ctrl + Maj + Q au clavier. Ferme l’émulateur et revient dans Lumen.');
     section('Sauvegarde');
     row('Sauvegarder ma configuration', 'Exporter…', async () => {
@@ -4457,12 +4458,80 @@
 
   // Pendant une partie, Lumen reste ouvert derrière l'émulateur et surveille Select + Start.
   let gameWatch = 0;
+  // ---------- Menu en jeu (bouton PS / Home, Select + L1, Ctrl+Maj+M) ----------
+  // Le panneau est une fenêtre par-dessus le jeu ; on la pilote d'ici avec la manette.
+  const IG = { open: false, sel: 0, prev: {}, game: null, started: 0 };
+  function igItems() {
+    return [
+      { id: 'resume', label: 'Reprendre', icon: '▶' },
+      api.capture ? { id: 'capture', label: 'Capture d’écran', icon: '📸' } : null,
+      { id: 'quit', label: 'Quitter le jeu', icon: '⏻', danger: true },
+    ].filter(Boolean);
+  }
+  function igData() {
+    const g = IG.game || {};
+    const mins = Math.max(0, Math.round((Date.now() - IG.started) / 60000));
+    const session = mins < 60 ? `${mins} min` : `${Math.floor(mins / 60)} h ${String(mins % 60).padStart(2, '0')}`;
+    const total = (S.cfg.playtime || {})[g.path] || 0;
+    const facts = [
+      { text: '🕒 ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) },
+      { text: 'Session · ' + session },
+    ];
+    if (total > 600) facts.push({ text: 'Total · ' + Math.round((total + (Date.now() - IG.started) / 1000) / 3600) + ' h' });
+    for (const b of Object.values(S.padBattery || {})) facts.push({ text: `🎮 ${b.charging ? '⚡ ' : ''}${b.level} %`, low: !b.charging && b.level <= 20 });
+    const sys = sysById(g.system) || {};
+    return { name: g.name || 'Jeu', system: sys.name || '', cover: g.cover ? api.mediaUrl(g.cover) : '', accent: S.accentNow || S.cfg.accent, facts, items: igItems(), sel: IG.sel };
+  }
+  function igOpen() {
+    if (!api.ingame || !S.inGame || IG.open) return;
+    IG.open = true; IG.sel = 0;
+    api.ingame.show(igData());
+  }
+  function igClose() {
+    if (!IG.open) return;
+    IG.open = false;
+    api.ingame.hide();
+  }
+  async function igChoose() {
+    const it = igItems()[IG.sel];
+    if (!it) return;
+    igClose();
+    if (it.id === 'capture') { await wait(350); api.capture.take(); }
+    if (it.id === 'quit') api.quitGame && api.quitGame();
+  }
+  // Appelé toutes les 50 ms pendant une partie : fronts montants des boutons.
+  function igPoll(pads) {
+    const now = {};
+    for (const p of pads) p.buttons.forEach((b, i) => { if (b && b.pressed) now[i] = true; });
+    for (const p of pads) {
+      const y = p.axes && p.axes[1];
+      if (y < -0.6) now.up = true;
+      if (y > 0.6) now.down = true;
+    }
+    const hit = (k) => now[k] && !IG.prev[k];
+    const comboMenu = (now[8] && hit(4)) || (now[4] && hit(8));
+    if (!IG.open) {
+      if (hit(16) || comboMenu) igOpen();
+    } else {
+      const n = igItems().length;
+      if (hit(12) || hit('up')) { IG.sel = (IG.sel + n - 1) % n; api.ingame.update(igData()); }
+      else if (hit(13) || hit('down')) { IG.sel = (IG.sel + 1) % n; api.ingame.update(igData()); }
+      else if (hit(0)) igChoose();
+      else if (hit(1) || hit(16) || comboMenu) igClose();
+    }
+    IG.prev = now;
+  }
+  if (api.ingame) api.ingame.onToggle(() => { if (IG.open) igClose(); else igOpen(); });
+
   function watchQuitCombo() {
     clearInterval(gameWatch);
     let heldSince = 0;
+    let tick = 0;
     gameWatch = setInterval(() => {
-      if (!S.inGame) { clearInterval(gameWatch); return; }
+      if (!S.inGame) { clearInterval(gameWatch); igClose(); return; }
       const pads = Input.getPads();
+      igPoll(pads);
+      if (IG.open) { heldSince = 0; if (++tick % 20 === 0) api.ingame.update(igData()); return; }
       const combo = pads.some((p) => p.buttons[8] && p.buttons[9] && p.buttons[8].pressed && p.buttons[9].pressed);
       if (!combo) { heldSince = 0; return; }
       if (!heldSince) heldSince = performance.now();
@@ -4470,7 +4539,7 @@
         heldSince = Infinity;
         api.quitGame && api.quitGame();
       }
-    }, 100);
+    }, 50);
   }
 
   async function launch(g) {
@@ -4498,6 +4567,7 @@
     if (!fp[g.path]) fp[g.path] = Date.now();
     saveCfg();
     S.launchFx = fx;
+    IG.game = g; IG.started = Date.now(); IG.open = false;
     const prof = profileOf(g);
     if (prof && prof.enabled) { startMapper(prof); toast('🎮 Profil manette → clavier actif (Select + Start pour le couper)', 'info', 4000); }
     // Pas d'événement de fin pour un jeu PC ouvert par Windows : on referme l'écran après un moment.

@@ -27,6 +27,8 @@ app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 
 const MEDIA_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.mp4', '.webm', '.mkv', '.mp3', '.ogg', '.opus', '.wav', '.m4a', '.flac']);
 const QUIT_SHORTCUT = 'CommandOrControl+Shift+Q';
+const MENU_SHORTCUT = 'CommandOrControl+Shift+M';
+const ingame = require('./ingame');
 let win = null;
 let currentGame = null; // { child, path }
 
@@ -387,6 +389,8 @@ function onGameEnded(gamePath, code, started) {
   setTimeout(() => backupSaves('après une partie'), 3000);
   stopRaWatch();
   globalShortcut.unregister(QUIT_SHORTCUT);
+  try { globalShortcut.unregister(MENU_SHORTCUT); } catch { /* pas enregistré */ }
+  ingame.hide();
   if (!win) return;
   if (win.isMinimized()) win.restore();
   win.show();
@@ -1101,7 +1105,11 @@ ipcMain.handle('app:fullscreen', () => {
   return win.isFullScreen();
 });
 
-ipcMain.handle('game:quit', () => quitCurrentGame());
+ipcMain.handle('game:quit', () => { ingame.hide(); return quitCurrentGame(); });
+// Menu en jeu : affiché seulement pendant une partie lancée par Lumen.
+ipcMain.handle('ingame:show', (_e, data) => { if (currentGame) ingame.show(data || {}); return !!currentGame; });
+ipcMain.handle('ingame:update', (_e, data) => { ingame.update(data || {}); return true; });
+ipcMain.handle('ingame:hide', () => { ingame.hide(); return true; });
 
 // ---------- RomM ----------
 ipcMain.handle('romm:status', () => {
@@ -1226,6 +1234,7 @@ ipcMain.handle('game:launch', async (_e, game) => {
       currentGame = { child, path: game.path };
       if (!sys.pc) startRaWatch(path.parse(game.path).name);
       globalShortcut.register(QUIT_SHORTCUT, quitCurrentGame);
+      try { globalShortcut.register(MENU_SHORTCUT, () => { if (win && !win.isDestroyed()) win.webContents.send('ingame:toggle'); }); } catch { /* raccourci pris */ }
       resolve({ ok: true });
     });
     child.once('exit', (code) => onGameEnded(game.path, code, started));

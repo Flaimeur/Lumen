@@ -84,6 +84,12 @@ contextBridge.exposeInMainWorld('lumen', {
   },
   launch: (game) => ipcRenderer.invoke('game:launch', { path: game.path, system: game.system }),
   quitGame: () => ipcRenderer.invoke('game:quit'),
+  ingame: {
+    show: (data) => ipcRenderer.invoke('ingame:show', data),
+    update: (data) => ipcRenderer.invoke('ingame:update', data),
+    hide: () => ipcRenderer.invoke('ingame:hide'),
+    onToggle: (cb) => ipcRenderer.on('ingame:toggle', () => cb()),
+  },
   pickFolder: (title, defaultPath) => ipcRenderer.invoke('dialog:folder', title, defaultPath),
   pickFile: (title, defaultPath) => ipcRenderer.invoke('dialog:file', title, defaultPath),
   pickAudio: (title) => ipcRenderer.invoke('dialog:audio', title),
