@@ -658,6 +658,25 @@
     return code.replace(/^Key|^Digit/, '');
   }
 
+  // Touches clavier « onglet précédent / suivant » (par défaut la position de Q et E : A et E en AZERTY).
+  const tabKeys = () => ({ lb: (S.cfg && S.cfg.tabKeys && S.cfg.tabKeys.lb) || 'KeyQ', rb: (S.cfg && S.cfg.tabKeys && S.cfg.tabKeys.rb) || 'KeyE' });
+  const tabKeyLabel = (which) => keyLabel(tabKeys()[which]);
+  function applyTabKeys() { const k = tabKeys(); Input.setTabKeys(k.lb, k.rb); }
+  if (navigator.keyboard && navigator.keyboard.getLayoutMap) navigator.keyboard.getLayoutMap().then(() => { if (S.cfg) renderDock(); }).catch(() => {});
+  function pickTabKey(which) {
+    openOverlay(h('div', { class: 'modal update-modal' }, h('h2', {}, which === 'lb' ? 'Onglet précédent' : 'Onglet suivant'),
+      h('p', { class: 'muted' }, 'Appuie sur la touche à utiliser (Échap pour annuler).')));
+    Input.captureNext = async (code) => {
+      closeOverlay(true);
+      const c = S.cfg.tabKeys || (S.cfg.tabKeys = {});
+      c[which] = code;
+      applyTabKeys();
+      await saveCfg();
+      renderDock(); rerender();
+      toast(`${which === 'lb' ? 'Onglet précédent' : 'Onglet suivant'} : ${keyLabel(code)}`);
+    };
+  }
+
   const profileOf = (g) => (S.cfg.padProfiles || {})[g.path] || null;
   async function saveProfile(g, p) {
     (S.cfg.padProfiles || (S.cfg.padProfiles = {}))[g.path] = p;
@@ -959,7 +978,7 @@
   }
   function hint(btn, label) {
     const kb = Input.lastDevice === 'keyboard';
-    if (kb) return h('div', { class: 'hint', onClick: () => Input.emit(btn) }, h('span', { class: 'glyph kb' }, KB_GLYPH[btn]), label);
+    if (kb) return h('div', { class: 'hint', onClick: () => Input.emit(btn) }, h('span', { class: 'glyph kb' }, btn === 'lb' || btn === 'rb' ? tabKeyLabel(btn) : KB_GLYPH[btn]), label);
     const g = padGlyph(btn);
     return h('div', { class: 'hint', onClick: () => Input.emit(btn) }, h('span', { class: `glyph pad-${g.physical} fam-${g.fam}` }, g.text), label);
   }
@@ -988,8 +1007,8 @@
     }
     const kb = Input.lastDevice === 'keyboard';
     const bumpers = dock.querySelectorAll('.dock-bumper');
-    bumpers[0].textContent = kb ? 'Q' : 'LB';
-    bumpers[1].textContent = kb ? 'E' : 'RB';
+    bumpers[0].textContent = kb ? tabKeyLabel('lb') : 'LB';
+    bumpers[1].textContent = kb ? tabKeyLabel('rb') : 'RB';
     const active = tabOf(S.route);
     let activeEl = null;
     for (const it of dock.querySelectorAll('.dock-item')) {
@@ -2934,6 +2953,8 @@
     }
     row('Tester la manette', 'Ouvrir', () => openPadTest(), 'Affiche en direct ce que Lumen reçoit : boutons pressés et sticks. Appuie d’abord sur un bouton, Windows ne montre la manette qu’après.');
     section('Boutons');
+    row('Clavier : onglet précédent', tabKeyLabel('lb'), () => pickTabKey('lb'), 'Touche pour passer à l’onglet de gauche.');
+    row('Clavier : onglet suivant', tabKeyLabel('rb'), () => pickTabKey('rb'), 'Touche pour passer à l’onglet de droite.');
     row('Inverser A/B et X/Y', toggle(c.swapAB), () => { c.swapAB = !c.swapAB; Input.swapAB = c.swapAB; saveCfg(); rerender(); }, 'Pour toutes les manettes.');
     row('Manette Switch : valider avec A', toggle(c.nintendoConfirm !== false), () => {
       c.nintendoConfirm = c.nintendoConfirm === false; Input.nintendoConfirm = c.nintendoConfirm; saveCfg(); rerender();
@@ -5038,6 +5059,7 @@
     S.accentNow = S.cfg.accent;
     document.documentElement.style.setProperty('--accent', S.cfg.accent);
     Input.swapAB = !!S.cfg.swapAB;
+    applyTabKeys();
     Input.nintendoConfirm = S.cfg.nintendoConfirm !== false;
   }
 

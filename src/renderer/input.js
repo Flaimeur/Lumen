@@ -28,10 +28,19 @@
   const KEYS = {
     ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
     Enter: 'a', ' ': 'a', Escape: 'b', Backspace: 'b',
-    f: 'x', i: 'y', q: 'lb', e: 'rb', Tab: 'menu', // M est réservée au son (couper / remettre)
+    f: 'x', i: 'y', Tab: 'menu', // M est réservée au son (couper / remettre)
     PageUp: 'lt', PageDown: 'rt', '/': 'search',
   };
+  // Onglet précédent / suivant : touches choisies par POSITION (KeyQ = « A » sur un clavier AZERTY), réglables.
+  Input.codeBinds = { KeyQ: 'lb', KeyE: 'rb' };
+  Input.setTabKeys = (lb, rb) => { Input.codeBinds = {}; if (lb) Input.codeBinds[lb] = 'lb'; if (rb) Input.codeBinds[rb] = 'rb'; };
+  Input.captureNext = null; // fonction appelée avec le code de la prochaine touche (réglage des touches)
   window.addEventListener('keydown', (ev) => {
+    if (Input.captureNext) {
+      const cb = Input.captureNext;
+      Input.captureNext = null; // Échap / Entrée : annule (la fenêtre se ferme normalement)
+      if (!['Escape', 'Enter', 'NumpadEnter'].includes(ev.code)) { ev.preventDefault(); cb(ev.code); return; }
+    }
     const t = ev.target;
     const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA');
     if (typing) {
@@ -40,7 +49,7 @@
       return;
     }
     if (ev.key === 'F11') { ev.preventDefault(); Input.emit('fullscreen'); return; }
-    const action = KEYS[ev.key.length === 1 ? ev.key.toLowerCase() : ev.key];
+    const action = Input.codeBinds[ev.code] || KEYS[ev.key.length === 1 ? ev.key.toLowerCase() : ev.key];
     if (!action) return;
     ev.preventDefault();
     setDevice('keyboard');
