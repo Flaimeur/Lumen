@@ -3883,6 +3883,10 @@
         for (const r of ra.recent) out.recent.push({ ...r, key: 'ra:' + r.raId, path: pathOf.get(r.raId) || null, source: 'RetroAchievements' });
       }
     } catch (err) { out.errors.push(err.message); }
+    // Jeux Steam retirés de la bibliothèque (masqués, NSFW cachés, autre compte) : leurs succès ne s'affichent pas.
+    const visible = (x) => !/^steam:/.test(x.path || '') || S.byPath.has(x.path);
+    out.games = out.games.filter(visible);
+    out.recent = out.recent.filter(visible);
     out.recent.sort((a, b) => b.time - a.time);
     for (const x of out.games) if (x.path) out.byPath.set(x.path, x);
     out.byKey = new Map(out.games.map((x) => [x.key, x]));
