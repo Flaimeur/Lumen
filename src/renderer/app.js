@@ -4477,7 +4477,14 @@
     const prof = profileOf(g);
     if (prof && prof.enabled) { startMapper(prof); toast('🎮 Profil manette → clavier actif (Select + Start pour le couper)', 'info', 4000); }
     // Pas d'événement de fin pour un jeu PC ouvert par Windows : on referme l'écran après un moment.
-    if (res.detached) { setTimeout(() => { if (S.launchFx === fx) { fx.close(); S.launchFx = null; } }, 3000); return; }
+    // L'accueil est redessiné pour que le jeu apparaisse dans « Joués récemment » (lancé depuis la roulette, un menu…).
+    if (res.detached) {
+      setTimeout(() => {
+        if (S.launchFx === fx) { fx.close(); S.launchFx = null; }
+        if (!S.overlay && S.route.view === 'home') { S.keepAnim = true; rerender(); }
+      }, 3000);
+      return;
+    }
     S.inGame = true;
     updateMusic();
     Input.paused = true;

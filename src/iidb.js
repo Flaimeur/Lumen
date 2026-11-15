@@ -62,7 +62,9 @@ async function findPlatform(call, sys) {
 }
 
 // Jeu → fiche iiDB : nom identique (sans ponctuation), de préférence sur la bonne plateforme.
-async function findGame(call, name, platformName) {
+// loose (nom tapé à la main) : accepte aussi une fiche qui contient tous les mots cherchés
+// (« tears of the kingdom » → « The Legend of Zelda: Tears of the Kingdom »), puis le 1er résultat sur la bonne console.
+async function findGame(call, name, platformName, loose = false) {
   const q = String(name || '').replace(/\s*[([].*?[)\]]\s*/g, ' ').trim();
   if (!q) return null;
   const res = await call(`/parents/search/enriched/page?q=${encodeURIComponent(q)}&skip=0&limit=10&assets_only=false&search_mode=default`);
@@ -70,9 +72,11 @@ async function findGame(call, name, platformName) {
   const want = fold(q);
   const plat = fold(platformName);
   const onPlat = (it) => !plat || fold(`${it.primary_platform}, ${it.platform_list}`).includes(plat);
-  return items.find((it) => fold(it.name) === want && onPlat(it))
-    || items.find((it) => fold(it.name) === want)
-    || null;
+  const exact = items.find((it) => fold(it.name) === want && onPlat(it)) || items.find((it) => fold(it.name) === want);
+  if (exact || !loose) return exact || null;
+  const words = want.split(' ').filter(Boolean);
+  const hasAll = (it) => { const n = new Set(fold(it.name).split(' ')); return words.every((w) => n.has(w)); };
+  return items.find((it) => hasAll(it) && onPlat(it)) || items.find(hasAll) || (plat ? items.find(onPlat) : null) || null;
 }
 
 // Remplit `cache` ({ games, platforms, collections }) pour ce qui n'a pas encore été cherché.
@@ -211,7 +215,7 @@ async function iidbOptions(target, { signal, fetchImpl } = {}) {
   let query = '';
   if (target.type === 'game') {
     let id = target.id;
-    if (!id) { const hit = await findGame(call, target.name, target.sys && target.sys.pc ? 'PC' : (target.sys && target.sys.iidbName) || ''); id = hit && hit.id; }
+    if (!id) { const hit = await findGame(call, target.name, target.sys && target.sys.pc ? 'PC' : (target.sys && target.sys.iidbName) || '', !!target.query); id = hit && hit.id; }
     if (id) query = `parent_id=${id}`;
   } else if (target.type === 'platform') {
     let id = target.id;
