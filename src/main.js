@@ -81,7 +81,7 @@ function scanPlatformArt(dir) {
     for (const f of files) {
       if (!['.png', '.jpg', '.jpeg', '.webp'].includes(path.extname(f).toLowerCase())) continue;
       const stem = path.parse(f).name.toLowerCase();
-      const store = /^(pc-)?(steam|epic|gog|itch)$/.exec(stem);
+      const store = /^(pc-)?(steam|epic|gog|itch|ea|ubisoft|battlenet|amazon|xbox)$/.exec(stem);
       const sys = store ? null : SYSTEMS.find((s) => s.id === stem) || findSystem(stem);
       const id = store ? `pc-${store[2]}` : sys && sys.id;
       if (!id) continue;
@@ -141,6 +141,14 @@ ipcMain.handle('store:open', async (_e, store, mode) => {
       spawn(setup, ['--prefer-launch', '--appname', 'itch'], { detached: true, stdio: 'ignore' }).unref();
       return { ok: true };
     }
+    // EA app, Ubisoft Connect, Battle.net, Amazon Games, Xbox.
+    const more = require('./morestores').launcherCommand(store);
+    if (more) {
+      if (more.uri) await shell.openExternal(more.uri);
+      else spawn(more.exe, more.args || [], { detached: true, stdio: 'ignore' }).unref();
+      return { ok: true };
+    }
+    if (['ea', 'ubisoft', 'battlenet', 'amazon', 'xbox'].includes(store)) return { ok: false, error: 'Launcher introuvable sur ce PC.' };
     return { ok: false, error: 'Launcher inconnu' };
   } catch (err) { return { ok: false, error: `Impossible d'ouvrir le launcher : ${err.message}` }; }
 });
@@ -149,7 +157,7 @@ ipcMain.handle('store:open', async (_e, store, mode) => {
 //  itch : dossier du jeu mis à la Corbeille (récupérable). Epic : pas de commande publique, on ouvre la bibliothèque.
 ipcMain.handle('pc:uninstall', async (_e, id) => {
   id = String(id || '');
-  if (!/^(steam|epic|gog|itch):/.test(id)) return { ok: false, error: 'Jeu PC inconnu.' };
+  if (!/^(steam|epic|gog|itch|ea|ubisoft|battlenet|amazon|xbox):/.test(id)) return { ok: false, error: 'Jeu PC inconnu.' };
   try {
     if (!pcLaunchers.has(id)) pcLaunchers = (await scanPc(loadConfig())).launchers;
     const l = pcLaunchers.get(id);
@@ -173,6 +181,14 @@ ipcMain.handle('pc:uninstall', async (_e, id) => {
       pcLaunchers.delete(id);
       return { ok: true, how: 'itch' };
     }
+    // Xbox : la page Applications de Windows. Les autres : le désinstalleur déclaré à Windows.
+    if (store === 'xbox') { await shell.openExternal('ms-settings:appsfeatures'); return { ok: true, how: 'xbox' }; }
+    if (l.uninstall) {
+      spawn(l.uninstall, [], { shell: true, detached: true, stdio: 'ignore', windowsHide: false }).unref();
+      return { ok: true, how: store };
+    }
+    const lc = require('./morestores').launcherCommand(store);
+    if (lc) { if (lc.uri) await shell.openExternal(lc.uri); else spawn(lc.exe, lc.args || [], { detached: true, stdio: 'ignore' }).unref(); return { ok: true, how: 'launcher' }; }
   } catch (err) { return { ok: false, error: `Impossible de désinstaller : ${err.message}` }; }
   return { ok: false, error: 'Launcher inconnu.' };
 });
@@ -1162,7 +1178,7 @@ ipcMain.handle('game:launch', async (_e, game) => {
   }
 
   // Jeux PC (Steam, Epic, GOG) : lancés par leur launcher, à partir de nos propres données de scan.
-  if (/^(steam|epic|gog|itch):/.test(String(game?.path))) {
+  if (/^(steam|epic|gog|itch|ea|ubisoft|battlenet|amazon|xbox):/.test(String(game?.path))) {
     if (!pcLaunchers.has(game.path)) pcLaunchers = (await scanPc(cfg)).launchers;
     const l = pcLaunchers.get(game.path);
     if (!l) return { ok: false, error: 'Jeu PC introuvable : il a peut-être été désinstallé.' };

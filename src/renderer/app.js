@@ -2320,7 +2320,7 @@
   }
 
   // Fabricant et année d'une console (fiches de systems.js ; les launchers PC ont les leurs).
-  const PC_META = { 'pc-steam': ['Valve', 2003], 'pc-epic': ['Epic Games', 2018], 'pc-gog': ['CD Projekt', 2008], 'pc-itch': ['itch.io', 2013] };
+  const PC_META = { 'pc-steam': ['Valve', 2003], 'pc-epic': ['Epic Games', 2018], 'pc-gog': ['CD Projekt', 2008], 'pc-itch': ['itch.io', 2013], 'pc-ea': ['Electronic Arts', 2022], 'pc-ubisoft': ['Ubisoft', 2020], 'pc-battlenet': ['Blizzard', 1996], 'pc-amazon': ['Amazon', 2020], 'pc-xbox': ['Microsoft', 2019] };
   function sysMetaOf(s) {
     const d = (S.defs || []).find((x) => x.id === s.id);
     if (d && d.maker) return { maker: d.maker, year: d.year };
@@ -2414,8 +2414,8 @@
   }
 
   // Boutons pour ouvrir le launcher depuis sa page (Steam, Epic, GOG, itch).
-  const STORE_NAMES = { steam: 'Steam', epic: 'Epic Games', gog: 'GOG Galaxy', itch: 'itch' };
-  const storeOf = (s) => { const m = /^pc-(steam|epic|gog|itch)$/.exec((s && s.id) || ''); return m ? m[1] : null; };
+  const STORE_NAMES = { steam: 'Steam', epic: 'Epic Games', gog: 'GOG Galaxy', itch: 'itch', ea: 'EA app', ubisoft: 'Ubisoft Connect', battlenet: 'Battle.net', amazon: 'Amazon Games', xbox: 'Xbox' };
+  const storeOf = (s) => { const m = /^pc-(steam|epic|gog|itch|ea|ubisoft|battlenet|amazon|xbox)$/.exec((s && s.id) || ''); return m ? m[1] : null; };
   async function openStore(store, mode) {
     if (!api.openStore) return;
     sfx('launchApp');
@@ -2656,7 +2656,7 @@
 
   const SET_CATS = [
     ['library', 'Bibliothèque', 'Dossiers, scan, jeux masqués'],
-    ['pc', 'Jeux PC', 'Steam, Epic, GOG, itch'],
+    ['pc', 'Jeux PC', 'Steam, Epic, GOG, itch, EA, Ubisoft…'],
     ['images', 'Images', 'iiDB, SteamGridDB, consoles'],
     ['sound', 'Son et musique', 'Volume, musique, sons'],
     ['controls', 'Manettes', 'PS4, PS5, Xbox, Switch'],
@@ -2712,7 +2712,7 @@
     cat('pc');
     section('Launchers');
     const stores = c.pcStores || (c.pcStores = { steam: true, epic: true, gog: true, itch: true, steamUninstalled: true });
-    for (const [id, label] of [['steam', 'Jeux Steam'], ['epic', 'Jeux Epic Games'], ['gog', 'Jeux GOG Galaxy'], ['itch', 'Jeux itch']]) {
+    for (const [id, label] of [['steam', 'Jeux Steam'], ['epic', 'Jeux Epic Games'], ['gog', 'Jeux GOG Galaxy'], ['itch', 'Jeux itch'], ['ea', 'Jeux EA app'], ['ubisoft', 'Jeux Ubisoft Connect'], ['battlenet', 'Jeux Battle.net'], ['amazon', 'Jeux Amazon Games'], ['xbox', 'Jeux Xbox / Game Pass']]) {
       row(label, toggle(stores[id] !== false), async () => { stores[id] = stores[id] === false; await saveCfg(); rescan(); },
         id === 'steam' ? 'Jeux installés sur ce PC, lancés via leur launcher.' : null);
       if (id === 'steam' && stores.steam !== false) {
@@ -3318,7 +3318,7 @@
       items.push([myRating(g) ? `Ma note : ${'★'.repeat(myRating(g))}` : 'Noter ce jeu', () => openRatingMenu(g, reopen), { icon: '✩', sub: true }]);
       if (g.source === 'app') items.push(...appMenuItems(g.path.slice(4)));
       else items.push(['Détails', run(() => openDetails(g)), { icon: 'ℹ' }]);
-      if (api.pcUninstall && g.source === 'pc' && g.installed !== false && /^(steam|epic|gog|itch):/.test(g.path)) items.push(['Désinstaller', run(() => uninstallPc(g)), { icon: '🗑', danger: true }]);
+      if (api.pcUninstall && g.source === 'pc' && g.installed !== false && /^(steam|epic|gog|itch|ea|ubisoft|battlenet|amazon|xbox):/.test(g.path)) items.push(['Désinstaller', run(() => uninstallPc(g)), { icon: '🗑', danger: true }]);
       if (achInfo(g) || (/^steam:/.test(g.path) && api.achievements)) items.push(['Succès', run(() => openAchievements(g)), { icon: '🏆' }]);
       if (api.capture) items.push(['Mes captures', run(async () => { const l = await api.capture.list(g.name); if (l.length) openCaptureViewer(g, l, 0); else toast('Pas encore de capture : Ctrl+Maj+S ou Select + R1 pendant le jeu'); }), { icon: '🖼' }]);
       // Tout le reste : dans « Personnaliser… ».
@@ -3451,7 +3451,8 @@
       epic: 'Epic Games ne permet pas de désinstaller depuis une autre appli : sa bibliothèque s’ouvre, clic sur « … » à côté du jeu puis « Désinstaller ».',
       gog: 'Le désinstalleur du jeu va s’ouvrir pour confirmer.',
       itch: 'Le dossier du jeu part à la Corbeille (récupérable tant qu’elle n’est pas vidée). Tes sauvegardes dans AppData ne sont pas touchées.',
-    }[store];
+      xbox: 'Windows ne laisse pas une autre appli désinstaller un jeu Xbox : la page « Applications installées » s’ouvre, cherche le jeu puis « Désinstaller ».',
+    }[store] || 'Le désinstalleur du jeu (ou son launcher) va s’ouvrir pour confirmer.';
     openOverlay(h('div', { class: 'modal update-modal' }, h('h2', {}, `Désinstaller « ${g.name} » ?`), h('p', { class: 'muted' }, help),
       h('div', { class: 'actions' },
         actionButton('Désinstaller', async () => {
@@ -3464,7 +3465,7 @@
             applyLib(await api.scan({ romm: false }));
             rerender();
             toast(`« ${g.name} » désinstallé (dans la Corbeille)`);
-          } else toast(r.how === 'epic' ? 'Bibliothèque Epic ouverte' : 'Confirme dans la fenêtre qui s’ouvre · la liste se mettra à jour au prochain scan');
+          } else toast(r.how === 'epic' ? 'Bibliothèque Epic ouverte' : r.how === 'xbox' ? 'Applications installées ouvertes' : 'Confirme dans la fenêtre qui s’ouvre · la liste se mettra à jour au prochain scan');
         }, true),
         actionButton('Annuler', () => closeOverlay()))));
   }

@@ -455,6 +455,7 @@ const STORES = {
   epic: { name: 'Epic Games', short: 'Epic', color: '#3a3a3a', scan: scanEpic },
   gog: { name: 'GOG', short: 'GOG', color: '#6b2fa6', scan: scanGog },
   itch: { name: 'itch', short: 'itch', color: '#fa5c5c', scan: scanItch },
+  ...require('./morestores').MORE_STORES,
 };
 
 // enabled : { steam, epic, gog, steamUninstalled } ; art : images SteamGridDB en cache, par id de jeu ;
