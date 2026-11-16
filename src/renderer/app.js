@@ -1942,7 +1942,9 @@
         render: () => companionBody(co),
         act: () => (main ? companionRun(co, main) : companionRun(co, { id: '__open', label: 'Ouvrir' })),
         x: co.actions[0] ? () => companionRun(co, co.actions[0]) : undefined,
-        y: co.actions[1] ? () => companionRun(co, co.actions[1]) : undefined,
+        // Y : toutes les actions (scènes de Lueur…) quand il y en a plus que les boutons du widget.
+        y: co.actions.length > 4 ? () => openMenu(co.name, co.actions.map((a) => [a.label, () => { closeOverlay(true); companionRun(co, a); }, { icon: a.icon }]), 'select', { subtitle: co.status || '' })
+          : co.actions[1] ? () => companionRun(co, co.actions[1]) : undefined,
       };
       WIDGET_ICONS[wid] = co.id === 'lueur' ? '☀' : '⚡';
     }
@@ -1963,7 +1965,8 @@
       h('div', { class: 'co-top' },
         h('div', { class: 'co-orb' }),
         h('div', { class: 'co-text' }, h('b', {}, co.name), h('div', { class: 'w-sub' }, co.status || (co.running ? 'Ouverte' : 'Fermée')))),
-      h('div', { class: 'co-actions' }, btns))];
+      h('div', { class: 'co-actions' }, btns,
+        co.actions.length > 4 ? h('button', { class: 'co-btn', title: 'Plus', 'aria-label': 'Plus d’actions', onClick: (e) => { e.stopPropagation(); WIDGETS['co-' + co.id].y(); } }, ico('★'), h('span', { class: 'co-lbl' }, 'Plus · Y')) : null))];
   }
 
   // Ajoute (ou retire) les widgets perso dans le registre commun.

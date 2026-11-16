@@ -37,8 +37,11 @@ const hex = (r, g, b) => '#' + [r, g, b].map((x) => Math.max(0, Math.min(255, Ma
 async function lueur() {
   const dir = path.join(appData(), 'Lueur');
   const settings = readJson(path.join(dir, 'settings.json'));
+  // Lueur 1.1+ écrit son état pour Lumen (state.json) : allumé, couleur, mode, scènes. Plus besoin de chercher le processus.
+  const st = readJson(path.join(dir, 'state.json'));
   let exe = await regRun('Lueur');
-  const running = await runningPath('Lueur');
+  if (st && exists(st.exe)) exe = st.exe;
+  const running = st && typeof st.running === 'boolean' ? (st.running ? (exe || 'oui') : '') : await runningPath('Lueur');
   if (!exists(exe)) exe = running;
   if (!exists(exe)) {
     const home = process.env.USERPROFILE || '';
@@ -47,18 +50,32 @@ async function lueur() {
   if (!exe && !settings) return null;
   const look = settings && settings.Look;
   const rgb = look && look.BaseRgb;
-  const color = rgb ? hex(rgb.R, rgb.G, rgb.B) : '#fbbf24';
-  const level = look ? Math.round((look.Level || 0) * 100) : null;
-  const status = look ? (look.IsWhite ? `Blanc ${look.Kelvin} K` : 'Couleur') + (level != null ? ` · ${level} %` : '') : 'Lumière de la chambre et RGB du PC';
+  let color = rgb ? hex(rgb.R, rgb.G, rgb.B) : '#fbbf24';
+  let level = look ? Math.round((look.Level || 0) * 100) : null;
+  let status = look ? (look.IsWhite ? `Blanc ${look.Kelvin} K` : 'Couleur') + (level != null ? ` · ${level} %` : '') : 'Lumière de la chambre et RGB du PC';
+  const cmds = new Set(((st && st.commands) || []).map((c) => String(c).split(' ')[0]));
+  const has = (c) => !st || !st.commands || cmds.has(c);
+  if (st) {
+    if (/^#[0-9a-f]{6}$/i.test(st.color || '')) color = st.color;
+    if (typeof st.level === 'number') level = st.level;
+    const mode = st.mode === 'screen' ? ' · mode écran' : st.mode === 'adaptive' ? ' · adaptatif' : '';
+    status = (st.on === false ? 'Éteint' : String(st.description || status).replace(/\u00B7/g, '·')) + mode;
+  }
+  const scenes = ((st && st.scenes) || ((settings && settings.Scenes) || []).map((s) => s.Name)).filter(Boolean).slice(0, 12);
+  const adaptiveOn = st ? st.mode === 'adaptive' : !!(settings && settings.AdaptiveOn);
+  const actions = [
+    { id: 'on', label: 'Allumer', args: ['--on'], icon: '☀' },
+    { id: 'off', label: 'Éteindre', args: ['--off'], icon: '🌙' },
+    { id: 'toggle', label: 'Basculer', args: ['--toggle'], icon: '⟳' },
+    { id: 'screen', label: 'Mode écran', args: ['--screen'], icon: '⛶' },
+    { id: 'warm', label: 'Soirée', args: ['--warm'], icon: '🌙' },
+  ];
+  if (has('--adaptive')) actions.push({ id: 'adaptive', label: adaptiveOn ? 'Arrêter l’adaptatif' : 'Lumière adaptative', args: ['--adaptive', adaptiveOn ? 'off' : 'on'], icon: '⚡' });
+  if (has('--scene')) for (const name of scenes) actions.push({ id: 'scene:' + name, label: 'Scène ' + name, args: ['--scene', name], icon: '★', scene: true });
+  if (has('--show')) actions.push({ id: 'show', label: 'Ouvrir Lueur', args: ['--show'], icon: '▶' });
   return {
-    id: 'lueur', name: 'Lueur', exe, running: !!running, color, status, level,
-    actions: [
-      { id: 'on', label: 'Allumer', args: ['--on'], icon: '☀' },
-      { id: 'off', label: 'Éteindre', args: ['--off'], icon: '🌙' },
-      { id: 'toggle', label: 'Basculer', args: ['--toggle'], icon: '⟳' },
-      { id: 'screen', label: 'Mode écran', args: ['--screen'], icon: '⛶' },
-      { id: 'warm', label: 'Soirée', args: ['--warm'], icon: '🌙' },
-    ],
+    id: 'lueur', name: 'Lueur', exe, running: !!running, on: st ? st.on !== false : null, color, status, level, version: st && st.version,
+    actions,
     open: [],
   };
 }
