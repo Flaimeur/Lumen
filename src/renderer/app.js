@@ -3546,7 +3546,7 @@
       steam: 'Steam va ouvrir sa fenêtre de désinstallation pour confirmer.',
       epic: 'Epic Games ne permet pas de désinstaller depuis une autre appli : sa bibliothèque s’ouvre, clic sur « … » à côté du jeu puis « Désinstaller ».',
       gog: 'Le désinstalleur du jeu va s’ouvrir pour confirmer.',
-      itch: 'Le dossier du jeu part à la Corbeille (récupérable tant qu’elle n’est pas vidée). Tes sauvegardes dans AppData ne sont pas touchées.',
+      itch: 'Le jeu est désinstallé par l’appli itch elle-même (ses fichiers sont supprimés). Tes sauvegardes dans AppData ne sont pas touchées.',
       xbox: 'Windows ne laisse pas une autre appli désinstaller un jeu Xbox : la page « Applications installées » s’ouvre, cherche le jeu puis « Désinstaller ».',
     }[store] || 'Le désinstalleur du jeu (ou son launcher) va s’ouvrir pour confirmer.';
     openOverlay(h('div', { class: 'modal update-modal' }, h('h2', {}, `Désinstaller « ${g.name} » ?`), h('p', { class: 'muted' }, help),
@@ -3560,7 +3560,7 @@
             await saveCfg();
             applyLib(await api.scan({ romm: false }));
             rerender();
-            toast(`« ${g.name} » désinstallé (dans la Corbeille)`);
+            toast(`« ${g.name} » désinstallé${r.cleaned ? ` · ${r.cleaned} ancien(s) jeu(x) itch nettoyé(s)` : ''}`);
           } else toast(r.how === 'epic' ? 'Bibliothèque Epic ouverte' : r.how === 'xbox' ? 'Applications installées ouvertes' : 'Confirme dans la fenêtre qui s’ouvre · la liste se mettra à jour au prochain scan');
         }, true),
         actionButton('Annuler', () => closeOverlay()))));

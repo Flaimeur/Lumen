@@ -175,6 +175,13 @@ ipcMain.handle('pc:uninstall', async (_e, id) => {
       return { ok: true, how: 'gog' };
     }
     if (store === 'itch') {
+      // Vraie désinstallation par butler (l'appli itch voit le jeu désinstallé) ; sinon, dossier à la Corbeille.
+      const ib = require('./itchbutler');
+      if (ib.butlerExe()) {
+        const r = await ib.uninstall(id.slice(5));
+        pcLaunchers.delete(id);
+        return { ok: true, how: 'itch', cleaned: r.cleaned };
+      }
       // Garde-fou : seulement un dossier de jeu itch (avec son reçu), rangé dans un dossier d'installation itch.
       const dir = l.dir && path.resolve(l.dir);
       const inside = dir && require('./pcstores').itchInstallDirs().some((b) => path.dirname(dir) === path.resolve(b));
