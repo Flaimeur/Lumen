@@ -35,6 +35,7 @@
   Input.codeBinds = { KeyQ: 'lb', KeyE: 'rb' };
   Input.setTabKeys = (lb, rb) => { Input.codeBinds = {}; if (lb) Input.codeBinds[lb] = 'lb'; if (rb) Input.codeBinds[rb] = 'rb'; };
   Input.captureNext = null; // fonction appelée avec le code de la prochaine touche (réglage des touches)
+  let lastTabAt = 0; // dernier changement d'onglet au clavier
   window.addEventListener('keydown', (ev) => {
     if (Input.captureNext) {
       const cb = Input.captureNext;
@@ -44,6 +45,12 @@
     const t = ev.target;
     const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA');
     if (typing) {
+      // Touche d'onglet maintenue (défilement des onglets), ou pressée juste après être arrivé dans un champ
+      // (onglet Recherche) : elle change d'onglet au lieu d'écrire une lettre.
+      const tab = Input.codeBinds[ev.code];
+      if (tab && (ev.repeat || (!t.value && performance.now() - lastTabAt < 700))) {
+        ev.preventDefault(); lastTabAt = Input.lastTabAt = performance.now(); setDevice('keyboard'); Input.emit(tab); return;
+      }
       if (ev.key === 'Enter') { ev.preventDefault(); Input.emit('a'); }
       else if (ev.key === 'Escape') { ev.preventDefault(); Input.emit('b'); }
       return;
@@ -52,6 +59,7 @@
     const action = Input.codeBinds[ev.code] || KEYS[ev.key.length === 1 ? ev.key.toLowerCase() : ev.key];
     if (!action) return;
     ev.preventDefault();
+    if (action === 'lb' || action === 'rb') lastTabAt = Input.lastTabAt = performance.now();
     setDevice('keyboard');
     Input.emit(action);
   });

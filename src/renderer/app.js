@@ -2669,7 +2669,9 @@
   // Saisie au clavier physique dans la recherche (avant les raccourcis de navigation).
   window.addEventListener('keydown', (ev) => {
     if (!S.cfg || S.overlay || S.route.view !== 'search' || ev.ctrlKey || ev.altKey) return;
-    if (!S.search && /^[qe]$/i.test(ev.key)) return; // champ vide : Q / E restent « onglet précédent / suivant »
+    // Touches d'onglet (A / E en AZERTY par défaut) : changent d'onglet si le champ est vide, si elles sont
+    // maintenues ou juste après être arrivé ici ; sinon elles écrivent normalement.
+    if (Input.codeBinds[ev.code] && (!S.search || ev.repeat || performance.now() - (Input.lastTabAt || 0) < 700)) return;
     if (ev.key === 'Backspace' || (ev.key.length === 1 && /[\p{L}\p{N} '\-&:]/u.test(ev.key))) {
       ev.preventDefault();
       ev.stopImmediatePropagation();
