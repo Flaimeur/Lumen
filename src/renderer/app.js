@@ -3392,26 +3392,28 @@
 
     if (g) {
       subtitle = (sysById(g.system) || {}).name || 'Jeu';
+      // Menu d'un jeu rangé en groupes : Jouer, puis Infos, Ma collection, et Gérer (Désinstaller tout en bas).
+      const info = [], coll = [], manage = [];
       items.push(['Jouer', run(() => launch(g)), { icon: '▶' }]);
-      items.push([isFav(g) ? 'Retirer des favoris' : 'Ajouter aux favoris', run(() => toggleFav(g)), { icon: isFav(g) ? '★' : '☆' }]);
-      items.push(['Ranger dans un dossier', run(() => openCollectionPicker(g)), { icon: '📁' }]);
+      coll.push([isFav(g) ? 'Retirer des favoris' : 'Ajouter aux favoris', run(() => toggleFav(g)), { icon: isFav(g) ? '★' : '☆' }]);
+      coll.push(['Ranger dans un dossier', run(() => openCollectionPicker(g)), { icon: '📁' }]);
       if (g.source !== 'app') {
         const bl = backlogCfg();
-        if (bl.done.includes(g.path)) items.push(['Remettre dans « À finir »', run(() => { bl.done = bl.done.filter((p) => p !== g.path); bl.list = [g.path, ...bl.list.filter((p) => p !== g.path)]; saveCfg(); S.keepAnim = true; rerender(); toast(`« ${g.name} » remis dans « À finir »`); }), { icon: '📋' }]);
-        else if (inBacklog(g)) items.push(['Marquer comme fini', run(() => markFinished(g)), { icon: '✓' }]);
-        else items.push(['Ajouter à « À finir »', run(() => { bl.list = [g.path, ...bl.list.filter((p) => p !== g.path)]; saveCfg(); toast(`« ${g.name} » ajouté à « À finir »`); if (S.route.view === 'backlog') { S.keepAnim = true; rerender(); } }), { icon: '📋' }]);
+        if (bl.done.includes(g.path)) coll.push(['Remettre dans « À finir »', run(() => { bl.done = bl.done.filter((p) => p !== g.path); bl.list = [g.path, ...bl.list.filter((p) => p !== g.path)]; saveCfg(); S.keepAnim = true; rerender(); toast(`« ${g.name} » remis dans « À finir »`); }), { icon: '📋' }]);
+        else if (inBacklog(g)) coll.push(['Marquer comme fini', run(() => markFinished(g)), { icon: '✓' }]);
+        else coll.push(['Ajouter à « À finir »', run(() => { bl.list = [g.path, ...bl.list.filter((p) => p !== g.path)]; saveCfg(); toast(`« ${g.name} » ajouté à « À finir »`); if (S.route.view === 'backlog') { S.keepAnim = true; rerender(); } }), { icon: '📋' }]);
       }
-      if ((S.cfg.recent || []).includes(g.path)) items.push(['Retirer des joués récemment', run(() => {
+      if ((S.cfg.recent || []).includes(g.path)) coll.push(['Retirer des joués récemment', run(() => {
         S.cfg.recent = S.cfg.recent.filter((p) => p !== g.path);
         saveCfg(); S.keepAnim = true; rerender();
         toast(`« ${g.name} » retiré des joués récemment`);
       }), { icon: '✕' }]);
-      items.push([myRating(g) ? `Ma note : ${'★'.repeat(myRating(g))}` : 'Noter ce jeu', () => openRatingMenu(g, reopen), { icon: '✩', sub: true }]);
-      if (g.source === 'app') items.push(...appMenuItems(g.path.slice(4)));
-      else items.push(['Détails', run(() => openDetails(g)), { icon: 'ℹ' }]);
-      if (api.pcUninstall && g.source === 'pc' && g.installed !== false && /^(steam|epic|gog|itch|ea|ubisoft|battlenet|amazon|xbox):/.test(g.path)) items.push(['Désinstaller', run(() => uninstallPc(g)), { icon: '🗑', danger: true }]);
-      if (achInfo(g) || (/^steam:/.test(g.path) && api.achievements)) items.push(['Succès', run(() => openAchievements(g)), { icon: '🏆' }]);
-      if (api.capture) items.push(['Mes captures', run(async () => { const l = await api.capture.list(g.name); if (l.length) openCaptureViewer(g, l, 0); else toast('Pas encore de capture : Ctrl+Maj+S ou Select + R1 pendant le jeu'); }), { icon: '🖼' }]);
+      coll.push([myRating(g) ? `Ma note : ${'★'.repeat(myRating(g))}` : 'Noter ce jeu', () => openRatingMenu(g, reopen), { icon: '✩', sub: true }]);
+      if (g.source === 'app') info.push(...appMenuItems(g.path.slice(4)));
+      else info.push(['Détails', run(() => openDetails(g)), { icon: 'ℹ' }]);
+      if (api.pcUninstall && g.source === 'pc' && g.installed !== false && /^(steam|epic|gog|itch|ea|ubisoft|battlenet|amazon|xbox):/.test(g.path)) manage.push(['Désinstaller', run(() => uninstallPc(g)), { icon: '🗑', danger: true }]);
+      if (achInfo(g) || (/^steam:/.test(g.path) && api.achievements)) info.push(['Succès', run(() => openAchievements(g)), { icon: '🏆' }]);
+      if (api.capture) info.push(['Mes captures', run(async () => { const l = await api.capture.list(g.name); if (l.length) openCaptureViewer(g, l, 0); else toast('Pas encore de capture : Ctrl+Maj+S ou Select + R1 pendant le jeu'); }), { icon: '🖼' }]);
       // Tout le reste : dans « Personnaliser… ».
       const custom = [];
       custom.push(['Changer les images', run(() => openArtEditor(artTarget('game', g))), { icon: '🖼' }]);
@@ -3442,7 +3444,10 @@
         toast(g.adult ? `« ${g.name} » marqué NSFW (caché de la roulette et du jeu surprise)` : `« ${g.name} » n’est plus marqué NSFW`);
       }), { icon: '🔞' }]);
       custom.push(['Masquer ce jeu', run(() => hideGame(g)), { icon: '⦸', danger: true }]);
-      items.push(['Personnaliser…', () => openSubMenu(g.name, custom, reopen), { icon: '⚙', sub: true }]);
+      manage.unshift(['Personnaliser…', () => openSubMenu(g.name, custom, reopen), { icon: '⚙', sub: true }]);
+      if (info.length) items.push({ section: 'Infos' }, ...info);
+      if (coll.length) items.push({ section: 'Ma collection' }, ...coll);
+      items.push({ section: 'Gérer' }, ...manage);
     }
 
     const folder = (S.focusEl && S.focusEl._folder) || (S.route.view === 'folder' ? S.route.id : null);

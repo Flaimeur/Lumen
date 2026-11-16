@@ -470,6 +470,9 @@ body.has-cursor .f.focused { outline-color: transparent !important; }
 .file { font-size: 12px; margin-top: 16px; word-break: break-all; user-select: text; }
 
 .menu { width: min(480px, 94vw); max-width: 480px; }
+/* Avec la barre de raccourcis : plus large pour que les libellés tiennent en entier. */
+.menu:has(.menu-bar) { width: min(640px, 94vw); max-width: 640px; }
+.menu-bar .mc-label { font-size: 11px; }
 .menu h2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 10px; }
 .menu-sub { color: var(--accent); font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 2px; }
 .menu-list { display: flex; flex-direction: column; gap: 2px; max-height: 58vh; overflow: auto; margin: 0 -6px; padding: 2px 6px; }
