@@ -1536,6 +1536,12 @@
     ps4: { name: 'Façon PS4', desc: 'Barre de widgets en haut, grand ruban de jeux et d’applis : la vignette sélectionnée s’élargit.' },
     xbox: { name: 'Façon Xbox', desc: 'Mosaïque de tuiles : jeu à reprendre en grand, jeux récents, widgets et applis épinglés.' },
     switch: { name: 'Façon Switch', desc: 'Grandes vignettes carrées en ligne, raccourcis ronds dessous, widgets en bas.' },
+    wiiu: { name: 'Façon Wii U', desc: 'Grille d’icônes carrées dans un panneau, raccourcis ronds et widgets dessous.' },
+    wii: { name: 'Façon Wii', desc: 'Grille de chaînes (jeux, applis et widgets), horloge et boutons ronds en bas.' },
+    n3ds: { name: 'Façon 3DS', desc: 'Deux écrans : le jeu sélectionné et les widgets en haut, la grille d’icônes en bas.' },
+    ds: { name: 'Façon DS', desc: 'Deux écrans : les widgets en haut, de grands boutons de jeux en bas.' },
+    vita: { name: 'Façon PS Vita', desc: 'Bulles rondes pour les jeux et les applis, widgets dessous.' },
+    psp: { name: 'Façon PSP', desc: 'Barre de catégories (Jeux, Applications, Widgets, Lumen) et liste verticale dessous.' },
   };
   function viewHomeConsole(layout, { recent, favs, all, featured }) {
     const home = homeCfg();
@@ -1561,8 +1567,8 @@
       const isApp = g.source === 'app';
       info.replaceChildren(...[
         layout === 'ps5' && g.logo ? h('img', { class: 'cx-logo', src: api.mediaUrl(g.logo), alt: g.name }) : h('h1', {}, g.name),
-        layout === 'switch' ? null : h('div', { class: 'cx-meta' }, [isApp ? 'Application' : sys.name, g.year, g.genre].filter(Boolean).join('  ·  ')),
-        layout === 'switch' ? null : h('div', { class: 'actions' },
+        ['switch', 'vita', 'wiiu'].includes(layout) ? null : h('div', { class: 'cx-meta' }, [isApp ? 'Application' : sys.name, g.year, g.genre].filter(Boolean).join('  ·  ')),
+        ['switch', 'vita', 'wiiu'].includes(layout) ? null : h('div', { class: 'actions' },
           infoBtn(isApp ? '▶  Ouvrir' : '▶  Jouer', () => launch(g), true),
           isApp ? null : infoBtn('Détails', () => openDetails(g))),
       ].filter(Boolean));
@@ -1584,16 +1590,76 @@
     const root = (...kids) => h('div', { class: `home cx cx-${layout}` + (S.homeEdit ? ' editing' : '') },
       S.homeEdit ? h('div', { class: 'edit-banner' }, '✏ Glisse les widgets pour changer leur ordre · Échap pour terminer') : null, ...kids);
 
+    // Raccourcis ronds vers les onglets (Switch, Wii, Wii U) ; items du menu « Lumen » de la PSP.
+    const SHORTCUTS = [['🔎', 'Recherche', 'search'], ['🎮', 'Consoles', 'systems'], ['📁', 'Dossiers', 'favorites'], ['🏆', 'Succès', 'achievements'], ['📊', 'Stats', 'stats'], ['⚙', 'Réglages', 'settings']];
+    const round = (ico, label, fn) => focusable(h('div', { class: 'cx-round' }, h('span', { class: 'cx-round-ico' }, ico), h('span', { class: 'cx-round-label' }, label)),
+      { a: fn, focus: () => { setTitle(label, ''); setHints('action'); } });
+    const rounds = (only) => h('div', { class: 'cx-rounds' }, SHORTCUTS.filter(([, , id]) => !only || only.includes(id)).map(([ico, label, id]) => round(ico, label, () => openTab(id))));
+    // Ligne de liste (PSP, DS) : petite image, nom et console.
+    const listRow = (g, cls) => {
+      const sys = sysById(g.system) || {};
+      const art = g.cover ? h('img', { src: api.mediaUrl(g.cover), alt: '', loading: 'lazy' }) : fallbackArt(g.name, sys.color, sys.short);
+      return focusable(h('div', { class: cls }, h('div', { class: 'cx-li-art' }, art), h('div', { class: 'cx-li-text' }, h('b', {}, g.name), h('span', {}, g.source === 'app' ? 'Application' : sys.name || ''))), {
+        a: () => launch(g), x: g.source === 'app' ? undefined : () => toggleFav(g), y: () => openDetails(g),
+        focus: () => { setTitle(g.name, sys.short || ''); setBackground(g.background || g.cover, sys.color); setHints('game'); paintInfo(g); },
+      });
+    };
+    const clockText = () => new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+    if (layout === 'psp') {
+      // Barre de catégories : la liste de la catégorie sélectionnée s'affiche sous son icône.
+      const cats = [
+        { id: 'games', ico: '🎮', label: 'Jeux', make: () => games.slice(0, 14).map((g) => listRow(g, 'cx-li xmb-item')) },
+        { id: 'apps', ico: '▦', label: 'Applications', make: () => apps.map((g) => listRow(g, 'cx-li xmb-item')) },
+        { id: 'widgets', ico: '✦', label: 'Widgets', make: () => widgetIds.map((w) => widgetCard(w)) },
+        { id: 'lumen', ico: '☾', label: 'Lumen', make: () => SHORTCUTS.map(([ico, label, id]) => focusable(h('div', { class: 'cx-li xmb-item' }, h('div', { class: 'cx-li-art xmb-ico' }, ico), h('div', { class: 'cx-li-text' }, h('b', {}, label))), { a: () => openTab(id), focus: () => { setTitle(label, ''); setHints('action'); } })) },
+      ].filter((c) => c.id !== 'apps' || apps.length).filter((c) => c.id !== 'widgets' || widgetIds.length);
+      if (!cats.some((c) => c.id === S.cxCat)) S.cxCat = 'games';
+      const listEl = h('div', { class: 'xmb-list' });
+      const paintList = () => {
+        const i = cats.findIndex((c) => c.id === S.cxCat);
+        listEl.style.setProperty('--i', String(i));
+        listEl.replaceChildren(...cats[i].make());
+      };
+      const bar = h('div', { class: 'xmb-bar' }, cats.map((c) => focusable(h('div', { class: 'xmb-cat' }, h('span', { class: 'xmb-cat-ico' }, c.ico), h('span', { class: 'xmb-cat-label' }, c.label)), {
+        a: () => { const f = listEl.querySelector('.f'); if (f) setFocus(f); },
+        focus: () => { setTitle(c.label, ''); setHints('action'); if (S.cxCat !== c.id) { S.cxCat = c.id; paintList(); } },
+      })));
+      paintList();
+      return root(bar, listEl);
+    }
+    if (layout === 'vita') return root(info, h('section', { class: 'vita-grid', 'data-fscale': '1.08' }, list.map((g) => tileFor(g, 'vita-bubble')), libTile()), cards('cx-cards'));
+    if (layout === 'n3ds') {
+      // L'écran du bas vient d'abord dans la page (la sélection démarre sur les jeux) ; CSS l'affiche en dessous.
+      return root(
+        h('div', { class: 'ds-screen ds-bottom n3ds-bottom' }, h('div', { class: 'n3ds-grid', 'data-fscale': '1.06' }, list.map((g) => tileFor(g)), libTile())),
+        h('div', { class: 'ds-screen ds-top n3ds-top' }, info, cards('ds-widgets')));
+    }
+    if (layout === 'ds') {
+      const top = h('div', { class: 'ds-screen ds-top ds-top-center' }, widgetIds.length ? cards('ds-widgets') : h('div', { class: 'ds-clock' }, clockText()));
+      return root(
+        h('div', { class: 'ds-screen ds-bottom ds-menu' }, list.slice(0, 8).map((g) => listRow(g, 'cx-li ds-btn')),
+          focusable(h('div', { class: 'cx-li ds-btn' }, h('div', { class: 'cx-li-art xmb-ico' }, '▦'), h('div', { class: 'cx-li-text' }, h('b', {}, 'Bibliothèque'), h('span', {}, 'Toutes tes consoles'))), { a: () => openTab('systems'), focus: () => { setTitle('Bibliothèque', ''); setHints('action'); } })),
+        top); // affiché au-dessus (CSS order)
+    }
+    if (layout === 'wii') {
+      const ch = (el) => { el.classList.add('wii-ch'); return el; };
+      return root(
+        // 12 chaînes, comme sur l'écran de la console : jusqu'à 3 widgets, la Bibliothèque, et des jeux / applis pour le reste.
+        h('section', { class: 'wii-grid', 'data-fscale': '1.04' }, list.slice(0, 11 - Math.min(3, widgetIds.length)).map((g) => tileFor(g, 'wii-ch')),
+          ...widgetIds.slice(0, 3).map((w) => ch(widgetCard(w))), ch(libTile())),
+        h('div', { class: 'wii-bar' },
+          round('⚙', 'Réglages', () => openTab('settings')),
+          h('div', { class: 'wii-clock' }, h('b', { 'data-clock': '' }, clockText()), h('span', {}, new Date().toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'numeric' }))),
+          round('🔎', 'Recherche', () => openTab('search'))));
+    }
+    if (layout === 'wiiu') return root(info, h('section', { class: 'wiiu-panel', 'data-fscale': '1.06' }, list.map((g) => tileFor(g)), libTile()), rounds(), cards('cx-cards'));
+
     if (layout === 'ps5') return root(row(1), info, cards('cx-cards'), systemsShelf());
     // PS4 : la rangée vient d'abord dans la page (sélection au démarrage), la barre de widgets s'affiche au-dessus.
     if (layout === 'ps4') return root(row(1), cards('cx-bar'), info);
     if (layout === 'switch') {
-      const round = (ico, label, fn) => focusable(h('div', { class: 'cx-round' }, h('span', { class: 'cx-round-ico' }, ico), h('span', { class: 'cx-round-label' }, label)),
-        { a: fn, focus: () => { setTitle(label, ''); setHints('action'); } });
-      return root(info, row(1.04), h('div', { class: 'cx-rounds' },
-        round('🔎', 'Recherche', () => openTab('search')), round('🎮', 'Consoles', () => openTab('systems')), round('📁', 'Dossiers', () => openTab('favorites')),
-        round('🏆', 'Succès', () => openTab('achievements')), round('📊', 'Stats', () => openTab('stats')), round('⚙', 'Réglages', () => openTab('settings'))),
-      cards('cx-cards'));
+      return root(info, row(1.04), rounds(), cards('cx-cards'));
     }
     // Xbox : mosaïque. Le jeu à reprendre en grand, puis jeux, widgets épinglés (2 cases) et applis.
     const [first, ...rest] = list;
@@ -2152,8 +2218,7 @@
   }
   // L'horloge du widget suit l'heure sans redessiner l'accueil.
   setInterval(() => {
-    const el = document.querySelector('[data-clock]');
-    if (el) el.textContent = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    for (const el of document.querySelectorAll('[data-clock]')) el.textContent = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   }, 15000);
   setInterval(() => { S.weather = null; }, 20 * 60 * 1000);
 
