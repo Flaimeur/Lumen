@@ -93,6 +93,8 @@
   const cursor = h('div', { id: 'cursor' });
 
   function focusScale(el) {
+    const fs = el.classList.contains('tile') && el.closest('[data-fscale]');
+    if (fs) return Number(fs.dataset.fscale) || 1;
     if (el.classList.contains('tile') || el.classList.contains('syscard') || el.classList.contains('folder')) return 1.07;
     if (el.classList.contains('btn')) return 1.04;
     return 1;
@@ -137,7 +139,7 @@
   window.addEventListener('wheel', () => { S.mouseHoldUntil = performance.now() + 220; }, { passive: true, capture: true });
   // Une fenêtre qui s'ouvre (ou se redessine) en s'animant déplace l'élément sélectionné : le cadre se recale à la fin.
   document.addEventListener('animationend', trackCursor, true);
-  document.addEventListener('transitionend', (e) => { if (e.propertyName === 'transform' || e.propertyName === 'translate' || e.propertyName === 'scale') trackCursor(); }, true);
+  document.addEventListener('transitionend', (e) => { if (['transform', 'translate', 'scale', 'flex-basis', 'width', 'height'].includes(e.propertyName)) trackCursor(); }, true);
   // La mise en page bouge sans défilement (scan, images, polices, contenu qui change de hauteur) :
   // le cadre suit l'élément sélectionné au lieu de rester à son ancienne place.
   if (window.ResizeObserver) {
@@ -1488,6 +1490,7 @@
     }
     const featured = recent[0] || S.byPath.get(S.featured);
     const home = homeCfg();
+    if (HOME_LAYOUTS[home.layout] && home.layout !== 'lumen') return viewHomeConsole(home.layout, { recent, favs, all, featured });
     const shelves = [];
     const shelfOf = {};
     const pushShelf = (id, title, items) => { shelves.push([title, items]); shelfOf[title] = id; };
@@ -1523,6 +1526,85 @@
     return h('div', { class: 'home' + (S.homeEdit ? ' editing' : '') },
       S.homeEdit ? h('div', { class: 'edit-banner' }, '✏ Réorganisation : glisse les widgets et les blocs où tu veux · Échap pour terminer') : null,
       ...els);
+  }
+
+  // ---------- Accueil façon consoles (Réglages → Personnaliser l'accueil → Disposition) ----------
+  // Même contenu que l'accueil Lumen (jeux récents, favoris, applications, widgets), placé comme sur les consoles.
+  const HOME_LAYOUTS = {
+    lumen: { name: 'Lumen', desc: 'Widgets, bandeau et étagères, dans l’ordre que tu choisis.' },
+    ps5: { name: 'Façon PS5', desc: 'Petite rangée de jeux et d’applis en haut, grand visuel du jeu sélectionné, widgets en cartes dessous.' },
+    ps4: { name: 'Façon PS4', desc: 'Barre de widgets en haut, grand ruban de jeux et d’applis : la vignette sélectionnée s’élargit.' },
+    xbox: { name: 'Façon Xbox', desc: 'Mosaïque de tuiles : jeu à reprendre en grand, jeux récents, widgets et applis épinglés.' },
+    switch: { name: 'Façon Switch', desc: 'Grandes vignettes carrées en ligne, raccourcis ronds dessous, widgets en bas.' },
+  };
+  function viewHomeConsole(layout, { recent, favs, all, featured }) {
+    const home = homeCfg();
+    const appsSys = S.lib.systems.find((s) => s.id === 'apps');
+    const apps = appsSys ? appsSys.games.slice(0, 8) : [];
+    // Jeux : récents, puis favoris, puis d'autres jeux pour remplir la rangée (les applis viennent après).
+    const seen = new Set();
+    const games = [];
+    const pushG = (g) => { if (g && g.source !== 'app' && !seen.has(g.path)) { seen.add(g.path); games.push(g); } };
+    recent.forEach(pushG);
+    favs.forEach(pushG);
+    pushG(featured);
+    for (const g of all) { if (games.length >= 12) break; pushG(g); }
+    const max = layout === 'xbox' ? 9 : 12;
+    const list = [...games.slice(0, max), ...apps];
+    const widgetIds = home.widgets.filter((w) => WIDGETS[w]);
+
+    // Fiche du jeu sélectionné (nom ou logo, console, boutons) : suit la sélection dans la rangée.
+    const info = h('div', { class: 'cx-info' });
+    const infoBtn = (label, fn, primary) => focusable(h('div', { class: 'btn' + (primary ? ' primary' : '') }, label), { a: fn, focus: () => setHints('action') });
+    const paintInfo = (g) => {
+      const sys = sysById(g.system) || {};
+      const isApp = g.source === 'app';
+      info.replaceChildren(...[
+        layout === 'ps5' && g.logo ? h('img', { class: 'cx-logo', src: api.mediaUrl(g.logo), alt: g.name }) : h('h1', {}, g.name),
+        layout === 'switch' ? null : h('div', { class: 'cx-meta' }, [isApp ? 'Application' : sys.name, g.year, g.genre].filter(Boolean).join('  ·  ')),
+        layout === 'switch' ? null : h('div', { class: 'actions' },
+          infoBtn(isApp ? '▶  Ouvrir' : '▶  Jouer', () => launch(g), true),
+          isApp ? null : infoBtn('Détails', () => openDetails(g))),
+      ].filter(Boolean));
+    };
+    const tileFor = (g, cls = '') => {
+      const t = gameTile(g);
+      if (cls) t.classList.add(cls);
+      const f = t._act.focus;
+      t._act.focus = () => { if (f) f(); paintInfo(g); };
+      return t;
+    };
+    // Dernière vignette : toute la bibliothèque (onglet Consoles).
+    const libTile = () => focusable(h('div', { class: 'tile cx-lib' }, h('span', { class: 'cx-lib-ico' }, '▦'), h('span', { class: 'cx-lib-name' }, 'Bibliothèque')),
+      { a: () => openTab('systems'), focus: () => { setTitle('Bibliothèque', 'Toutes tes consoles'); setHints('action'); } });
+    const row = (fscale) => h('div', { class: 'row cx-row', 'data-fscale': fscale }, list.map((g) => tileFor(g)), libTile());
+    const cards = (cls) => (widgetIds.length ? h('section', { class: cls }, widgetIds.map((w) => widgetCard(w))) : null);
+    const systemsShelf = () => h('section', { class: 'shelf' }, h('div', { class: 'shelf-title' }, 'Consoles'), h('div', { class: 'row' }, sortedSystems().map(systemCard)));
+    if (list[0]) paintInfo(list[0]);
+    const root = (...kids) => h('div', { class: `home cx cx-${layout}` + (S.homeEdit ? ' editing' : '') },
+      S.homeEdit ? h('div', { class: 'edit-banner' }, '✏ Glisse les widgets pour changer leur ordre · Échap pour terminer') : null, ...kids);
+
+    if (layout === 'ps5') return root(row(1), info, cards('cx-cards'), systemsShelf());
+    // PS4 : la rangée vient d'abord dans la page (sélection au démarrage), la barre de widgets s'affiche au-dessus.
+    if (layout === 'ps4') return root(row(1), cards('cx-bar'), info);
+    if (layout === 'switch') {
+      const round = (ico, label, fn) => focusable(h('div', { class: 'cx-round' }, h('span', { class: 'cx-round-ico' }, ico), h('span', { class: 'cx-round-label' }, label)),
+        { a: fn, focus: () => { setTitle(label, ''); setHints('action'); } });
+      return root(info, row(1.04), h('div', { class: 'cx-rounds' },
+        round('🔎', 'Recherche', () => openTab('search')), round('🎮', 'Consoles', () => openTab('systems')), round('📁', 'Dossiers', () => openTab('favorites')),
+        round('🏆', 'Succès', () => openTab('achievements')), round('📊', 'Stats', () => openTab('stats')), round('⚙', 'Réglages', () => openTab('settings'))),
+      cards('cx-cards'));
+    }
+    // Xbox : mosaïque. Le jeu à reprendre en grand, puis jeux, widgets épinglés (2 cases) et applis.
+    const [first, ...rest] = list;
+    const big = first ? tileFor(first, 'cx-big') : null;
+    if (big) big.append(h('div', { class: 'cx-big-label' }, h('span', { class: 'eyebrow' }, recent.length ? 'Reprendre' : 'À la une'), h('b', {}, first.name)));
+    const gameRest = rest.filter((g) => g.source !== 'app');
+    const appRest = rest.filter((g) => g.source === 'app');
+    return root(
+      h('section', { class: 'cx-mosaic', 'data-fscale': '1.03' }, big, ...gameRest.map((g) => tileFor(g)),
+        ...widgetIds.map((w) => widgetCard(w)), ...appRest.map((g) => tileFor(g)), libTile()),
+      systemsShelf());
   }
 
   // ---------- Réorganisation à la souris (mode édition de l'accueil) ----------
@@ -2236,6 +2318,11 @@
     };
     const tog = (on) => h('span', { class: 'toggle' + (on ? ' on' : '') });
     const section = (t) => rows.push(h('div', { class: 'set-section' }, t));
+
+    section('Disposition');
+    const lay = HOME_LAYOUTS[home.layout] || HOME_LAYOUTS.lumen;
+    add('Disposition de l’accueil', lay.name, () => openMenu('Disposition de l’accueil', Object.entries(HOME_LAYOUTS).map(([id, l]) => [l.name + (id === (home.layout || 'lumen') ? '  ✓' : ''), () => { home.layout = id; reopen('Disposition de l’accueil'); }])),
+      lay.desc + (home.layout && home.layout !== 'lumen' ? ' Les blocs et leur ordre plus bas ne servent qu’à la disposition Lumen.' : ''));
 
     section('Styles tout prêts');
     for (const [id, p] of Object.entries(STYLE_PRESETS)) add(p.name, 'Appliquer', async () => { await applyStylePreset(id); openHomeEditor(p.name); }, `${p.desc} ${wallLabel({ ...wallCfg(), ...p.wall }).replace(/^f/, 'F')}.`, { focus: () => paintHome({ preset: id }) });
