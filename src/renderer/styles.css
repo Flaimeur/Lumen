@@ -1447,3 +1447,15 @@ body.evening::before { content: ""; position: fixed; inset: 0; z-index: 9998; po
 .chk-row.good .chk-state { color: #4ade80; }
 .chk-row.warn .chk-state { color: #fcd34d; }
 .chk-row.bad .chk-state { color: #f87171; }
+
+/* ---------- Mac : effets allégés ----------
+   Sur écran Retina, chaque panneau en verre dépoli (backdrop-filter) refait un flou de tout ce qui est derrière lui
+   à chaque image des fonds animés : le GPU tourne en permanence et l'interface saccade. On garde le même rendu
+   avec des panneaux un peu plus opaques, et les halos de fond sont flous une fois pour toutes (pas d'animation). */
+html.mac { --panel: rgba(18, 22, 34, 0.86); }
+html.mac *, html.mac *::before, html.mac *::after { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+html.mac .aurora, html.mac .bg-layer.on { animation: none; }
+html.mac .aurora { mix-blend-mode: normal; }
+html.mac .grain { display: none; }
+/* Le zoom lent des bannières (Ken Burns) redessine une grande image à chaque image : ~10 % de GPU en continu. */
+html.mac .hero-art img, html.mac .hero-art .gen, html.mac .sys-banner img { animation: none; }

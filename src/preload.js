@@ -105,6 +105,7 @@ contextBridge.exposeInMainWorld('lumen', {
   readSound: (file) => ipcRenderer.invoke('sound:read', file),
   quit: () => ipcRenderer.invoke('app:quit'),
   version: ipcRenderer.sendSync('app:version'),
+  platform: process.platform,
   padLog: (msg) => ipcRenderer.send('pad:log', msg),
   weather: (city) => ipcRenderer.invoke('weather:get', city),
   media: (cmd) => ipcRenderer.invoke('media:ask', cmd || 'state'),

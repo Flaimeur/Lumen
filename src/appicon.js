@@ -61,8 +61,37 @@ public static class LumenIcon {
 [LumenIcon]::Save($env:LUMEN_ICON_SRC, $env:LUMEN_ICON_OUT)
 `;
 
+// Mac : l'icône .icns de l'application (Info.plist → CFBundleIconFile) convertie en PNG 512 px par sips ;
+// sinon l'aperçu Quick Look de l'appli (icônes rangées dans Assets.car).
+function extractIconMac(src, out) {
+  const fs = require('fs');
+  const path = require('path');
+  const os = require('os');
+  const { plistValue } = require('./platform');
+  return new Promise((resolve) => {
+    if (!/\.app\/?$/i.test(src)) return resolve(false);
+    let name = plistValue(src, 'CFBundleIconFile');
+    if (name && !/\.icns$/i.test(name)) name += '.icns';
+    const icns = name ? path.join(src, 'Contents', 'Resources', name) : '';
+    if (icns && fs.existsSync(icns)) {
+      execFile('/usr/bin/sips', ['-s', 'format', 'png', '-Z', '512', icns, '--out', out], { timeout: 20000 }, (err) => resolve(!err && fs.existsSync(out)));
+      return;
+    }
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lumen-icon-'));
+    execFile('/usr/bin/qlmanage', ['-t', '-s', '512', '-o', tmp, src], { timeout: 20000 }, () => {
+      try {
+        const f = fs.readdirSync(tmp).find((x) => x.endsWith('.png'));
+        if (f) { fs.copyFileSync(path.join(tmp, f), out); return resolve(true); }
+      } catch { /* pas d'aperçu */ } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+      resolve(false);
+    });
+  });
+}
+
 // Chemins passés par variables d'environnement : rien n'est interprété par PowerShell.
 function extractIcon(src, out) {
+  if (process.platform === 'darwin') return extractIconMac(src, out);
+  if (process.platform !== 'win32') return Promise.resolve(false);
   return new Promise((resolve) => {
     const encoded = Buffer.from(SCRIPT, 'utf16le').toString('base64');
     execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], {

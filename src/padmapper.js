@@ -72,7 +72,8 @@ let ready = false;
 const down = new Set(); // touches/boutons enfoncés, relâchés à l'arrêt
 
 function start() {
-  if (proc) return;
+  // Windows seulement (SendInput) : sur Mac, simuler clavier/souris demande un module natif et l'accès Accessibilité.
+  if (proc || process.platform !== 'win32') return;
   ready = false;
   const encoded = Buffer.from(SCRIPT, 'utf16le').toString('base64');
   proc = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], { windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] });

@@ -1,7 +1,11 @@
 'use strict';
+const { IS_MAC } = require('./platform');
 
 // Commande RetroArch standard : plein écran + cœur libretro.
-const RA = (core) => `"{retroarch}" -f -L "{retroarchDir}\\cores\\${core}_libretro.dll" "{rom}"`;
+// Mac : les cœurs (.dylib) sont dans ~/Library/Application Support/RetroArch/cores ({retroarchCores}).
+const RA = IS_MAC
+  ? (core) => `"{retroarch}" -f -L "{retroarchCores}/${core}_libretro.dylib" "{rom}"`
+  : (core) => `"{retroarch}" -f -L "{retroarchDir}\\cores\\${core}_libretro.dll" "{rom}"`;
 
 // folders : noms de dossiers reconnus (comparés en minuscules, sans espaces ni tirets).
 // Les noms suivent la convention ES-DE pour que les bibliothèques existantes marchent directement.
@@ -35,7 +39,10 @@ module.exports = [
   { id: 'ngp', name: 'Neo Geo Pocket', short: 'NGP', color: '#6c757d', folders: ['ngp', 'ngpc'], ext: ['ngp', 'ngc', 'zip'], command: RA('mednafen_ngp') },
   { id: 'wonderswan', name: 'WonderSwan', short: 'WS', color: '#577590', folders: ['wonderswan', 'wonderswancolor', 'ws', 'wsc'], ext: ['ws', 'wsc', 'zip'], command: RA('mednafen_wswan') },
   // Jeux PC : raccourcis .lnk / .url (Steam, GOG…) ou exécutables. Ouverts directement par Windows.
-  { id: 'windows', name: 'Jeux PC', short: 'PC', color: '#0f766e', folders: ['windows', 'pc', 'steam'], ext: ['lnk', 'url', 'exe', 'bat'], command: '{open}' },
+  // Mac : applications .app, alias, raccourcis .webloc / .command, ouverts par macOS.
+  IS_MAC
+    ? { id: 'windows', name: 'Jeux Mac', short: 'Mac', color: '#0f766e', folders: ['windows', 'pc', 'steam', 'mac', 'macos', 'osx'], ext: ['app', 'webloc', 'url', 'command', 'alias'], command: '{open}' }
+    : { id: 'windows', name: 'Jeux PC', short: 'PC', color: '#0f766e', folders: ['windows', 'pc', 'steam'], ext: ['lnk', 'url', 'exe', 'bat'], command: '{open}' },
 ];
 
 // ---------- Fiches des consoles : fabricant, année de sortie, émulateurs au choix ----------

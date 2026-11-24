@@ -48,6 +48,8 @@ async function indexImages(dirs, exts = IMAGE_EXT) {
 async function walk(dir, exts, depth, out) {
   for (const e of await listDir(dir)) {
     const full = path.join(dir, e.name);
+    // Applications macOS (.app) : ce sont des dossiers, mais on les traite comme un fichier de jeu.
+    if (e.isDirectory() && exts.has('app') && /\.app$/i.test(e.name)) { out.push(full); continue; }
     if (e.isDirectory()) {
       if (depth > 0 && !e.name.startsWith('.') && !SKIP_DIRS.has(e.name.toLowerCase())) {
         await walk(full, exts, depth - 1, out);

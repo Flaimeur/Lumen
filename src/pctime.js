@@ -8,6 +8,13 @@ const path = require('path');
 const SCRIPT = '(Get-CimInstance Win32_Process -Property ExecutablePath | Where-Object { $_.ExecutablePath } | ForEach-Object { $_.ExecutablePath }) -join "`n"';
 
 function runningPaths() {
+  if (process.platform === 'darwin') {
+    // Mac : chemin complet du programme de chaque processus.
+    return new Promise((resolve) => {
+      execFile('/bin/ps', ['-axo', 'comm='], { timeout: 20000, maxBuffer: 8 * 1024 * 1024 },
+        (err, out) => resolve(err ? null : String(out).split(/\n/).map((p) => p.trim().toLowerCase()).filter(Boolean)));
+    });
+  }
   return new Promise((resolve) => {
     execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', SCRIPT], { windowsHide: true, timeout: 20000, maxBuffer: 8 * 1024 * 1024 },
       (err, out) => resolve(err ? null : String(out).split(/\r?\n/).map((p) => p.trim().toLowerCase()).filter(Boolean)));
@@ -17,7 +24,7 @@ function runningPaths() {
 let timer = null;
 // getLaunchers() → Map id → { store, dir } ; onTick({ running: [ids] }).
 function start(getLaunchers, onTick, every = 30000) {
-  if (timer || process.platform !== 'win32') return;
+  if (timer || !['win32', 'darwin'].includes(process.platform)) return;
   const tick = async () => {
     const dirs = [];
     for (const [id, l] of getLaunchers()) {

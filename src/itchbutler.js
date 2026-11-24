@@ -6,17 +6,19 @@ const { spawn } = require('child_process');
 const net = require('net');
 const fs = require('fs');
 const path = require('path');
+const { appData } = require('./platform');
+const BUTLER = process.platform === 'win32' ? 'butler.exe' : 'butler';
 
 function butlerExe() {
-  const base = path.join(process.env.APPDATA || '', 'itch', 'broth', 'butler');
+  const base = path.join(appData(), 'itch', 'broth', 'butler');
   let v = '';
   try { v = fs.readFileSync(path.join(base, '.chosen-version'), 'utf8').trim(); } catch { /* pas de version choisie */ }
   const cands = [];
-  if (v) cands.push(path.join(base, 'versions', v, 'butler.exe'));
-  try { for (const d of fs.readdirSync(path.join(base, 'versions')).sort().reverse()) cands.push(path.join(base, 'versions', d, 'butler.exe')); } catch { /* rien */ }
+  if (v) cands.push(path.join(base, 'versions', v, BUTLER));
+  try { for (const d of fs.readdirSync(path.join(base, 'versions')).sort().reverse()) cands.push(path.join(base, 'versions', d, BUTLER)); } catch { /* rien */ }
   return cands.find((p) => fs.existsSync(p)) || '';
 }
-const dbPath = () => path.join(process.env.APPDATA || '', 'itch', 'db', 'butler.db');
+const dbPath = () => path.join(appData(), 'itch', 'db', 'butler.db');
 
 // Ouvre une session butler : fn(call) reçoit call(method, params) → result (ou lève l'erreur).
 function withButler(fn, timeout = 120000) {

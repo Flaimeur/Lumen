@@ -53,6 +53,8 @@ function show(data) {
     webPreferences: { sandbox: true, contextIsolation: true, javascript: true, backgroundThrottling: false },
   });
   w.setAlwaysOnTop(true, 'screen-saver');
+  // Mac : visible aussi par-dessus un jeu en plein écran (qui a son propre Space).
+  if (process.platform === 'darwin') w.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   w.setIgnoreMouseEvents(true);
   w.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(PAGE));
   w.webContents.once('did-finish-load', () => { update(pending); if (w && !w.isDestroyed()) w.showInactive(); });

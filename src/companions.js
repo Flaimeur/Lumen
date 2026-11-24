@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const { execFile, spawn } = require('child_process');
 
-const appData = () => process.env.APPDATA || '';
+const appData = () => require('./platform').appData();
 const exists = (p) => { try { return !!p && fs.existsSync(p); } catch { return false; } };
 const readJson = (p) => { try { return JSON.parse(fs.readFileSync(p, 'utf8').replace(/^\uFEFF/, '')); } catch { return null; } };
 
@@ -35,6 +35,7 @@ function runningPath(proc) {
 const hex = (r, g, b) => '#' + [r, g, b].map((x) => Math.max(0, Math.min(255, Math.round(x))).toString(16).padStart(2, '0')).join('');
 
 async function lueur() {
+  if (process.platform !== 'win32') return null; // Lueur est une appli Windows
   const dir = path.join(appData(), 'Lueur');
   const settings = readJson(path.join(dir, 'settings.json'));
   // Lueur 1.1+ écrit son état pour Lumen (state.json) : allumé, couleur, mode, scènes. Plus besoin de chercher le processus.

@@ -1,6 +1,11 @@
 (() => {
   'use strict';
   const api = window.lumen || window.LumenMock;
+  // Mac : mêmes écrans, avec les noms et chemins de macOS.
+  const MAC = api.platform === 'darwin';
+  const OS = MAC ? 'macOS' : 'Windows';
+  // Mac (écran Retina) : effets de flou allégés, voir html.mac dans styles.css.
+  if (MAC) document.documentElement.classList.add('mac');
   const Input = window.Input;
   const $ = (sel, root = document) => root.querySelector(sel);
 
@@ -833,7 +838,7 @@
         ? pads.map((p) => `Manette n°${p.native ? 'PS (lue par Lumen)' : p.index + 1} : ${p.id}\nType détecté : ${Input.padType} · disposition : ${p.mapping || 'non standard'}\n`
           + `Boutons pressés : ${p.buttons.map((b, i) => (b.pressed ? i : null)).filter((x) => x !== null).join(', ') || 'aucun'}\n`
           + `Sticks : ${p.axes.map((a) => a.toFixed(2)).join('  ')}`).join('\n\n')
-        : `Aucune manette visible par Lumen.\nFenêtre au premier plan : ${document.hasFocus() ? 'oui' : 'non'}\n\nAppuie sur un bouton de la manette. Si rien ne change, Windows ne la transmet pas à Lumen (Bluetooth, pilote ou logiciel qui la capture).`;
+        : `Aucune manette visible par Lumen.\nFenêtre au premier plan : ${document.hasFocus() ? 'oui' : 'non'}\n\nAppuie sur un bouton de la manette. Si rien ne change, ${OS} ne la transmet pas à Lumen (Bluetooth, pilote ou logiciel qui la capture).`;
     }, 60);
   }
 
@@ -2422,9 +2427,9 @@
     const ext = await openPrompt({ title: 'Extensions des jeux', value: (c.ext || []).join(', '), help: 'Séparées par des virgules : iso, chd, pkg, adf, exe… Vide = tous les fichiers.' });
     if (ext === null) return;
     c.ext = ext.split(/[,\s;]+/).map((x) => x.trim().replace(/^\./, '').toLowerCase()).filter(Boolean);
-    const exe = await api.pickFile(`Émulateur pour ${c.name} (Annuler = ouvrir avec Windows)`, '');
+    const exe = await api.pickFile(`Émulateur pour ${c.name} (Annuler = ouvrir avec ${OS})`, '');
     if (exe) {
-      const args = await openPrompt({ title: 'Options de lancement', value: c.args || '"{rom}"', help: 'Ce qui suit l’émulateur. {rom} = le jeu. Exemples : "{rom}" · -f "{rom}" · -L "C:\\cores\\core.dll" "{rom}"' });
+      const args = await openPrompt({ title: 'Options de lancement', value: c.args || '"{rom}"', help: 'Ce qui suit l’émulateur. {rom} = le jeu. Exemples : "{rom}" · -f "{rom}" · ' + (MAC ? '-L "{retroarchCores}/core_libretro.dylib" "{rom}"' : '-L "C:\\cores\\core.dll" "{rom}"') });
       if (args === null) return;
       c.args = args.trim() || '"{rom}"';
       c.command = `"${exe}" ${c.args}`;
@@ -2865,7 +2870,7 @@
     if (api.apps) {
       cat('apps');
       section('Applications');
-      row('Ajouter une application', '＋', () => addApp(), 'Word, navigateur, Discord… : un programme (.exe) ou un raccourci du menu Démarrer. Elles apparaissent dans Consoles → Applications.');
+      row('Ajouter une application', '＋', () => addApp(), MAC ? 'Pages, navigateur, Discord… : une application (.app) du dossier Applications. Elles apparaissent dans Consoles → Applications.' : 'Word, navigateur, Discord… : un programme (.exe) ou un raccourci du menu Démarrer. Elles apparaissent dans Consoles → Applications.');
       for (const a of c.apps || []) {
         row(a.name, 'Modifier', () => openMenu(a.name, appMenuItems(a.id)), a.target);
       }
@@ -2904,7 +2909,7 @@
         rerender();
       });
       row('Mot de passe', st.hasPassword ? '•••••••• enregistré' : 'Non défini', async () => {
-        const v = await openPrompt({ title: 'Mot de passe RomM', value: '', keyboard: 'url', secret: true, help: 'Chiffré par Windows sur ce PC. Le jeton client est préférable : il peut être révoqué sans changer ton mot de passe.' });
+        const v = await openPrompt({ title: 'Mot de passe RomM', value: '', keyboard: 'url', secret: true, help: (MAC ? 'Chiffré dans le trousseau de ce Mac.' : 'Chiffré par Windows sur ce PC.') + ' Le jeton client est préférable : il peut être révoqué sans changer ton mot de passe.' });
         if (v === null || !v) return;
         await api.romm.setSecret('password', v);
         await refreshRommStatus();
@@ -2969,7 +2974,7 @@
       row('Activer la télécommande', toggle(!!(ri && ri.enabled)), async () => {
         S.remoteInfo = await api.remote.set(!(ri && ri.enabled));
         S.cfg.remote = { ...(S.cfg.remote || {}), enabled: S.remoteInfo.enabled, pin: S.remoteInfo.pin };
-        if (S.remoteInfo.enabled) { pushRemoteLibrary(); toast('Télécommande active · Windows peut demander d’autoriser Lumen sur le réseau privé'); }
+        if (S.remoteInfo.enabled) { pushRemoteLibrary(); toast(MAC ? 'Télécommande active · macOS peut demander d’autoriser les connexions entrantes' : 'Télécommande active · Windows peut demander d’autoriser Lumen sur le réseau privé'); }
         rerender();
       }, 'Depuis ton téléphone, sur le même Wi-Fi : choisir et lancer un jeu, la musique, Lueur, quitter le jeu. Rien n’est accessible hors de ton réseau.');
       if (ri && ri.enabled) {
@@ -2985,7 +2990,7 @@
       row(`${PAD_LABEL[p.type] || 'Manette'} · n°${p.index + 1}`, p.rumble ? 'Tester la vibration' : '', p.rumble ? () => Input.rumble(0.8, 400) : null,
         `${p.name.replace(/\s*\(.*$/, '')} · disposition ${p.mapping === 'standard' ? 'standard' : 'non standard (corrigée par Lumen)'} · ${p.buttons} boutons`);
     }
-    row('Tester la manette', 'Ouvrir', () => openPadTest(), 'Affiche en direct ce que Lumen reçoit : boutons pressés et sticks. Appuie d’abord sur un bouton, Windows ne montre la manette qu’après.');
+    row('Tester la manette', 'Ouvrir', () => openPadTest(), 'Affiche en direct ce que Lumen reçoit : boutons pressés et sticks. Appuie d’abord sur un bouton, ' + OS + ' ne montre la manette qu’après.');
     section('Boutons');
     row('Clavier : onglet précédent', tabKeyLabel('lb'), () => pickTabKey('lb'), 'Touche pour passer à l’onglet de gauche.');
     row('Clavier : onglet suivant', tabKeyLabel('rb'), () => pickTabKey('rb'), 'Touche pour passer à l’onglet de droite.');
@@ -3096,7 +3101,7 @@
     section('Profils');
     row('Profil actuel', activeProfile().name, () => openProfileMenu(), plural(profiles().length, 'profil', 'profils') + ' sur ce PC. Chacun a ses favoris, notes, temps de jeu, dossiers et son accueil.');
     section('Lumen');
-    row('Version', api.version || '', null, 'Frontend de jeux pour Windows : ROMs, jeux PC et applications.');
+    row('Version', api.version || '', null, MAC ? 'Frontend de jeux pour macOS : ROMs, jeux Mac et applications.' : 'Frontend de jeux pour Windows : ROMs, jeux PC et applications.');
     if (api.update) {
       const u = S.update || {};
       const label = { checking: 'Recherche…', downloading: `Téléchargement ${u.version || ''} · ${u.progress || 0} %`, ready: `${u.version} prête · redémarrer`,
@@ -3785,7 +3790,7 @@
         h('p', { class: 'muted' }, 'RetroArch fait tourner la plupart des consoles rétro. Les émulateurs autonomes (Dolphin, PCSX2…) se règlent dans Réglages → Émulateurs.'),
         h('div', { class: 'wiz-status' + (S.cfg.emulators.retroarch ? ' ok' : '') }, S.cfg.emulators.retroarch ? `Trouvé : ${S.cfg.emulators.retroarch}` : 'RetroArch n’a pas été détecté automatiquement'),
         h('div', { class: 'actions' },
-          actionButton(S.cfg.emulators.retroarch ? 'Changer' : 'Indiquer retroarch.exe', async () => { closeOverlay(true); await pickEmulator('retroarch'); openWelcome(3); }, !S.cfg.emulators.retroarch),
+          actionButton(S.cfg.emulators.retroarch ? 'Changer' : (MAC ? 'Indiquer RetroArch.app' : 'Indiquer retroarch.exe'), async () => { closeOverlay(true); await pickEmulator('retroarch'); openWelcome(3); }, !S.cfg.emulators.retroarch),
           actionButton(S.cfg.emulators.retroarch ? 'Continuer' : 'Passer', next, !!S.cfg.emulators.retroarch)),
       ];
     } else if (step === 4) {
@@ -4618,7 +4623,7 @@
       title: `Commande · ${sys.name}`,
       value: current,
       resetValue: '',
-      help: 'Variables : {rom}, {romDir}, {romName}, {retroarch}, {retroarchDir}, {dolphin}, {pcsx2}, {cemu}, {eden}, {azahar}. Mets {open} pour ouvrir le fichier avec Windows.',
+      help: 'Variables : {rom}, {romDir}, {romName}, {retroarch}, {retroarchDir}, {dolphin}, {pcsx2}, {cemu}, {eden}, {azahar}' + (MAC ? ', {retroarchCores}' : '') + '. Mets {open} pour ouvrir le fichier avec ' + OS + '.',
     });
     if (v === null) return;
     if (!v.trim() || v.trim() === sys.command) delete S.cfg.commands[sys.id];
@@ -4877,7 +4882,7 @@
     const u = S.update || {};
     el.hidden = u.status !== 'ready' && u.status !== 'downloading';
     el.classList.toggle('ready', u.status === 'ready');
-    el.textContent = u.status === 'ready' ? '⬆ Mise à jour prête · Redémarrer' : `⬇ Mise à jour · ${u.progress || 0} %`;
+    el.textContent = u.status === 'ready' ? (u.manual ? '⬆ Nouvelle version · Télécharger' : '⬆ Mise à jour prête · Redémarrer') : `⬇ Mise à jour · ${u.progress || 0} %`;
     el.title = u.status === 'ready' ? `Lumen ${u.version} est téléchargée` : `Téléchargement de Lumen ${u.version || ''}`;
     el.onclick = u.status === 'ready' ? () => offerUpdate(true) : null;
   }
@@ -4893,15 +4898,16 @@
       h('div', { class: 'eyebrow' }, '⬆ Mise à jour prête'),
       h('h2', {}, `Lumen ${u.version}`),
       notes.length ? h('ul', { class: 'upd-notes' }, notes.map((l) => h('li', {}, l))) : h('p', { class: 'muted' }, 'Une nouvelle version est téléchargée.'),
-      h('p', { class: 'muted upd-hint' }, 'Le redémarrage prend quelques secondes. « Plus tard » : elle s’installera quand tu fermeras Lumen.'),
+      h('p', { class: 'muted upd-hint' }, u.manual ? 'Sur Mac, télécharge le nouveau .dmg sur GitHub puis remplace Lumen dans Applications.' : 'Le redémarrage prend quelques secondes. « Plus tard » : elle s’installera quand tu fermeras Lumen.'),
       h('div', { class: 'actions' },
-        actionButton('⟳ Redémarrer maintenant', () => installUpdateNow(), true),
+        u.manual ? actionButton('⬇ Télécharger', () => { closeOverlay(true); api.update.install(); }, true) : actionButton('⟳ Redémarrer maintenant', () => installUpdateNow(), true),
         actionButton('Plus tard', () => closeOverlay()))));
     sfx('select');
   }
   // Écran plein « Mise à jour en cours » : l'installation est silencieuse, Lumen revient tout seul.
   function installUpdateNow() {
     const u = S.update || {};
+    if (u.manual) { api.update.install(); return; }
     if (S.overlay) closeOverlay(true);
     document.body.append(h('div', { class: 'upd-screen' },
       h('span', { class: 'logo-mark big' }),

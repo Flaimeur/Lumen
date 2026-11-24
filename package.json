@@ -15,7 +15,9 @@
     "check:romm": "node scripts/check-romm.js",
     "icon": "electron scripts/make-icon.js",
     "dist": "electron-builder --win nsis",
-    "dist:portable": "electron-builder --win portable"
+    "dist:portable": "electron-builder --win portable",
+    "dist:mac": "electron-builder --mac",
+    "dist:mac:local": "electron-builder --mac dir"
   },
   "build": {
     "appId": "app.lumen.frontend",
@@ -49,7 +51,38 @@
         "repo": "Lumen",
         "releaseType": "release"
       }
-    ]
+    ],
+    "mac": {
+      "icon": "build/icon.png",
+      "category": "public.app-category.games",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "identity": "-",
+      "hardenedRuntime": false,
+      "darkModeSupport": true,
+      "extendInfo": {
+        "NSAppleEventsUsageDescription": "Lumen pilote Spotify / Musique (widget Lecture en cours) et la mise en veille ou l'extinction du Mac.",
+        "NSBluetoothAlwaysUsageDescription": "Lumen lit les manettes Bluetooth.",
+        "LSApplicationCategoryType": "public.app-category.games"
+      },
+      "artifactName": "${productName}-${version}-mac.${ext}"
+    },
+    "dmg": {
+      "artifactName": "${productName}-${version}-mac.${ext}",
+      "title": "Lumen ${version}"
+    }
   },
   "devDependencies": {
     "electron": "^45.2.3",
