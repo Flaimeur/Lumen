@@ -1063,6 +1063,9 @@
     const items = focusables(scopeRoot());
     const cur = S.focusEl && scopeRoot().contains(S.focusEl) ? S.focusEl : null;
     if (!cur) { if (items[0]) setFocus(items[0]); return; }
+    // Destination imposée par l'élément (ex. liste du XMB de la PSP : haut / bas = élément voisin).
+    const forced = cur._act && cur._act.nav && cur._act.nav[dir];
+    if (forced) { const t = forced(); if (t) { setFocus(t); return; } }
     const r = cur.getBoundingClientRect();
     const cx = r.left + r.width / 2;
     const cy = r.top + r.height / 2;
@@ -1704,9 +1707,32 @@
       const paintList = () => {
         const i = cats.findIndex((c) => c.id === S.cxCat);
         listEl.style.setProperty('--i', String(i));
-        listEl.replaceChildren(...cats[i].make());
+        const items = cats[i].make();
+        listEl.style.setProperty('--off', '0px');
+        items.forEach((it, j) => {
+          if (!it._act) return;
+          const f = it._act.focus;
+          it._act.focus = () => { if (f) f(); xmbScroll(it); };
+          // Comme sur la PSP : haut / bas parcourent la liste, gauche / droite changent de catégorie.
+          const catEl = (d) => barEls[Math.max(0, Math.min(barEls.length - 1, i + d))];
+          it._act.nav = {
+            up: () => (j > 0 ? items[j - 1] : catEl(0)),
+            down: () => items[j + 1] || null,
+            left: () => (i > 0 ? catEl(-1) : null),
+            right: () => (i < barEls.length - 1 ? catEl(1) : null),
+          };
+        });
+        listEl.replaceChildren(...items);
       };
-      const bar = h('div', { class: 'xmb-bar' }, cats.map((c) => focusable(h('div', { class: 'xmb-cat' }, h('span', { class: 'xmb-cat-ico' }, cxIco(c.ico)), h('span', { class: 'xmb-cat-label' }, c.label)), {
+      const xmbScroll = (el) => {
+        const items = [...listEl.children];
+        const k = items.indexOf(el);
+        if (k < 0) return;
+        listEl.style.setProperty('--off', el.offsetTop + 'px');
+        items.forEach((it, j) => it.classList.toggle('xmb-above', j < k));
+      };
+      let barEls = [];
+      const bar = h('div', { class: 'xmb-bar' }, barEls = cats.map((c) => focusable(h('div', { class: 'xmb-cat' }, h('span', { class: 'xmb-cat-ico' }, cxIco(c.ico)), h('span', { class: 'xmb-cat-label' }, c.label)), {
         a: () => { const f = listEl.querySelector('.f'); if (f) setFocus(f); },
         focus: () => { setTitle(c.label, ''); setHints('action'); if (S.cxCat !== c.id) { S.cxCat = c.id; paintList(); } },
       })));
@@ -1761,15 +1787,20 @@
       // Switch : pas de widgets sur la console ; raccourcis ronds + Veille.
       return root(statusBar(), info, row(1.04), h('div', { class: 'cx-rounds' }, SHORTCUTS.map(([ico, label, id]) => round(ico, label, () => openTab(id))), round(...POWER)));
     }
-    // Xbox : mosaïque. Le jeu à reprendre en grand, puis jeux, widgets épinglés (2 cases) et applis.
-    const [first, ...rest] = list;
-    const big = first ? tileFor(first, 'cx-big') : null;
-    if (big) big.append(h('div', { class: 'cx-big-label' }, h('span', { class: 'eyebrow' }, recent.length ? 'Reprendre' : 'À la une'), h('b', {}, first.name)));
-    const gameRest = rest.filter((g) => g.source !== 'app');
-    const appRest = rest.filter((g) => g.source === 'app');
+    // Xbox Series : l'image du jeu sélectionné remplit l'écran ; rangée « Reprendre » (jeux) avec le nom sous la
+    // vignette choisie, puis une rangée « Épinglés » (widgets et applis).
+    const gamesOnly = list.filter((g) => g.source !== 'app');
+    const appsOnly = list.filter((g) => g.source === 'app');
+    const xName = h('div', { class: 'xb-name' });
+    const xTile = (g) => { const t = tileFor(g); const f = t._act.focus; t._act.focus = () => { if (f) f(); xName.textContent = g.name; }; return t; };
     return root(
-      h('section', { class: 'cx-mosaic', 'data-fscale': '1.03' }, big, ...gameRest.map((g) => tileFor(g)),
-        ...widgetIds.map((w) => widgetCard(w)), ...appRest.map((g) => tileFor(g)), libTile()),
+      h('section', { class: 'xb-band' },
+        h('div', { class: 'xb-label' }, recent.length ? 'Reprendre' : 'Mes jeux'),
+        h('div', { class: 'row cx-row xb-row', 'data-fscale': '1.06' }, gamesOnly.map(xTile), libTile()),
+        xName),
+      (widgetIds.length || appsOnly.length) ? h('section', { class: 'xb-pins' },
+        h('div', { class: 'xb-label' }, 'Épinglés'),
+        h('div', { class: 'row xb-pinrow' }, ...widgetIds.map((w) => widgetCard(w)), ...appsOnly.map((g) => tileFor(g)))) : null,
       statusBar()); // affichée en haut (CSS order), mais après les jeux pour que la sélection démarre sur eux
   }
 
