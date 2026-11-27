@@ -1656,9 +1656,9 @@ body.cx-chrome #bottombar { padding-top: 0; opacity: 0.75; }
 .cx-ps4 .cx-cards { margin-top: 2vh; }
 
 /* ---- Switch : fond uni, profil à gauche, heure et batterie à droite, ronds colorés ---- */
-body.cx-chrome[data-cx="switch"] #bg > * { display: none; }
-body.cx-chrome[data-cx="switch"] #bg { background: #2d2d2d; }
-body.cx-chrome[data-cx="switch"] { --accent: #00c3e3; }
+body[data-cxt="switch"] #bg > * { display: none; }
+body[data-cxt="switch"] #bg { background: #2d2d2d; }
+body[data-cxt="switch"] { --accent: #00c3e3; }
 .cx-switch .cx-status { padding: 22px 3vw 0; }
 .cx-switch .cx-info { margin: 3vh 3vw 0; }
 .cx-switch .cx-info h1 { color: #00c3e3; font-weight: 700; }
@@ -1677,16 +1677,16 @@ body.cx-chrome[data-cx="switch"] { --accent: #00c3e3; }
 .cx-xbox .cx-status { padding: 16px 12px 4px; order: -1; }
 
 /* ---- PSP : fond à vagues, date et heure en haut à droite ---- */
-body.cx-chrome[data-cx="psp"] #bg > * { display: none; }
-body.cx-chrome[data-cx="psp"] #bg { background: linear-gradient(180deg, #0f2a52 0%, #0a1c3a 55%, #071226 100%); }
-body.cx-chrome[data-cx="psp"] #bg::before, body.cx-chrome[data-cx="psp"] #bg::after {
+body[data-cxt="psp"] #bg > * { display: none; }
+body[data-cxt="psp"] #bg { background: linear-gradient(180deg, #0f2a52 0%, #0a1c3a 55%, #071226 100%); }
+body[data-cxt="psp"] #bg::before, body[data-cxt="psp"] #bg::after {
   content: ""; position: absolute; left: -10%; right: -10%; height: 46%; top: 42%; border-radius: 50%;
   background: radial-gradient(ellipse at center, rgba(160,210,255,.22), rgba(160,210,255,0) 62%);
   animation: xmb-wave 14s ease-in-out infinite alternate;
 }
-body.cx-chrome[data-cx="psp"] #bg::after { top: 50%; height: 30%; animation-duration: 19s; animation-direction: alternate-reverse; opacity: .7; }
+body[data-cxt="psp"] #bg::after { top: 50%; height: 30%; animation-duration: 19s; animation-direction: alternate-reverse; opacity: .7; }
 @keyframes xmb-wave { from { transform: translateX(-4%) rotate(-3deg) scaleY(.8); } to { transform: translateX(4%) rotate(3deg) scaleY(1.15); } }
-@media (prefers-reduced-motion: reduce) { body.cx-chrome[data-cx="psp"] #bg::before, body.cx-chrome[data-cx="psp"] #bg::after { animation: none; } }
+@media (prefers-reduced-motion: reduce) { body[data-cxt="psp"] #bg::before, body[data-cxt="psp"] #bg::after { animation: none; } }
 .cx-status-psp { padding: 18px 3vw 0; }
 .cx-status-psp .cx-clock { font-size: 20px; font-weight: 600; }
 
@@ -1716,7 +1716,7 @@ body.cx-light .cx-lib-name { color: #6b7482; }
 body.cx-light .cx-round { background: #ffffff; color: #5b6573; box-shadow: 0 2px 6px rgba(0,0,0,.12), inset 0 0 0 2px #d5dbe2; }
 
 /* ---- Wii : fond à fines lignes, chaînes à cadre blanc, barre du bas arrondie ---- */
-body.cx-chrome[data-cx="wii"] #bg { background: repeating-linear-gradient(0deg, #f4f6f8 0 3px, #eaeef2 3px 4px); }
+body[data-cxt="wii"] #bg { background: repeating-linear-gradient(0deg, #f4f6f8 0 3px, #eaeef2 3px 4px); }
 .wii-grid > .wii-ch { border-radius: 18px; box-shadow: 0 0 0 4px #ffffff, 0 0 0 6px #cfd6de, 0 6px 14px rgba(0,0,0,.12); }
 .wii-grid > .widget.wii-ch { background: #ffffff; color: #3a414c; }
 .wii-bar { position: relative; margin: 18px 0 0; padding: 18px 6vw 24px; background: linear-gradient(#f9fafb, #e3e8ed); border-radius: 50% 50% 0 0 / 34px 34px 0 0; box-shadow: 0 -2px 0 #d5dbe2; justify-content: space-between; }
@@ -1724,7 +1724,7 @@ body.cx-chrome[data-cx="wii"] #bg { background: repeating-linear-gradient(0deg, 
 .wii-clock span { color: #8a939f; }
 
 /* ---- Wii U : panneau blanc quadrillé ---- */
-body.cx-chrome[data-cx="wiiu"] #bg { background: #f2f4f6; background-image: linear-gradient(#e4e8ec 1px, transparent 1px), linear-gradient(90deg, #e4e8ec 1px, transparent 1px); background-size: 34px 34px; }
+body[data-cxt="wiiu"] #bg { background: #f2f4f6; background-image: linear-gradient(#e4e8ec 1px, transparent 1px), linear-gradient(90deg, #e4e8ec 1px, transparent 1px); background-size: 34px 34px; }
 .wiiu-panel { background: rgba(255,255,255,.85); box-shadow: 0 4px 18px rgba(0,0,0,.08), inset 0 0 0 1px #d9dfe5; }
 .wiiu-panel > .tile { border-radius: 10px; box-shadow: 0 0 0 3px #ffffff, 0 0 0 4px #d5dbe2; }
 
@@ -1756,9 +1756,9 @@ body.cx-light .cx-li.focused { background: #dff3fc; }
 .ds-cal-grid .today { background: #33b5ec; color: #fff; border-radius: 6px; font-weight: 800; }
 
 /* ---- PS4 : fond bleu à vagues par défaut, vignettes carrées, sélection agrandie ---- */
-body.cx-chrome[data-cx="ps4"] #bg > * { display: none; }
-body.cx-chrome[data-cx="ps4"] #bg { background: radial-gradient(120% 90% at 70% 110%, #1d6fc4 0%, #0f3f86 38%, #0a2457 70%, #061538 100%); }
-body.cx-chrome[data-cx="ps4"] #bg::before { content: ""; position: absolute; inset: 40% -20% -10%; background: radial-gradient(ellipse at 50% 60%, rgba(120,190,255,.28), transparent 60%); filter: blur(6px); animation: xmb-wave 18s ease-in-out infinite alternate; }
+body[data-cxt="ps4"] #bg > * { display: none; }
+body[data-cxt="ps4"] #bg { background: radial-gradient(120% 90% at 70% 110%, #1d6fc4 0%, #0f3f86 38%, #0a2457 70%, #061538 100%); }
+body[data-cxt="ps4"] #bg::before { content: ""; position: absolute; inset: 40% -20% -10%; background: radial-gradient(ellipse at 50% 60%, rgba(120,190,255,.28), transparent 60%); filter: blur(6px); animation: xmb-wave 18s ease-in-out infinite alternate; }
 .cx-ps4 .cx-row .tile { flex: 0 0 var(--tile); height: var(--tile); }
 .cx-ps4 .cx-row .focused.tile { flex-basis: calc(var(--tile) * 1.35); height: calc(var(--tile) * 1.35); }
 .cx-ps4 .cx-row { align-items: center; }
@@ -1796,3 +1796,58 @@ body.cx-chrome[data-cx="xbox"] #bg .bg-shade { background: linear-gradient(180de
 .xmb-list > .cx-li { transition: transform .22s var(--out), opacity .2s; }
 .xmb-list > .cx-li.focused { background: rgba(255,255,255,.12); }
 @media (prefers-reduced-motion: reduce) { .cx-psp > .xmb-list, .xmb-list > .cx-li { transition: none; } }
+
+/* ---- Wii : 3 rangées de 4 chaînes, barre en bas de l'écran, chaînes vides ---- */
+.cx-wii { display: flex; flex-direction: column; min-height: 100%; }
+.cx-wii .wii-grid { grid-template-rows: repeat(3, clamp(110px, 11vw, 180px)); grid-auto-rows: 0; overflow: hidden; }
+.wii-grid > .wii-ch.wide { grid-column: auto; }
+.wii-empty { border-radius: 18px; background: linear-gradient(#f7f9fa, #e9edf1); box-shadow: 0 0 0 4px #ffffff, 0 0 0 6px #d8dee4; }
+.cx-wii .wii-bar { margin-top: auto; }
+
+/* ---- Widgets lisibles sur les fonds clairs ---- */
+body.cx-light .widget { --text: #2f3640; --muted: #6b7482; color: #2f3640; background: #ffffff; }
+body.cx-light .widget .w-title, body.cx-light .widget .w-sub { color: #6b7482; }
+body.cx-light .widget.has-bg { --text: #ffffff; --muted: rgba(255, 255, 255, 0.78); color: #ffffff; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6); }
+body.cx-light .widget.has-bg .w-title, body.cx-light .widget.has-bg .w-sub { color: rgba(255, 255, 255, 0.85); }
+body.cx-light .widget.has-bg .w-bgimg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,.72), rgba(0,0,0,.35)); }
+
+/* =========================================================================
+   Thème de la console choisie, sur tout Lumen (pas seulement l'accueil)
+   ========================================================================= */
+/* PS5 : sélection blanche, coins arrondis modérés. */
+body[data-cxt="ps5"] { --accent: #f2f4f8; }
+body[data-cxt="ps5"] .tile { border-radius: 14px; }
+/* PS4 : bleu, fond à vagues (défini plus haut), vignettes presque carrées. */
+body[data-cxt="ps4"] { --accent: #4aa3ff; --panel: rgba(8, 32, 78, 0.55); --panel-strong: rgba(6, 24, 60, 0.96); --line: rgba(140, 190, 255, 0.16); }
+body[data-cxt="ps4"] .tile { border-radius: 4px; }
+/* Xbox : vert, angles droits partout, panneaux gris foncé. */
+body[data-cxt="xbox"] { --accent: #3fbf3f; --panel: rgba(28, 28, 28, 0.78); --panel-strong: rgba(22, 22, 22, 0.97); --line: rgba(255, 255, 255, 0.08); }
+body[data-cxt="xbox"] #bg { background: #0e0e0e; }
+body[data-cxt="xbox"] .tile, body[data-cxt="xbox"] .widget, body[data-cxt="xbox"] .set-row, body[data-cxt="xbox"] .modal,
+body[data-cxt="xbox"] .btn, body[data-cxt="xbox"] .chip, body[data-cxt="xbox"] .pill, body[data-cxt="xbox"] #dock,
+body[data-cxt="xbox"] .dock-item, body[data-cxt="xbox"] .menu-item, body[data-cxt="xbox"] .syscard, body[data-cxt="xbox"] .hint { border-radius: 4px; }
+/* Switch : gris foncé uni, cyan, petits arrondis. */
+body[data-cxt="switch"] { --panel: rgba(62, 62, 62, 0.92); --panel-strong: #383838; --line: rgba(255, 255, 255, 0.07); }
+body[data-cxt="switch"] .tile { border-radius: 3px; }
+body[data-cxt="switch"] .modal { border-radius: 10px; }
+body[data-cxt="switch"] .btn, body[data-cxt="switch"] .set-row, body[data-cxt="switch"] .menu-item, body[data-cxt="switch"] .syscard { border-radius: 6px; }
+/* PS Vita : bleu nuit, bulles. */
+body[data-cxt="vita"] { --accent: #4aa3ff; }
+body[data-cxt="vita"] #bg > * { display: none; }
+body[data-cxt="vita"] #bg { background: radial-gradient(130% 100% at 20% 0%, #1b3c7a 0%, #0c1d42 45%, #060d22 100%); }
+/* PSP : bleu, sélection blanche douce. */
+body[data-cxt="psp"] { --accent: #d6e8ff; --panel: rgba(255, 255, 255, 0.07); --panel-strong: rgba(10, 28, 58, 0.96); }
+
+/* ---- Thème clair complet (Wii, Wii U, 3DS, DS) ---- */
+body.cx-light { --text: #2f3640; --muted: #6b7482; --panel: rgba(255, 255, 255, 0.88); --panel-strong: #ffffff; --line: rgba(20, 30, 40, 0.12); color-scheme: light; color: var(--text); }
+body[data-cxt="n3ds"] #bg > *, body[data-cxt="ds"] #bg > * { display: none; }
+body[data-cxt="n3ds"] #bg, body[data-cxt="ds"] #bg { background: #eef1f4; }
+body.cx-light .tile { background: #e6eaee; box-shadow: 0 0 0 3px #ffffff, 0 0 0 4px #d5dbe2, 0 4px 10px rgba(0, 0, 0, 0.1); }
+body.cx-light .modal { box-shadow: 0 24px 60px rgba(30, 40, 50, 0.22); }
+body.cx-light .btn { background: #e9edf1; color: var(--text); }
+body.cx-light .btn.primary { background: var(--accent); color: #ffffff; }
+body.cx-light .focused.set-row, body.cx-light .focused.chip, body.cx-light .menu-item.focused, body.cx-light .focused.menu-chip { background: #dff3fc; }
+body.cx-light .dock-item { color: #5b6573; }
+body.cx-light .syscard, body.cx-light .folder { box-shadow: 0 0 0 3px #ffffff, 0 0 0 4px #d5dbe2, 0 4px 10px rgba(0, 0, 0, 0.1); }
+body.cx-light .view-head h1, body.cx-light h1, body.cx-light h2 { color: #2f3640; }
+body.cx-light #overlay { background: rgba(200, 210, 220, 0.45); }

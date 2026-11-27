@@ -1105,7 +1105,11 @@
       const on = !!(lay && lay !== 'lumen' && HOME_LAYOUTS[lay]);
       document.body.classList.toggle('cx-chrome', on);
       document.body.dataset.cx = on ? lay : '';
-      document.body.classList.toggle('cx-light', on && ['wii', 'wiiu', 'n3ds', 'ds'].includes(lay));
+      // Thème de la console choisie : sur tout Lumen (bibliothèque, fiches, réglages, menus), pas seulement l'accueil.
+      const theme = S.cfg ? homeCfg().layout : null;
+      const themed = !!(theme && theme !== 'lumen' && HOME_LAYOUTS[theme]);
+      document.body.dataset.cxt = themed ? theme : '';
+      document.body.classList.toggle('cx-light', themed && ['wii', 'wiiu', 'n3ds', 'ds'].includes(theme));
     }
     let content;
     if (v === 'home') content = viewHome();
@@ -1768,11 +1772,13 @@
         top); // affiché au-dessus (CSS order)
     }
     if (layout === 'wii') {
-      const ch = (el) => { el.classList.add('wii-ch'); return el; };
+      // Une chaîne = une case (même un widget large) ; toujours 12 cases (3 × 4) comme sur la console.
+      const ch = (el) => { el.classList.add('wii-ch'); el.classList.remove('wide'); return el; };
+      const nW = Math.min(3, widgetIds.length);
+      const chGames = list.slice(0, 11 - nW).map((g) => tileFor(g, 'wii-ch'));
+      const empty = Array.from({ length: Math.max(0, 11 - nW - chGames.length) }, () => h('div', { class: 'wii-ch wii-empty', 'aria-hidden': 'true' }));
       return root(
-        // 12 chaînes, comme sur l'écran de la console : jusqu'à 3 widgets, la Bibliothèque, et des jeux / applis pour le reste.
-        h('section', { class: 'wii-grid', 'data-fscale': '1.04' }, list.slice(0, 11 - Math.min(3, widgetIds.length)).map((g) => tileFor(g, 'wii-ch')),
-          ...widgetIds.slice(0, 3).map((w) => ch(widgetCard(w))), ch(libTile())),
+        h('section', { class: 'wii-grid', 'data-fscale': '1.04' }, chGames, ...widgetIds.slice(0, nW).map((w) => ch(widgetCard(w))), ...empty, ch(libTile())),
         h('div', { class: 'wii-bar' },
           round('settings', 'Réglages', () => openTab('settings')),
           h('div', { class: 'wii-clock' }, h('b', { 'data-clock': '' }, clockText()), h('span', {}, new Date().toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'numeric' }))),
