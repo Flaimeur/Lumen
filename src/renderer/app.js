@@ -924,7 +924,7 @@
   let bgFront = 0;
   function setBackground(file, color) {
     clearTimeout(bgTimer);
-    if (document.body.classList.contains('wp-fixed')) { document.documentElement.style.setProperty('--ambient', color || 'var(--accent)'); return; }
+    if (document.body.classList.contains('wp-fixed') && !['ps5', 'xbox'].includes(document.body.dataset.cxt)) { document.documentElement.style.setProperty('--ambient', color || 'var(--accent)'); return; }
     bgTimer = setTimeout(() => {
       const key = file || color || 'none';
       document.documentElement.style.setProperty('--ambient', color || 'var(--accent)');
@@ -1620,14 +1620,14 @@
       const t = gameTile(g);
       if (cls) t.classList.add(cls);
       const f = t._act.focus;
-      t._act.focus = () => { if (f) f(); paintInfo(g); placeSelName(t, g); };
+      t._act.focus = () => { if (f) f(); paintInfo(g); placeSelName(t, g); const r = t.closest('.cx'); if (r) r.classList.remove('hub-on'); };
       return t;
     };
     // Dernière vignette : toute la bibliothèque (onglet Consoles).
     // Icônes dessinées de Lumen (comme le dock) plutôt que des émojis, qui changent de style d'un PC à l'autre.
     const cxIco = (name) => (ICONS[name] ? icon(name) : window.LumenGlyphs ? window.LumenGlyphs.svg(name) : h('span', {}, '•'));
     const libTile = () => focusable(h('div', { class: 'tile cx-lib' }, h('span', { class: 'cx-lib-ico' }, cxIco('library')), h('span', { class: 'cx-lib-name' }, 'Bibliothèque')),
-      { a: () => openTab('systems'), focus: () => { setTitle('Bibliothèque', 'Toutes tes consoles'); setHints('action'); } });
+      { a: () => openTab('systems'), focus: () => { setTitle('Bibliothèque', 'Toutes tes consoles'); setHints('action'); hideSelName(); } });
     const row = (fscale) => h('div', { class: 'row cx-row', 'data-fscale': fscale }, list.map((g) => tileFor(g)), libTile(), layout === 'ps5' ? selName : null);
     const cards = (cls) => (widgetIds.length ? h('section', { class: cls }, widgetIds.map((w) => widgetCard(w))) : null);
     const systemsShelf = () => h('section', { class: 'shelf' }, h('div', { class: 'shelf-title' }, 'Consoles'), h('div', { class: 'row' }, sortedSystems().map(systemCard)));
@@ -1668,8 +1668,9 @@
       if (layout === 'ps5') {
         const appsSysId = appsSys ? 'apps' : null;
         return h('div', { class: 'cx-status' },
-          h('div', { class: 'cx-tabs' }, h('span', { class: 'cx-tab on' }, 'Jeux'),
-            focusable(h('span', { class: 'cx-tab' }, 'Médias'), { a: () => (appsSysId ? go({ view: 'games', systemId: appsSysId }) : openTab('systems')), focus: () => { setTitle('Médias', 'Applications'); setHints('action'); } })),
+          h('div', { class: 'cx-tabs' },
+            focusable(h('span', { class: 'cx-tab' + (S.cxMedia ? '' : ' on') }, 'Jeux'), { a: () => { S.cxMedia = false; S.keepAnim = true; rerender(); }, focus: () => { setTitle('Jeux', ''); setHints('action'); } }),
+            focusable(h('span', { class: 'cx-tab' + (S.cxMedia ? ' on' : '') }, 'Médias'), { a: () => { S.cxMedia = true; S.keepAnim = true; rerender(); }, focus: () => { setTitle('Médias', 'Applications et captures'); setHints('action'); } })),
           h('div', { class: 'cx-right' }, sIcon('search', 'Recherche', () => openTab('search')), sIcon('settings', 'Réglages', () => openTab('settings')), avatar(), padBat(), clockEl()));
       }
       if (layout === 'ps4') {
@@ -1690,11 +1691,15 @@
     };
     // PS5 : le nom du jeu sélectionné s'affiche à droite de sa vignette agrandie.
     const selName = h('div', { class: 'cx-selname' });
+    let selTile = null;
+    const hideSelName = () => { selName.classList.remove('on'); if (selTile) { selTile.style.marginRight = ''; selTile = null; } };
     const placeSelName = (t, g) => {
       if (layout !== 'ps5') return;
+      hideSelName();
       selName.textContent = g.name;
-      const put = () => { if (!t.isConnected) return; selName.style.left = (t.offsetLeft + t.offsetWidth + 18) + 'px'; selName.style.top = (t.offsetTop + t.offsetHeight / 2) + 'px'; selName.classList.add('on'); };
-      selName.classList.remove('on');
+      selTile = t;
+      t.style.marginRight = Math.min(320, selName.scrollWidth + 44) + 'px';
+      const put = () => { if (!t.isConnected || selTile !== t) return; selName.style.left = (t.offsetLeft + t.offsetWidth + 18) + 'px'; selName.style.top = (t.offsetTop + t.offsetHeight / 2) + 'px'; selName.classList.add('on'); };
       setTimeout(put, 240);
     };
 
@@ -1786,7 +1791,35 @@
     }
     if (layout === 'wiiu') return root(statusBar(), info, h('section', { class: 'wiiu-panel', 'data-fscale': '1.06' }, list.map((g) => tileFor(g)), libTile()), rounds(), cards('cx-cards'));
 
-    if (layout === 'ps5') return root(row(1), statusBar(), info, cards('cx-cards'));
+    if (layout === 'ps5') {
+      // Jeux : tuile « Accueil » (widgets, comme le Welcome hub), jeux, Bibliothèque.
+      // Médias : applis et captures d'écran (les plus récentes).
+      const media = !!S.cxMedia;
+      if (media && !S.cxCaptures && api.capture && api.capture.all) {
+        S.cxCaptures = [];
+        api.capture.all(40).then((l) => { S.cxCaptures = l || []; if (S.route.view === 'home' && !S.overlay && S.cxMedia) { S.keepAnim = true; rerender(); } }).catch(() => {});
+      }
+      const caps = S.cxCaptures || [];
+      const capTile = (c) => focusable(h('div', { class: 'tile cx-cap' }, h('img', { class: 'art', src: api.mediaUrl(c.path), alt: '', loading: 'lazy' })), {
+        a: () => { const same = caps.filter((x) => x.game === c.game); openCaptureViewer({ name: c.game }, same, same.indexOf(c)); },
+        focus: () => {
+          hideSelName(); setBackground(c.path); setHints('action');
+          setTitle(c.game, 'Capture');
+          info.replaceChildren(h('h1', {}, c.game), h('div', { class: 'cx-meta' }, 'Capture · ' + new Date(c.time).toLocaleString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })));
+        },
+      });
+      const hub = focusable(h('div', { class: 'tile cx-lib cx-hub' }, h('span', { class: 'cx-lib-ico' }, cxIco('home')), h('span', { class: 'cx-lib-name' }, 'Accueil')), {
+        a: () => openHomeEditor(),
+        focus: () => { const r = hub.closest('.cx'); if (r) r.classList.add('hub-on'); hideSelName(); setTitle('Accueil', 'Tes widgets'); setHints('action'); setBackground(null, S.cfg.accent); },
+      });
+      const items = media
+        ? [...apps.map((g) => tileFor(g)), ...caps.map(capTile)]
+        : [...games.slice(0, 12).map((g) => tileFor(g)), libTile()];
+      const rowEl = h('div', { class: 'row cx-row', 'data-fscale': '1' }, items, media ? null : hub, selName);
+      if (media) { info.replaceChildren(); if (apps[0]) paintInfo(apps[0]); }
+      const empty = media && !items.length ? h('p', { class: 'muted cx-empty' }, 'Pas encore d’application ni de capture (Ctrl+Maj+S ou Select + R1 pendant un jeu).') : null;
+      return root(rowEl, statusBar(), empty, info, cards('cx-cards'));
+    }
     // PS4 : la rangée vient d'abord dans la page (sélection au démarrage), la barre de widgets s'affiche au-dessus.
     if (layout === 'ps4') return root(row(1), statusBar(), info, cards('cx-cards'));
     if (layout === 'switch') {

@@ -823,6 +823,7 @@ ipcMain.handle('companions:run', (_e, id, action) => companions.run(String(id ||
 ipcMain.handle('shell:folder', async (_e, p) => { const d = String(p || ''); if (!d || !fs.existsSync(d) || !fs.statSync(d).isDirectory()) return 'Dossier introuvable'; return shell.openPath(d); });
 ipcMain.handle('shell:url', async (_e, u) => { const s = String(u || ''); if (!/^https?:\/\//i.test(s)) return false; await shell.openExternal(s); return true; });
 ipcMain.handle('capture:list', (_e, name) => capture.list(String(name || '')));
+ipcMain.handle('capture:all', (_e, limit) => capture.listAll(Math.min(200, Number(limit) || 40)));
 ipcMain.handle('capture:open', (_e, name) => { const d = name ? capture.gameDir(String(name)) : capture.root(); fs.mkdirSync(d, { recursive: true }); return shell.openPath(d); });
 
 // ---------- RetroAchievements (pseudo + clé Web API de l'utilisateur) ----------

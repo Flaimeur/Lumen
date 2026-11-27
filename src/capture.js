@@ -35,4 +35,17 @@ function list(gameName) {
   } catch { return []; }
 }
 
-module.exports = { take, list, gameDir, root };
+function listAll(limit = 40) {
+  const out = [];
+  let dirs = [];
+  try { dirs = fs.readdirSync(root(), { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name); } catch { return out; }
+  for (const d of dirs) {
+    const dir = path.join(root(), d);
+    let files = [];
+    try { files = fs.readdirSync(dir).filter((f) => /\.(jpe?g|png|webp)$/i.test(f)); } catch { continue; }
+    for (const f of files) { const p = path.join(dir, f); try { out.push({ path: p, time: fs.statSync(p).mtimeMs, game: d }); } catch { /* fichier disparu */ } }
+  }
+  return out.sort((a, b) => b.time - a.time).slice(0, limit);
+}
+
+module.exports = { take, list, listAll, gameDir, root };

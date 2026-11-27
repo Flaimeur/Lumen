@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld('lumen', {
     arm: (game) => ipcRenderer.invoke('capture:arm', game || null),
     take: () => ipcRenderer.invoke('capture:take'),
     list: (name) => ipcRenderer.invoke('capture:list', name),
+    all: (limit) => ipcRenderer.invoke('capture:all', limit),
     open: (name) => ipcRenderer.invoke('capture:open', name || ''),
     onTaken: (cb) => ipcRenderer.on('capture:taken', (_e, d) => cb(d)),
   },
