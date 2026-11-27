@@ -1851,3 +1851,21 @@ body.cx-light .dock-item { color: #5b6573; }
 body.cx-light .syscard, body.cx-light .folder { box-shadow: 0 0 0 3px #ffffff, 0 0 0 4px #d5dbe2, 0 4px 10px rgba(0, 0, 0, 0.1); }
 body.cx-light .view-head h1, body.cx-light h1, body.cx-light h2 { color: #2f3640; }
 body.cx-light #overlay { background: rgba(200, 210, 220, 0.45); }
+
+/* ---- Wii : la grille de chaînes remplit l'écran jusqu'à la barre ---- */
+.cx-wii .wii-grid { flex: 1 1 auto; grid-template-rows: repeat(3, minmax(110px, 1fr)); min-height: 0; padding-bottom: 18px; }
+.cx-wii .wii-bar { margin-top: 0; }
+
+/* ---- Thème clair : textes de couleur assombris pour rester lisibles ---- */
+body.cx-light .w-rank-text b, body.cx-light .rank-name { color: color-mix(in srgb, var(--rc) 45%, #2f3640); }
+body.cx-light .gen, body.cx-light .gen-title, body.cx-light .gen-chip { color: #ffffff; }
+
+/* ---- Schéma des dispositions : toujours sombre (lisible même en thème clair) ---- */
+.lay-sketch .ls-bg { fill: #161b26; stroke: rgba(0, 0, 0, 0.25); }
+.lay-sketch .ls-game { fill: rgba(255, 255, 255, 0.32); }
+.lay-sketch .ls-widget { fill: rgba(255, 255, 255, 0.12); stroke: rgba(255, 255, 255, 0.28); }
+.lay-sketch .ls-panel { fill: rgba(255, 255, 255, 0.07); stroke: rgba(255, 255, 255, 0.2); }
+.lay-sketch .ls-text { fill: rgba(255, 255, 255, 0.7); }
+.lay-sketch .ls-line { fill: rgba(255, 255, 255, 0.2); }
+.lay-sketch .ls-round { fill: rgba(255, 255, 255, 0.2); stroke: rgba(255, 255, 255, 0.4); }
+.lay-sketch .ls-screen { fill: rgba(0, 0, 0, 0.45); stroke: rgba(255, 255, 255, 0.35); }
