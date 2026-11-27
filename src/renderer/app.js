@@ -2350,7 +2350,8 @@
     const paintHome = (o = {}) => { const key = JSON.stringify(o); if (key === hpvLast) return; clearTimeout(hpvTimer); hpvTimer = setTimeout(() => { hpvLast = key; paintHomeNow(o); }, 140); };
     const paintHomeNow = (o) => {
       if (!hpv.isConnected) return;
-      const saved = o.preset ? JSON.stringify({ home: S.cfg.home, wallpaper: S.cfg.wallpaper, accent: S.cfg.accent }) : null;
+      // Aperçu d'un style : on garde les objets d'origine (l'éditeur les modifie ensuite) et une copie de l'accueil.
+      const saved = o.preset ? { home: homeCfg(), homeCopy: JSON.stringify(homeCfg()), wallpaper: S.cfg.wallpaper, accent: S.cfg.accent } : null;
       let wallTxt = '';
       let view;
       try {
@@ -2380,7 +2381,13 @@
         hpv.style.setProperty('--accent', S.cfg.accent);
         hpv.style.setProperty('--wp-dim', String(wl.dim ?? 0.25));
       } catch { view = h('div', {}); } finally {
-        if (saved) { const b = JSON.parse(saved); S.cfg.home = b.home; S.cfg.wallpaper = b.wallpaper; S.cfg.accent = b.accent; }
+        // Remise en état sur place : les réglages choisis après (disposition, widgets…) touchent bien la vraie config.
+        if (saved) {
+          const hc = saved.home;
+          for (const k of Object.keys(hc)) delete hc[k];
+          Object.assign(hc, JSON.parse(saved.homeCopy));
+          S.cfg.home = hc; S.cfg.wallpaper = saved.wallpaper; S.cfg.accent = saved.accent;
+        }
       }
       view.querySelectorAll('.f').forEach((e) => { e.classList.remove('f', 'focused'); });
       view.querySelectorAll('[id]').forEach((e) => e.removeAttribute('id'));
@@ -2422,7 +2429,7 @@
       const pv = h('div', { class: 'lay-preview' });
       const show = (id) => pv.replaceChildren(layoutSketch(id), h('b', {}, HOME_LAYOUTS[id].name), h('p', { class: 'muted small' }, HOME_LAYOUTS[id].desc));
       show(home.layout || 'lumen');
-      openMenu('Disposition de l’accueil', Object.entries(HOME_LAYOUTS).map(([id, l]) => [l.name + (id === (home.layout || 'lumen') ? '  ✓' : ''), () => { home.layout = id; reopen('Disposition de l’accueil'); }, { focus: () => { show(id); setHints('action'); } }]),
+      openMenu('Disposition de l’accueil', Object.entries(HOME_LAYOUTS).map(([id, l]) => [l.name + (id === (home.layout || 'lumen') ? '  ✓' : ''), () => { homeCfg().layout = id; reopen('Disposition de l’accueil'); }, { focus: () => { show(id); setHints('action'); } }]),
         'select', { preview: pv, cls: 'lay-menu' });
     },
       lay.desc + (home.layout && home.layout !== 'lumen' ? ' Les blocs et leur ordre plus bas ne servent qu’à la disposition Lumen.' : ''));
