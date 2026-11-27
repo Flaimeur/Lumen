@@ -1543,6 +1543,35 @@
     vita: { name: 'Façon PS Vita', desc: 'Bulles rondes pour les jeux et les applis, widgets dessous.' },
     psp: { name: 'Façon PSP', desc: 'Barre de catégories (Jeux, Applications, Widgets, Lumen) et liste verticale dessous.' },
   };
+  // Petit schéma de chaque disposition (menu de choix) : g = jeu, b = grand jeu, w = widget, r = rond,
+  // l = ligne de liste, t = texte, s = écran (DS / 3DS), c = bulle, i = icône de catégorie. Coordonnées sur 160 × 90.
+  const LAYOUT_SKETCH = {
+    lumen: [['w', 6, 6, 34, 14], ['w', 44, 6, 34, 14], ['w', 82, 6, 34, 14], ['w', 120, 6, 34, 14], ['b', 6, 24, 148, 26], ['g', 6, 56, 20, 28], ['g', 30, 56, 20, 28], ['g', 54, 56, 20, 28], ['g', 78, 56, 20, 28], ['g', 102, 56, 20, 28]],
+    ps5: [['g', 6, 6, 14, 14], ['g', 24, 6, 10, 10], ['g', 38, 6, 10, 10], ['g', 52, 6, 10, 10], ['g', 66, 6, 10, 10], ['g', 80, 6, 10, 10], ['t', 6, 28, 70, 9], ['t', 6, 41, 40, 5], ['w', 6, 56, 34, 28], ['w', 44, 56, 34, 28], ['w', 82, 56, 34, 28], ['w', 120, 56, 34, 28]],
+    ps4: [['w', 6, 5, 148, 10], ['g', 6, 24, 34, 40], ['g', 44, 30, 22, 28], ['g', 70, 30, 22, 28], ['g', 96, 30, 22, 28], ['g', 122, 30, 22, 28], ['t', 6, 70, 70, 7], ['t', 6, 80, 40, 4]],
+    xbox: [['b', 6, 6, 54, 50], ['g', 64, 6, 28, 23], ['g', 96, 6, 28, 23], ['g', 128, 6, 26, 23], ['g', 64, 33, 28, 23], ['g', 96, 33, 28, 23], ['g', 128, 33, 26, 23], ['w', 6, 60, 70, 24], ['w', 80, 60, 74, 24]],
+    switch: [['t', 6, 4, 50, 5], ['b', 6, 13, 34, 34], ['g', 44, 13, 34, 34], ['g', 82, 13, 34, 34], ['g', 120, 13, 34, 34], ['r', 44, 56, 9], ['r', 64, 56, 9], ['r', 84, 56, 9], ['r', 104, 56, 9], ['w', 6, 70, 46, 16], ['w', 56, 70, 46, 16], ['w', 106, 70, 48, 16]],
+    wiiu: [['t', 6, 4, 50, 5], ['w', 6, 12, 148, 40, 'panel'], ['g', 12, 16, 20, 15], ['g', 36, 16, 20, 15], ['g', 60, 16, 20, 15], ['g', 84, 16, 20, 15], ['g', 108, 16, 20, 15], ['g', 12, 34, 20, 15], ['g', 36, 34, 20, 15], ['g', 60, 34, 20, 15], ['r', 44, 58, 8], ['r', 64, 58, 8], ['r', 84, 58, 8], ['r', 104, 58, 8], ['w', 6, 72, 70, 14], ['w', 80, 72, 74, 14]],
+    wii: [['g', 6, 6, 34, 18], ['g', 44, 6, 34, 18], ['g', 82, 6, 34, 18], ['g', 120, 6, 34, 18], ['g', 6, 28, 34, 18], ['g', 44, 28, 34, 18], ['g', 82, 28, 34, 18], ['w', 120, 28, 34, 18], ['w', 6, 50, 34, 18], ['w', 44, 50, 34, 18], ['g', 82, 50, 34, 18], ['g', 120, 50, 34, 18], ['r', 14, 76, 7], ['t', 62, 74, 36, 8], ['r', 140, 76, 7]],
+    n3ds: [['s', 22, 3, 116, 40], ['t', 30, 10, 50, 7], ['w', 88, 10, 42, 26], ['s', 38, 47, 84, 40], ['g', 44, 52, 16, 14], ['g', 64, 52, 16, 14], ['g', 84, 52, 16, 14], ['g', 104, 52, 12, 14], ['g', 44, 70, 16, 14], ['g', 64, 70, 16, 14]],
+    ds: [['s', 30, 3, 100, 40], ['w', 38, 10, 40, 26], ['w', 82, 10, 40, 26], ['s', 30, 47, 100, 40], ['l', 36, 52, 42, 9], ['l', 82, 52, 42, 9], ['l', 36, 64, 42, 9], ['l', 82, 64, 42, 9], ['l', 36, 76, 42, 8]],
+    vita: [['t', 6, 4, 50, 5], ['c', 22, 24, 11], ['c', 50, 24, 11], ['c', 78, 24, 11], ['c', 106, 24, 11], ['c', 134, 24, 11], ['c', 36, 50, 11], ['c', 64, 50, 11], ['c', 92, 50, 11], ['c', 120, 50, 11], ['w', 6, 68, 70, 18], ['w', 80, 68, 74, 18]],
+    psp: [['i', 30, 8, 18, 14], ['i', 60, 8, 14, 12], ['i', 86, 8, 14, 12], ['i', 112, 8, 14, 12], ['l', 30, 30, 90, 10], ['l', 30, 44, 90, 10], ['l', 30, 58, 90, 10], ['l', 30, 72, 90, 10]],
+  };
+  function layoutSketch(id) {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 160 90');
+    svg.setAttribute('class', 'lay-sketch');
+    const add = (tag, attrs) => { const e = document.createElementNS(ns, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); svg.append(e); };
+    add('rect', { x: 0, y: 0, width: 160, height: 90, rx: 6, class: 'ls-bg' });
+    for (const [k, x, y, w, hgt, extra] of LAYOUT_SKETCH[id] || []) {
+      if (k === 'r' || k === 'c') add('circle', { cx: x, cy: y, r: w, class: k === 'r' ? 'ls-round' : 'ls-game' });
+      else add('rect', { x, y, width: w, height: hgt, rx: k === 't' || k === 'l' ? 2 : k === 's' ? 4 : 3, class: 'ls-' + ({ g: 'game', b: 'big', w: extra === 'panel' ? 'panel' : 'widget', t: 'text', l: 'line', s: 'screen', i: 'cat' }[k]) });
+    }
+    return svg;
+  }
+
   function viewHomeConsole(layout, { recent, favs, all, featured }) {
     const home = homeCfg();
     const appsSys = S.lib.systems.find((s) => s.id === 'apps');
@@ -2388,7 +2417,14 @@
 
     section('Disposition');
     const lay = HOME_LAYOUTS[home.layout] || HOME_LAYOUTS.lumen;
-    add('Disposition de l’accueil', lay.name, () => openMenu('Disposition de l’accueil', Object.entries(HOME_LAYOUTS).map(([id, l]) => [l.name + (id === (home.layout || 'lumen') ? '  ✓' : ''), () => { home.layout = id; reopen('Disposition de l’accueil'); }])),
+    add('Disposition de l’accueil', lay.name, () => {
+      // Aperçu : un schéma et la description de la disposition sélectionnée.
+      const pv = h('div', { class: 'lay-preview' });
+      const show = (id) => pv.replaceChildren(layoutSketch(id), h('b', {}, HOME_LAYOUTS[id].name), h('p', { class: 'muted small' }, HOME_LAYOUTS[id].desc));
+      show(home.layout || 'lumen');
+      openMenu('Disposition de l’accueil', Object.entries(HOME_LAYOUTS).map(([id, l]) => [l.name + (id === (home.layout || 'lumen') ? '  ✓' : ''), () => { home.layout = id; reopen('Disposition de l’accueil'); }, { focus: () => { show(id); setHints('action'); } }]),
+        'select', { preview: pv, cls: 'lay-menu' });
+    },
       lay.desc + (home.layout && home.layout !== 'lumen' ? ' Les blocs et leur ordre plus bas ne servent qu’à la disposition Lumen.' : ''));
 
     section('Styles tout prêts');
@@ -3507,7 +3543,7 @@
     const bar = opts.bar && opts.bar.length
       ? h('div', { class: 'menu-bar', style: `grid-template-columns: repeat(${opts.bar.length}, minmax(0, 1fr))` }, opts.bar.map(([icon, label, fn]) => focusable(h('div', { class: 'menu-chip', title: label }, h('span', { class: 'mc-icon' }, icon), h('span', { class: 'mc-label' }, label)), { a: fn })))
       : null;
-    openOverlay(h('div', { class: 'modal menu' },
+    openOverlay(h('div', { class: 'modal menu' + (opts.cls ? ' ' + opts.cls : '') },
       opts.subtitle ? h('div', { class: 'menu-sub' }, opts.subtitle) : null,
       h('h2', {}, title),
       opts.preview ? h('div', { class: 'menu-preview' }, opts.preview) : null,
