@@ -1097,6 +1097,12 @@
     const v = S.route.view;
     if (S.cfg) setAccent(v === 'games' ? (sysById(S.route.systemId) || {}).color : null);
     document.body.classList.toggle('home-clock', v === 'home' && !!S.cfg && homeCfg().widgets.includes('clock'));
+    {
+      const lay = v === 'home' && S.cfg ? homeCfg().layout : null;
+      const on = !!(lay && lay !== 'lumen' && HOME_LAYOUTS[lay]);
+      document.body.classList.toggle('cx-chrome', on);
+      document.body.dataset.cx = on ? lay : '';
+    }
     let content;
     if (v === 'home') content = viewHome();
     else if (v === 'search') content = viewSearch();
@@ -1606,7 +1612,7 @@
       const t = gameTile(g);
       if (cls) t.classList.add(cls);
       const f = t._act.focus;
-      t._act.focus = () => { if (f) f(); paintInfo(g); };
+      t._act.focus = () => { if (f) f(); paintInfo(g); placeSelName(t, g); };
       return t;
     };
     // Dernière vignette : toute la bibliothèque (onglet Consoles).
@@ -1614,7 +1620,7 @@
     const cxIco = (name) => (ICONS[name] ? icon(name) : window.LumenGlyphs ? window.LumenGlyphs.svg(name) : h('span', {}, '•'));
     const libTile = () => focusable(h('div', { class: 'tile cx-lib' }, h('span', { class: 'cx-lib-ico' }, cxIco('library')), h('span', { class: 'cx-lib-name' }, 'Bibliothèque')),
       { a: () => openTab('systems'), focus: () => { setTitle('Bibliothèque', 'Toutes tes consoles'); setHints('action'); } });
-    const row = (fscale) => h('div', { class: 'row cx-row', 'data-fscale': fscale }, list.map((g) => tileFor(g)), libTile());
+    const row = (fscale) => h('div', { class: 'row cx-row', 'data-fscale': fscale }, list.map((g) => tileFor(g)), libTile(), layout === 'ps5' ? selName : null);
     const cards = (cls) => (widgetIds.length ? h('section', { class: cls }, widgetIds.map((w) => widgetCard(w))) : null);
     const systemsShelf = () => h('section', { class: 'shelf' }, h('div', { class: 'shelf-title' }, 'Consoles'), h('div', { class: 'row' }, sortedSystems().map(systemCard)));
     if (list[0]) paintInfo(list[0]);
@@ -1637,6 +1643,53 @@
     };
     const clockText = () => new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
+    // ---- Barre d'état propre à chaque console (remplace la barre du haut de Lumen) ----
+    let prof = null; try { prof = activeProfile(); } catch { prof = null; }
+    prof = prof || { name: 'Joueur', color: S.cfg.accent };
+    const avatar = () => h('span', { class: 'cx-ava', style: `--pc:${prof.color || S.cfg.accent}` }, (prof.name || 'J').trim().charAt(0).toUpperCase());
+    const padBat = () => {
+      const b = Object.values(S.padBattery || {})[0];
+      if (!b) return null;
+      return h('span', { class: 'cx-bat' + (b.charging ? ' chg' : b.level <= 20 ? ' low' : '') }, h('i', { class: 'cx-bat-cell' }, h('i', { style: `width:${Math.max(8, b.level)}%` })), b.charging ? '' : `${b.level} %`);
+    };
+    const clockEl = (cls = '') => h('span', { class: 'cx-clock ' + cls, 'data-clock': '' }, clockText());
+    const sIcon = (ico, label, fn) => focusable(h('div', { class: 'cx-sico', title: label }, cxIco(ico)), { a: fn, focus: () => { setTitle(label, ''); setHints('action'); } });
+    const POWER = ['power', 'Éteindre / veille', () => openPowerMenu()];
+    const statusBar = () => {
+      const date = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+      if (layout === 'ps5') {
+        const appsSysId = appsSys ? 'apps' : null;
+        return h('div', { class: 'cx-status' },
+          h('div', { class: 'cx-tabs' }, h('span', { class: 'cx-tab on' }, 'Jeux'),
+            focusable(h('span', { class: 'cx-tab' }, 'Médias'), { a: () => (appsSysId ? go({ view: 'games', systemId: appsSysId }) : openTab('systems')), focus: () => { setTitle('Médias', 'Applications'); setHints('action'); } })),
+          h('div', { class: 'cx-right' }, sIcon('search', 'Recherche', () => openTab('search')), sIcon('settings', 'Réglages', () => openTab('settings')), avatar(), padBat(), clockEl()));
+      }
+      if (layout === 'ps4') {
+        return h('div', { class: 'cx-status cx-status-ps4' },
+          h('div', { class: 'cx-left' }, avatar(), h('b', {}, prof.name || '')),
+          h('div', { class: 'cx-fnbar' },
+            sIcon('search', 'Recherche', () => openTab('search')), sIcon('favorites', 'Dossiers', () => openTab('favorites')),
+            sIcon('achievements', 'Trophées', () => openTab('achievements')), sIcon('stats', 'Stats', () => openTab('stats')),
+            sIcon('systems', 'Bibliothèque', () => openTab('systems')), sIcon('settings', 'Paramètres', () => openTab('settings')), sIcon(...POWER)),
+          h('div', { class: 'cx-right' }, padBat(), clockEl()));
+      }
+      if (layout === 'switch') return h('div', { class: 'cx-status' }, h('div', { class: 'cx-left' }, avatar()), h('div', { class: 'cx-right' }, clockEl(), padBat()));
+      if (layout === 'xbox') return h('div', { class: 'cx-status' }, h('div', { class: 'cx-left' }, avatar(), h('b', {}, prof.name || '')), h('div', { class: 'cx-right' }, sIcon('search', 'Recherche', () => openTab('search')), sIcon('settings', 'Paramètres', () => openTab('settings')), padBat(), clockEl()));
+      if (layout === 'psp') return h('div', { class: 'cx-status cx-status-psp' }, h('span', {}), h('div', { class: 'cx-right' }, h('span', { class: 'cx-date' }, date), clockEl(), padBat()));
+      if (layout === 'vita' || layout === 'wiiu') return h('div', { class: 'cx-status cx-status-slim' }, h('div', { class: 'cx-left' }, avatar()), h('div', { class: 'cx-right' }, padBat(), clockEl()));
+      if (layout === 'n3ds' || layout === 'ds') return h('div', { class: 'cx-status cx-status-ds' }, h('span', { class: 'cx-date' }, date), h('div', { class: 'cx-right' }, clockEl(), padBat()));
+      return null;
+    };
+    // PS5 : le nom du jeu sélectionné s'affiche à droite de sa vignette agrandie.
+    const selName = h('div', { class: 'cx-selname' });
+    const placeSelName = (t, g) => {
+      if (layout !== 'ps5') return;
+      selName.textContent = g.name;
+      const put = () => { if (!t.isConnected) return; selName.style.left = (t.offsetLeft + t.offsetWidth + 18) + 'px'; selName.style.top = (t.offsetTop + t.offsetHeight / 2) + 'px'; selName.classList.add('on'); };
+      selName.classList.remove('on');
+      setTimeout(put, 240);
+    };
+
     if (layout === 'psp') {
       // Barre de catégories : la liste de la catégorie sélectionnée s'affiche sous son icône.
       const cats = [
@@ -1657,17 +1710,17 @@
         focus: () => { setTitle(c.label, ''); setHints('action'); if (S.cxCat !== c.id) { S.cxCat = c.id; paintList(); } },
       })));
       paintList();
-      return root(bar, listEl);
+      return root(statusBar(), bar, listEl);
     }
-    if (layout === 'vita') return root(info, h('section', { class: 'vita-grid', 'data-fscale': '1.08' }, list.map((g) => tileFor(g, 'vita-bubble')), libTile()), cards('cx-cards'));
+    if (layout === 'vita') return root(statusBar(), info, h('section', { class: 'vita-grid', 'data-fscale': '1.08' }, list.map((g) => tileFor(g, 'vita-bubble')), libTile()), cards('cx-cards'));
     if (layout === 'n3ds') {
       // L'écran du bas vient d'abord dans la page (la sélection démarre sur les jeux) ; CSS l'affiche en dessous.
       return root(
         h('div', { class: 'ds-screen ds-bottom n3ds-bottom' }, h('div', { class: 'n3ds-grid', 'data-fscale': '1.06' }, list.map((g) => tileFor(g)), libTile())),
-        h('div', { class: 'ds-screen ds-top n3ds-top' }, info, cards('ds-widgets')));
+        h('div', { class: 'ds-screen ds-top n3ds-top' }, statusBar(), info, cards('ds-widgets')));
     }
     if (layout === 'ds') {
-      const top = h('div', { class: 'ds-screen ds-top ds-top-center' }, widgetIds.length ? cards('ds-widgets') : h('div', { class: 'ds-clock' }, clockText()));
+      const top = h('div', { class: 'ds-screen ds-top ds-top-center' }, statusBar(), widgetIds.length ? cards('ds-widgets') : h('div', { class: 'ds-clock' }, clockText()));
       return root(
         h('div', { class: 'ds-screen ds-bottom ds-menu' }, list.slice(0, 8).map((g) => listRow(g, 'cx-li ds-btn')),
           focusable(h('div', { class: 'cx-li ds-btn' }, h('div', { class: 'cx-li-art xmb-ico' }, cxIco('library')), h('div', { class: 'cx-li-text' }, h('b', {}, 'Bibliothèque'), h('span', {}, 'Toutes tes consoles'))), { a: () => openTab('systems'), focus: () => { setTitle('Bibliothèque', ''); setHints('action'); } })),
@@ -1684,13 +1737,14 @@
           h('div', { class: 'wii-clock' }, h('b', { 'data-clock': '' }, clockText()), h('span', {}, new Date().toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'numeric' }))),
           round('search', 'Recherche', () => openTab('search'))));
     }
-    if (layout === 'wiiu') return root(info, h('section', { class: 'wiiu-panel', 'data-fscale': '1.06' }, list.map((g) => tileFor(g)), libTile()), rounds(), cards('cx-cards'));
+    if (layout === 'wiiu') return root(statusBar(), info, h('section', { class: 'wiiu-panel', 'data-fscale': '1.06' }, list.map((g) => tileFor(g)), libTile()), rounds(), cards('cx-cards'));
 
-    if (layout === 'ps5') return root(row(1), info, cards('cx-cards'), systemsShelf());
+    if (layout === 'ps5') return root(row(1), statusBar(), info, cards('cx-cards'));
     // PS4 : la rangée vient d'abord dans la page (sélection au démarrage), la barre de widgets s'affiche au-dessus.
-    if (layout === 'ps4') return root(row(1), cards('cx-bar'), info);
+    if (layout === 'ps4') return root(row(1), statusBar(), info, cards('cx-cards'));
     if (layout === 'switch') {
-      return root(info, row(1.04), rounds(), cards('cx-cards'));
+      // Switch : pas de widgets sur la console ; raccourcis ronds + Veille.
+      return root(statusBar(), info, row(1.04), h('div', { class: 'cx-rounds' }, SHORTCUTS.map(([ico, label, id]) => round(ico, label, () => openTab(id))), round(...POWER)));
     }
     // Xbox : mosaïque. Le jeu à reprendre en grand, puis jeux, widgets épinglés (2 cases) et applis.
     const [first, ...rest] = list;
@@ -1701,7 +1755,7 @@
     return root(
       h('section', { class: 'cx-mosaic', 'data-fscale': '1.03' }, big, ...gameRest.map((g) => tileFor(g)),
         ...widgetIds.map((w) => widgetCard(w)), ...appRest.map((g) => tileFor(g)), libTile()),
-      systemsShelf());
+      statusBar()); // affichée en haut (CSS order), mais après les jeux pour que la sélection démarre sur eux
   }
 
   // ---------- Réorganisation à la souris (mode édition de l'accueil) ----------
