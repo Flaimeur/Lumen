@@ -1883,3 +1883,8 @@ body[data-cxt="ps5"].wp-fixed .bg-layer.on, body[data-cxt="xbox"].wp-fixed .bg-l
 .cx-ps5 .cx-row .focused.cx-cap { flex-basis: calc(var(--tile) * 2.2); }
 .cx-empty { margin: 4vh 14px; }
 .cx-tab.focused { background: rgba(255,255,255,.12); padding: 4px 10px; }
+
+/* ---- PS4 : ruban au milieu, zone de fonctions juste au-dessus ---- */
+.cx-ps4 > .cx-status { order: -3; display: flex; }
+.cx-ps4 > .cx-fnbar { order: -2; align-self: center; margin-top: 16vh; }
+.cx-ps4 > .cx-row { order: -1; margin-top: 2vh; }

@@ -1663,7 +1663,11 @@
     const clockEl = (cls = '') => h('span', { class: 'cx-clock ' + cls, 'data-clock': '' }, clockText());
     const sIcon = (ico, label, fn) => focusable(h('div', { class: 'cx-sico', title: label }, cxIco(ico)), { a: fn, focus: () => { setTitle(label, ''); setHints('action'); } });
     const POWER = ['power', 'Éteindre / veille', () => openPowerMenu()];
-    const statusBar = () => {
+    const statusBar = (which = layout) => {
+      if (which === 'ps4-fn') return statusFor('ps4-fn');
+      return statusFor(layout);
+    };
+    const statusFor = (layout) => {
       const date = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
       if (layout === 'ps5') {
         const appsSysId = appsSys ? 'apps' : null;
@@ -1676,11 +1680,14 @@
       if (layout === 'ps4') {
         return h('div', { class: 'cx-status cx-status-ps4' },
           h('div', { class: 'cx-left' }, avatar(), h('b', {}, prof.name || '')),
-          h('div', { class: 'cx-fnbar' },
+          h('div', { class: 'cx-right' }, padBat(), clockEl()));
+      }
+      if (layout === 'ps4-fn') {
+        // Zone de fonctions de la PS4 : juste au-dessus du ruban de jeux.
+        return h('div', { class: 'cx-fnbar' },
             sIcon('search', 'Recherche', () => openTab('search')), sIcon('favorites', 'Dossiers', () => openTab('favorites')),
             sIcon('achievements', 'Trophées', () => openTab('achievements')), sIcon('stats', 'Stats', () => openTab('stats')),
-            sIcon('systems', 'Bibliothèque', () => openTab('systems')), sIcon('settings', 'Paramètres', () => openTab('settings')), sIcon(...POWER)),
-          h('div', { class: 'cx-right' }, padBat(), clockEl()));
+            sIcon('systems', 'Bibliothèque', () => openTab('systems')), sIcon('settings', 'Paramètres', () => openTab('settings')), sIcon(...POWER));
       }
       if (layout === 'switch') return h('div', { class: 'cx-status' }, h('div', { class: 'cx-left' }, avatar()), h('div', { class: 'cx-right' }, clockEl(), padBat()));
       if (layout === 'xbox') return h('div', { class: 'cx-status' }, h('div', { class: 'cx-left' }, avatar(), h('b', {}, prof.name || '')), h('div', { class: 'cx-right' }, sIcon('search', 'Recherche', () => openTab('search')), sIcon('settings', 'Paramètres', () => openTab('settings')), padBat(), clockEl()));
@@ -1821,7 +1828,9 @@
       return root(rowEl, statusBar(), empty, info, cards('cx-cards'));
     }
     // PS4 : la rangée vient d'abord dans la page (sélection au démarrage), la barre de widgets s'affiche au-dessus.
-    if (layout === 'ps4') return root(row(1), statusBar(), info, cards('cx-cards'));
+    // PS4 : ruban au milieu de l'écran, zone de fonctions juste au-dessus (affichées dans cet ordre par CSS,
+    // mais le ruban vient d'abord dans la page pour que la sélection démarre sur les jeux).
+    if (layout === 'ps4') return root(row(1), statusBar(), statusBar('ps4-fn'), info, cards('cx-cards'));
     if (layout === 'switch') {
       // Switch : pas de widgets sur la console ; raccourcis ronds + Veille.
       return root(statusBar(), info, row(1.04), h('div', { class: 'cx-rounds' }, SHORTCUTS.map(([ico, label, id]) => round(ico, label, () => openTab(id))), round(...POWER)));
