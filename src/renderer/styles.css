@@ -1697,3 +1697,76 @@ body.cx-chrome[data-cx="psp"] #bg::after { top: 50%; height: 30%; animation-dura
 /* ---- DS / 3DS : barre d'état en haut de l'écran du haut ---- */
 .cx-status-ds { margin: -8px -10px 10px; padding: 0 0 8px; border-bottom: 1px solid rgba(255,255,255,.1); min-height: 0; font-size: 13px; }
 .cx-status-ds .cx-clock { font-size: 15px; }
+
+/* =========================================================================
+   Consoles Nintendo à menu clair (Wii, Wii U, 3DS, DS)
+   ========================================================================= */
+body.cx-light #bg > * { display: none; }
+body.cx-light #bg { background: #eef1f4; }
+body.cx-light { --accent: #33b5ec; color: #3a414c; }
+body.cx-light #bottombar { color: #4a525e; opacity: 1; }
+body.cx-light .cx-status, body.cx-light .cx-clock { color: #4a525e; }
+body.cx-light .cx-date { color: #7b8492; }
+body.cx-light .cx-sico { color: #5b6573; }
+body.cx-light .cx-sico.focused { background: rgba(51,181,236,.18); }
+body.cx-light .cx-info h1 { color: #2f3640; text-shadow: none; }
+body.cx-light .cx-meta { color: #6b7482; text-shadow: none; }
+body.cx-light .cx-lib { background: #ffffff; color: #6b7482; box-shadow: inset 0 0 0 2px #d5dbe2; }
+body.cx-light .cx-lib-name { color: #6b7482; }
+body.cx-light .cx-round { background: #ffffff; color: #5b6573; box-shadow: 0 2px 6px rgba(0,0,0,.12), inset 0 0 0 2px #d5dbe2; }
+
+/* ---- Wii : fond à fines lignes, chaînes à cadre blanc, barre du bas arrondie ---- */
+body.cx-chrome[data-cx="wii"] #bg { background: repeating-linear-gradient(0deg, #f4f6f8 0 3px, #eaeef2 3px 4px); }
+.wii-grid > .wii-ch { border-radius: 18px; box-shadow: 0 0 0 4px #ffffff, 0 0 0 6px #cfd6de, 0 6px 14px rgba(0,0,0,.12); }
+.wii-grid > .widget.wii-ch { background: #ffffff; color: #3a414c; }
+.wii-bar { position: relative; margin: 18px 0 0; padding: 18px 6vw 24px; background: linear-gradient(#f9fafb, #e3e8ed); border-radius: 50% 50% 0 0 / 34px 34px 0 0; box-shadow: 0 -2px 0 #d5dbe2; justify-content: space-between; }
+.wii-clock b { color: #8a939f; font-weight: 600; letter-spacing: .06em; }
+.wii-clock span { color: #8a939f; }
+
+/* ---- Wii U : panneau blanc quadrillé ---- */
+body.cx-chrome[data-cx="wiiu"] #bg { background: #f2f4f6; background-image: linear-gradient(#e4e8ec 1px, transparent 1px), linear-gradient(90deg, #e4e8ec 1px, transparent 1px); background-size: 34px 34px; }
+.wiiu-panel { background: rgba(255,255,255,.85); box-shadow: 0 4px 18px rgba(0,0,0,.08), inset 0 0 0 1px #d9dfe5; }
+.wiiu-panel > .tile { border-radius: 10px; box-shadow: 0 0 0 3px #ffffff, 0 0 0 4px #d5dbe2; }
+
+/* ---- 3DS / DS : écrans clairs dans un boîtier ---- */
+body.cx-light .ds-screen { background: #fbfcfd; color: #3a414c; box-shadow: 0 0 0 12px #d9dee4, 0 0 0 14px #c5ccd4, 0 18px 40px rgba(0,0,0,.15); }
+body.cx-chrome[data-cx="n3ds"] .ds-screen { background: linear-gradient(#ffffff, #eef1f4); }
+.n3ds-grid > .tile { box-shadow: 0 0 0 2px #ffffff, 0 2px 6px rgba(0,0,0,.18); }
+.n3ds-applets { display: flex; justify-content: center; gap: 18px; margin-top: 14px; padding-top: 10px; border-top: 1px solid #dde2e7; }
+.n3ds-bottom { display: flex; flex-direction: column-reverse; }
+.n3ds-bottom .n3ds-applets { margin: 0 0 14px; padding: 0 0 10px; border-top: 0; border-bottom: 1px solid #dde2e7; }
+body.cx-light .ds-btn { background: linear-gradient(#ffffff, #e9edf1); box-shadow: inset 0 0 0 1px #cfd6de, 0 2px 4px rgba(0,0,0,.08); color: #3a414c; }
+body.cx-light .ds-btn .cx-li-text span { color: #7b8492; }
+body.cx-light .cx-li.focused { background: #dff3fc; }
+.ds-menu > .ds-btn:first-child { grid-column: 1 / -1; }
+.cx-status-ds { color: #6b7482; border-bottom-color: #dde2e7; }
+
+/* DS : horloge à aiguilles + calendrier */
+.ds-face { display: flex; align-items: center; justify-content: center; gap: 6vw; padding: 2vh 0; }
+.ds-analog { position: relative; width: clamp(150px, 15vw, 220px); aspect-ratio: 1; border-radius: 50%; background: #ffffff; box-shadow: inset 0 0 0 4px #c9d0d8, 0 4px 14px rgba(0,0,0,.1); }
+.ds-tick { position: absolute; left: 50%; top: 6%; width: 3px; height: 8%; margin-left: -1.5px; background: #9aa3ae; transform-origin: 50% 551%; }
+.ds-hand { position: absolute; left: 50%; bottom: 50%; transform-origin: 50% 100%; border-radius: 3px; }
+.ds-h { width: 6px; height: 26%; margin-left: -3px; background: #4a525e; }
+.ds-m { width: 4px; height: 38%; margin-left: -2px; background: #33b5ec; }
+.ds-pin { position: absolute; left: 50%; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: #4a525e; }
+.ds-cal { min-width: 240px; }
+.ds-cal-head { font-weight: 800; text-transform: capitalize; margin-bottom: 8px; color: #4a525e; }
+.ds-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; font-size: 13px; font-variant-numeric: tabular-nums; color: #5b6573; }
+.ds-cal-dow { font-weight: 800; color: #9aa3ae; }
+.ds-cal-grid .today { background: #33b5ec; color: #fff; border-radius: 6px; font-weight: 800; }
+
+/* ---- PS4 : fond bleu à vagues par défaut, vignettes carrées, sélection agrandie ---- */
+body.cx-chrome[data-cx="ps4"] #bg > * { display: none; }
+body.cx-chrome[data-cx="ps4"] #bg { background: radial-gradient(120% 90% at 70% 110%, #1d6fc4 0%, #0f3f86 38%, #0a2457 70%, #061538 100%); }
+body.cx-chrome[data-cx="ps4"] #bg::before { content: ""; position: absolute; inset: 40% -20% -10%; background: radial-gradient(ellipse at 50% 60%, rgba(120,190,255,.28), transparent 60%); filter: blur(6px); animation: xmb-wave 18s ease-in-out infinite alternate; }
+.cx-ps4 .cx-row .tile { flex: 0 0 var(--tile); height: var(--tile); }
+.cx-ps4 .cx-row .focused.tile { flex-basis: calc(var(--tile) * 1.35); height: calc(var(--tile) * 1.35); }
+.cx-ps4 .cx-row { align-items: center; }
+
+/* ---- PS Vita : points de page à droite ---- */
+.cx-vita { position: relative; }
+.cx-vita::after { content: ""; position: absolute; right: 18px; top: 50%; width: 8px; height: 56px; translate: 0 -50%; background: radial-gradient(circle, #fff 0 3px, transparent 3.5px) 0 0 / 8px 14px repeat-y; opacity: .7; }
+
+/* Aides en bas lisibles sur les fonds clairs (Wii, Wii U, 3DS, DS). */
+body.cx-light .hint { color: #4a525e; background: rgba(255, 255, 255, 0.85); box-shadow: inset 0 0 0 1px #d5dbe2; }
+body.cx-light .glyph:not([class*="pad-"]) { background: #e6eaee; color: #3a414c; box-shadow: inset 0 0 0 1px #cfd6de; }

@@ -1102,6 +1102,7 @@
       const on = !!(lay && lay !== 'lumen' && HOME_LAYOUTS[lay]);
       document.body.classList.toggle('cx-chrome', on);
       document.body.dataset.cx = on ? lay : '';
+      document.body.classList.toggle('cx-light', on && ['wii', 'wiiu', 'n3ds', 'ds'].includes(lay));
     }
     let content;
     if (v === 'home') content = viewHome();
@@ -1716,11 +1717,25 @@
     if (layout === 'n3ds') {
       // L'écran du bas vient d'abord dans la page (la sélection démarre sur les jeux) ; CSS l'affiche en dessous.
       return root(
-        h('div', { class: 'ds-screen ds-bottom n3ds-bottom' }, h('div', { class: 'n3ds-grid', 'data-fscale': '1.06' }, list.map((g) => tileFor(g)), libTile())),
+        h('div', { class: 'ds-screen ds-bottom n3ds-bottom' }, h('div', { class: 'n3ds-grid', 'data-fscale': '1.06' }, list.map((g) => tileFor(g)), libTile()),
+          h('div', { class: 'n3ds-applets' }, SHORTCUTS.filter(([, , id]) => ['favorites', 'achievements', 'search', 'settings'].includes(id)).map(([ico, label, id]) => sIcon(ico, label, () => openTab(id))))),
         h('div', { class: 'ds-screen ds-top n3ds-top' }, statusBar(), info, cards('ds-widgets')));
     }
     if (layout === 'ds') {
-      const top = h('div', { class: 'ds-screen ds-top ds-top-center' }, statusBar(), widgetIds.length ? cards('ds-widgets') : h('div', { class: 'ds-clock' }, clockText()));
+      const now = new Date();
+      const hand = (cls, deg) => h('i', { class: 'ds-hand ' + cls, style: `rotate:${deg}deg` });
+      const analog = h('div', { class: 'ds-analog', 'data-analog': '' },
+        ...Array.from({ length: 12 }, (_, i) => h('b', { class: 'ds-tick', style: `rotate:${i * 30}deg` })),
+        hand('ds-h', (now.getHours() % 12) * 30 + now.getMinutes() / 2), hand('ds-m', now.getMinutes() * 6), h('i', { class: 'ds-pin' }));
+      const first = new Date(now.getFullYear(), now.getMonth(), 1);
+      const days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      const lead = (first.getDay() + 6) % 7; // semaine commençant le lundi
+      const cal = h('div', { class: 'ds-cal' },
+        h('div', { class: 'ds-cal-head' }, now.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })),
+        h('div', { class: 'ds-cal-grid' }, ...['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d) => h('span', { class: 'ds-cal-dow' }, d)),
+          ...Array.from({ length: lead }, () => h('span', {})),
+          ...Array.from({ length: days }, (_, i) => h('span', { class: i + 1 === now.getDate() ? 'today' : '' }, String(i + 1)))));
+      const top = h('div', { class: 'ds-screen ds-top ds-top-center' }, statusBar(), h('div', { class: 'ds-face' }, analog, cal));
       return root(
         h('div', { class: 'ds-screen ds-bottom ds-menu' }, list.slice(0, 8).map((g) => listRow(g, 'cx-li ds-btn')),
           focusable(h('div', { class: 'cx-li ds-btn' }, h('div', { class: 'cx-li-art xmb-ico' }, cxIco('library')), h('div', { class: 'cx-li-text' }, h('b', {}, 'Bibliothèque'), h('span', {}, 'Toutes tes consoles'))), { a: () => openTab('systems'), focus: () => { setTitle('Bibliothèque', ''); setHints('action'); } })),
@@ -2304,6 +2319,12 @@
   // L'horloge du widget suit l'heure sans redessiner l'accueil.
   setInterval(() => {
     for (const el of document.querySelectorAll('[data-clock]')) el.textContent = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    for (const el of document.querySelectorAll('[data-analog]')) {
+      const d = new Date();
+      const hh = el.querySelector('.ds-h'), mm = el.querySelector('.ds-m');
+      if (hh) hh.style.rotate = ((d.getHours() % 12) * 30 + d.getMinutes() / 2) + 'deg';
+      if (mm) mm.style.rotate = (d.getMinutes() * 6) + 'deg';
+    }
   }, 15000);
   setInterval(() => { S.weather = null; }, 20 * 60 * 1000);
 
