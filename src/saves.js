@@ -7,13 +7,27 @@ const fsp = fs.promises;
 const path = require('path');
 
 const MAX_FILE = 150 * 1024 * 1024; // un état de sauvegarde énorme (> 150 Mo) n'est pas copié
-const home = () => process.env.USERPROFILE || '';
-const appData = () => process.env.APPDATA || '';
+const P = require('./platform');
+const home = () => (P.IS_WIN ? process.env.USERPROFILE || '' : P.home());
+const appData = () => P.appData();
 const docs = () => path.join(home(), 'Documents');
 const exists = (p) => { try { return !!p && fs.existsSync(p); } catch { return false; } };
 
 // Dossier cloud par défaut : OneDrive, sinon Google Drive.
 function defaultDest() {
+  if (P.IS_MAC) {
+    // iCloud Drive, sinon Google Drive / OneDrive (montés dans ~/Library/CloudStorage).
+    const icloud = path.join(home(), 'Library', 'Mobile Documents', 'com~apple~CloudDocs');
+    if (exists(icloud)) return path.join(icloud, 'Lumen', 'Sauvegardes');
+    try {
+      const cs = path.join(home(), 'Library', 'CloudStorage');
+      for (const d of fs.readdirSync(cs)) {
+        if (/^GoogleDrive/i.test(d)) { const g = ['Mon Drive', 'My Drive'].map((x) => path.join(cs, d, x)).find(exists); if (g) return path.join(g, 'Lumen', 'Sauvegardes'); }
+        if (/^OneDrive/i.test(d)) return path.join(cs, d, 'Lumen', 'Sauvegardes');
+      }
+    } catch { /* aucun cloud */ }
+    return '';
+  }
   const od = process.env.OneDrive || process.env.OneDriveConsumer || path.join(home(), 'OneDrive');
   if (exists(od)) return path.join(od, 'Lumen', 'Sauvegardes');
   for (const g of ['G:\\Mon Drive', 'G:\\My Drive', path.join(home(), 'Google Drive'), path.join(home(), 'Google Drive', 'Mon Drive')]) if (exists(g)) return path.join(g, 'Lumen', 'Sauvegardes');
@@ -24,7 +38,20 @@ function defaultDest() {
 function sources(cfg) {
   const e = cfg.emulators || {};
   const dirOf = (exe) => (exe ? path.dirname(exe) : '');
-  const list = [
+  const list = P.IS_MAC ? [
+    ['RetroArch', 'saves', path.join(appData(), 'RetroArch', 'saves')],
+    ['RetroArch', 'states', path.join(appData(), 'RetroArch', 'states')],
+    ['Dolphin', 'GC', path.join(appData(), 'Dolphin', 'GC')],
+    ['Dolphin', 'Wii', path.join(appData(), 'Dolphin', 'Wii', 'title')],
+    ['Ryujinx', 'save', path.join(appData(), 'Ryujinx', 'bis', 'user', 'save')],
+    ['Azahar', 'sdmc', path.join(appData(), 'Azahar', 'sdmc', 'Nintendo 3DS')],
+    ['Citra', 'sdmc', path.join(appData(), 'Citra', 'sdmc', 'Nintendo 3DS')],
+    ['PCSX2', 'memcards', path.join(appData(), 'PCSX2', 'memcards')],
+    ['DuckStation', 'memcards', path.join(appData(), 'DuckStation', 'memcards')],
+    ['PPSSPP', 'SAVEDATA', path.join(docs(), 'PPSSPP', 'PSP', 'SAVEDATA')],
+    ['PPSSPP', 'SAVEDATA (config)', path.join(home(), '.config', 'ppsspp', 'PSP', 'SAVEDATA')],
+    ['Cemu', 'save', path.join(appData(), 'Cemu', 'mlc01', 'usr', 'save')],
+  ] : [
     ['RetroArch', 'saves', path.join(dirOf(e.retroarch), 'saves')],
     ['RetroArch', 'states', path.join(dirOf(e.retroarch), 'states')],
     ['Dolphin', 'GC', path.join(appData(), 'Dolphin Emulator', 'GC')],

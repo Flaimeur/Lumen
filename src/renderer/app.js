@@ -1,6 +1,11 @@
 (() => {
   'use strict';
   const api = window.lumen || window.LumenMock;
+  // Mac : mêmes écrans, avec les noms et chemins de macOS.
+  const MAC = api.platform === 'darwin';
+  const OS = MAC ? 'macOS' : 'Windows';
+  // Mac (écran Retina) : effets de flou allégés, voir html.mac dans styles.css.
+  if (MAC) document.documentElement.classList.add('mac');
   const Input = window.Input;
   const $ = (sel, root = document) => root.querySelector(sel);
 
@@ -88,6 +93,8 @@
   const cursor = h('div', { id: 'cursor' });
 
   function focusScale(el) {
+    const fs = el.classList.contains('tile') && el.closest('[data-fscale]');
+    if (fs) return Number(fs.dataset.fscale) || 1;
     if (el.classList.contains('tile') || el.classList.contains('syscard') || el.classList.contains('folder')) return 1.07;
     if (el.classList.contains('btn')) return 1.04;
     return 1;
@@ -132,7 +139,7 @@
   window.addEventListener('wheel', () => { S.mouseHoldUntil = performance.now() + 220; }, { passive: true, capture: true });
   // Une fenêtre qui s'ouvre (ou se redessine) en s'animant déplace l'élément sélectionné : le cadre se recale à la fin.
   document.addEventListener('animationend', trackCursor, true);
-  document.addEventListener('transitionend', (e) => { if (e.propertyName === 'transform' || e.propertyName === 'translate' || e.propertyName === 'scale') trackCursor(); }, true);
+  document.addEventListener('transitionend', (e) => { if (['transform', 'translate', 'scale', 'flex-basis', 'width', 'height'].includes(e.propertyName)) trackCursor(); }, true);
   // La mise en page bouge sans défilement (scan, images, polices, contenu qui change de hauteur) :
   // le cadre suit l'élément sélectionné au lieu de rester à son ancienne place.
   if (window.ResizeObserver) {
@@ -833,7 +840,7 @@
         ? pads.map((p) => `Manette n°${p.native ? 'PS (lue par Lumen)' : p.index + 1} : ${p.id}\nType détecté : ${Input.padType} · disposition : ${p.mapping || 'non standard'}\n`
           + `Boutons pressés : ${p.buttons.map((b, i) => (b.pressed ? i : null)).filter((x) => x !== null).join(', ') || 'aucun'}\n`
           + `Sticks : ${p.axes.map((a) => a.toFixed(2)).join('  ')}`).join('\n\n')
-        : `Aucune manette visible par Lumen.\nFenêtre au premier plan : ${document.hasFocus() ? 'oui' : 'non'}\n\nAppuie sur un bouton de la manette. Si rien ne change, Windows ne la transmet pas à Lumen (Bluetooth, pilote ou logiciel qui la capture).`;
+        : `Aucune manette visible par Lumen.\nFenêtre au premier plan : ${document.hasFocus() ? 'oui' : 'non'}\n\nAppuie sur un bouton de la manette. Si rien ne change, ${OS} ne la transmet pas à Lumen (Bluetooth, pilote ou logiciel qui la capture).`;
     }, 60);
   }
 
@@ -1483,6 +1490,7 @@
     }
     const featured = recent[0] || S.byPath.get(S.featured);
     const home = homeCfg();
+    if (HOME_LAYOUTS[home.layout] && home.layout !== 'lumen') return viewHomeConsole(home.layout, { recent, favs, all, featured });
     const shelves = [];
     const shelfOf = {};
     const pushShelf = (id, title, items) => { shelves.push([title, items]); shelfOf[title] = id; };
@@ -1518,6 +1526,151 @@
     return h('div', { class: 'home' + (S.homeEdit ? ' editing' : '') },
       S.homeEdit ? h('div', { class: 'edit-banner' }, '✏ Réorganisation : glisse les widgets et les blocs où tu veux · Échap pour terminer') : null,
       ...els);
+  }
+
+  // ---------- Accueil façon consoles (Réglages → Personnaliser l'accueil → Disposition) ----------
+  // Même contenu que l'accueil Lumen (jeux récents, favoris, applications, widgets), placé comme sur les consoles.
+  const HOME_LAYOUTS = {
+    lumen: { name: 'Lumen', desc: 'Widgets, bandeau et étagères, dans l’ordre que tu choisis.' },
+    ps5: { name: 'Façon PS5', desc: 'Petite rangée de jeux et d’applis en haut, grand visuel du jeu sélectionné, widgets en cartes dessous.' },
+    ps4: { name: 'Façon PS4', desc: 'Barre de widgets en haut, grand ruban de jeux et d’applis : la vignette sélectionnée s’élargit.' },
+    xbox: { name: 'Façon Xbox', desc: 'Mosaïque de tuiles : jeu à reprendre en grand, jeux récents, widgets et applis épinglés.' },
+    switch: { name: 'Façon Switch', desc: 'Grandes vignettes carrées en ligne, raccourcis ronds dessous, widgets en bas.' },
+    wiiu: { name: 'Façon Wii U', desc: 'Grille d’icônes carrées dans un panneau, raccourcis ronds et widgets dessous.' },
+    wii: { name: 'Façon Wii', desc: 'Grille de chaînes (jeux, applis et widgets), horloge et boutons ronds en bas.' },
+    n3ds: { name: 'Façon 3DS', desc: 'Deux écrans : le jeu sélectionné et les widgets en haut, la grille d’icônes en bas.' },
+    ds: { name: 'Façon DS', desc: 'Deux écrans : les widgets en haut, de grands boutons de jeux en bas.' },
+    vita: { name: 'Façon PS Vita', desc: 'Bulles rondes pour les jeux et les applis, widgets dessous.' },
+    psp: { name: 'Façon PSP', desc: 'Barre de catégories (Jeux, Applications, Widgets, Lumen) et liste verticale dessous.' },
+  };
+  function viewHomeConsole(layout, { recent, favs, all, featured }) {
+    const home = homeCfg();
+    const appsSys = S.lib.systems.find((s) => s.id === 'apps');
+    const apps = appsSys ? appsSys.games.slice(0, 8) : [];
+    // Jeux : récents, puis favoris, puis d'autres jeux pour remplir la rangée (les applis viennent après).
+    const seen = new Set();
+    const games = [];
+    const pushG = (g) => { if (g && g.source !== 'app' && !seen.has(g.path)) { seen.add(g.path); games.push(g); } };
+    recent.forEach(pushG);
+    favs.forEach(pushG);
+    pushG(featured);
+    for (const g of all) { if (games.length >= 12) break; pushG(g); }
+    const max = layout === 'xbox' ? 9 : 12;
+    const list = [...games.slice(0, max), ...apps];
+    const widgetIds = home.widgets.filter((w) => WIDGETS[w]);
+
+    // Fiche du jeu sélectionné (nom ou logo, console, boutons) : suit la sélection dans la rangée.
+    const info = h('div', { class: 'cx-info' });
+    const infoBtn = (label, fn, primary) => focusable(h('div', { class: 'btn' + (primary ? ' primary' : '') }, label), { a: fn, focus: () => setHints('action') });
+    const paintInfo = (g) => {
+      const sys = sysById(g.system) || {};
+      const isApp = g.source === 'app';
+      info.replaceChildren(...[
+        layout === 'ps5' && g.logo ? h('img', { class: 'cx-logo', src: api.mediaUrl(g.logo), alt: g.name }) : h('h1', {}, g.name),
+        ['switch', 'vita', 'wiiu'].includes(layout) ? null : h('div', { class: 'cx-meta' }, [isApp ? 'Application' : sys.name, g.year, g.genre].filter(Boolean).join('  ·  ')),
+        ['switch', 'vita', 'wiiu'].includes(layout) ? null : h('div', { class: 'actions' },
+          infoBtn(isApp ? '▶  Ouvrir' : '▶  Jouer', () => launch(g), true),
+          isApp ? null : infoBtn('Détails', () => openDetails(g))),
+      ].filter(Boolean));
+    };
+    const tileFor = (g, cls = '') => {
+      const t = gameTile(g);
+      if (cls) t.classList.add(cls);
+      const f = t._act.focus;
+      t._act.focus = () => { if (f) f(); paintInfo(g); };
+      return t;
+    };
+    // Dernière vignette : toute la bibliothèque (onglet Consoles).
+    const libTile = () => focusable(h('div', { class: 'tile cx-lib' }, h('span', { class: 'cx-lib-ico' }, '▦'), h('span', { class: 'cx-lib-name' }, 'Bibliothèque')),
+      { a: () => openTab('systems'), focus: () => { setTitle('Bibliothèque', 'Toutes tes consoles'); setHints('action'); } });
+    const row = (fscale) => h('div', { class: 'row cx-row', 'data-fscale': fscale }, list.map((g) => tileFor(g)), libTile());
+    const cards = (cls) => (widgetIds.length ? h('section', { class: cls }, widgetIds.map((w) => widgetCard(w))) : null);
+    const systemsShelf = () => h('section', { class: 'shelf' }, h('div', { class: 'shelf-title' }, 'Consoles'), h('div', { class: 'row' }, sortedSystems().map(systemCard)));
+    if (list[0]) paintInfo(list[0]);
+    const root = (...kids) => h('div', { class: `home cx cx-${layout}` + (S.homeEdit ? ' editing' : '') },
+      S.homeEdit ? h('div', { class: 'edit-banner' }, '✏ Glisse les widgets pour changer leur ordre · Échap pour terminer') : null, ...kids);
+
+    // Raccourcis ronds vers les onglets (Switch, Wii, Wii U) ; items du menu « Lumen » de la PSP.
+    const SHORTCUTS = [['🔎', 'Recherche', 'search'], ['🎮', 'Consoles', 'systems'], ['📁', 'Dossiers', 'favorites'], ['🏆', 'Succès', 'achievements'], ['📊', 'Stats', 'stats'], ['⚙', 'Réglages', 'settings']];
+    const round = (ico, label, fn) => focusable(h('div', { class: 'cx-round' }, h('span', { class: 'cx-round-ico' }, ico), h('span', { class: 'cx-round-label' }, label)),
+      { a: fn, focus: () => { setTitle(label, ''); setHints('action'); } });
+    const rounds = (only) => h('div', { class: 'cx-rounds' }, SHORTCUTS.filter(([, , id]) => !only || only.includes(id)).map(([ico, label, id]) => round(ico, label, () => openTab(id))));
+    // Ligne de liste (PSP, DS) : petite image, nom et console.
+    const listRow = (g, cls) => {
+      const sys = sysById(g.system) || {};
+      const art = g.cover ? h('img', { src: api.mediaUrl(g.cover), alt: '', loading: 'lazy' }) : fallbackArt(g.name, sys.color, sys.short);
+      return focusable(h('div', { class: cls }, h('div', { class: 'cx-li-art' }, art), h('div', { class: 'cx-li-text' }, h('b', {}, g.name), h('span', {}, g.source === 'app' ? 'Application' : sys.name || ''))), {
+        a: () => launch(g), x: g.source === 'app' ? undefined : () => toggleFav(g), y: () => openDetails(g),
+        focus: () => { setTitle(g.name, sys.short || ''); setBackground(g.background || g.cover, sys.color); setHints('game'); paintInfo(g); },
+      });
+    };
+    const clockText = () => new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+    if (layout === 'psp') {
+      // Barre de catégories : la liste de la catégorie sélectionnée s'affiche sous son icône.
+      const cats = [
+        { id: 'games', ico: '🎮', label: 'Jeux', make: () => games.slice(0, 14).map((g) => listRow(g, 'cx-li xmb-item')) },
+        { id: 'apps', ico: '▦', label: 'Applications', make: () => apps.map((g) => listRow(g, 'cx-li xmb-item')) },
+        { id: 'widgets', ico: '✦', label: 'Widgets', make: () => widgetIds.map((w) => widgetCard(w)) },
+        { id: 'lumen', ico: '☾', label: 'Lumen', make: () => SHORTCUTS.map(([ico, label, id]) => focusable(h('div', { class: 'cx-li xmb-item' }, h('div', { class: 'cx-li-art xmb-ico' }, ico), h('div', { class: 'cx-li-text' }, h('b', {}, label))), { a: () => openTab(id), focus: () => { setTitle(label, ''); setHints('action'); } })) },
+      ].filter((c) => c.id !== 'apps' || apps.length).filter((c) => c.id !== 'widgets' || widgetIds.length);
+      if (!cats.some((c) => c.id === S.cxCat)) S.cxCat = 'games';
+      const listEl = h('div', { class: 'xmb-list' });
+      const paintList = () => {
+        const i = cats.findIndex((c) => c.id === S.cxCat);
+        listEl.style.setProperty('--i', String(i));
+        listEl.replaceChildren(...cats[i].make());
+      };
+      const bar = h('div', { class: 'xmb-bar' }, cats.map((c) => focusable(h('div', { class: 'xmb-cat' }, h('span', { class: 'xmb-cat-ico' }, c.ico), h('span', { class: 'xmb-cat-label' }, c.label)), {
+        a: () => { const f = listEl.querySelector('.f'); if (f) setFocus(f); },
+        focus: () => { setTitle(c.label, ''); setHints('action'); if (S.cxCat !== c.id) { S.cxCat = c.id; paintList(); } },
+      })));
+      paintList();
+      return root(bar, listEl);
+    }
+    if (layout === 'vita') return root(info, h('section', { class: 'vita-grid', 'data-fscale': '1.08' }, list.map((g) => tileFor(g, 'vita-bubble')), libTile()), cards('cx-cards'));
+    if (layout === 'n3ds') {
+      // L'écran du bas vient d'abord dans la page (la sélection démarre sur les jeux) ; CSS l'affiche en dessous.
+      return root(
+        h('div', { class: 'ds-screen ds-bottom n3ds-bottom' }, h('div', { class: 'n3ds-grid', 'data-fscale': '1.06' }, list.map((g) => tileFor(g)), libTile())),
+        h('div', { class: 'ds-screen ds-top n3ds-top' }, info, cards('ds-widgets')));
+    }
+    if (layout === 'ds') {
+      const top = h('div', { class: 'ds-screen ds-top ds-top-center' }, widgetIds.length ? cards('ds-widgets') : h('div', { class: 'ds-clock' }, clockText()));
+      return root(
+        h('div', { class: 'ds-screen ds-bottom ds-menu' }, list.slice(0, 8).map((g) => listRow(g, 'cx-li ds-btn')),
+          focusable(h('div', { class: 'cx-li ds-btn' }, h('div', { class: 'cx-li-art xmb-ico' }, '▦'), h('div', { class: 'cx-li-text' }, h('b', {}, 'Bibliothèque'), h('span', {}, 'Toutes tes consoles'))), { a: () => openTab('systems'), focus: () => { setTitle('Bibliothèque', ''); setHints('action'); } })),
+        top); // affiché au-dessus (CSS order)
+    }
+    if (layout === 'wii') {
+      const ch = (el) => { el.classList.add('wii-ch'); return el; };
+      return root(
+        // 12 chaînes, comme sur l'écran de la console : jusqu'à 3 widgets, la Bibliothèque, et des jeux / applis pour le reste.
+        h('section', { class: 'wii-grid', 'data-fscale': '1.04' }, list.slice(0, 11 - Math.min(3, widgetIds.length)).map((g) => tileFor(g, 'wii-ch')),
+          ...widgetIds.slice(0, 3).map((w) => ch(widgetCard(w))), ch(libTile())),
+        h('div', { class: 'wii-bar' },
+          round('⚙', 'Réglages', () => openTab('settings')),
+          h('div', { class: 'wii-clock' }, h('b', { 'data-clock': '' }, clockText()), h('span', {}, new Date().toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'numeric' }))),
+          round('🔎', 'Recherche', () => openTab('search'))));
+    }
+    if (layout === 'wiiu') return root(info, h('section', { class: 'wiiu-panel', 'data-fscale': '1.06' }, list.map((g) => tileFor(g)), libTile()), rounds(), cards('cx-cards'));
+
+    if (layout === 'ps5') return root(row(1), info, cards('cx-cards'), systemsShelf());
+    // PS4 : la rangée vient d'abord dans la page (sélection au démarrage), la barre de widgets s'affiche au-dessus.
+    if (layout === 'ps4') return root(row(1), cards('cx-bar'), info);
+    if (layout === 'switch') {
+      return root(info, row(1.04), rounds(), cards('cx-cards'));
+    }
+    // Xbox : mosaïque. Le jeu à reprendre en grand, puis jeux, widgets épinglés (2 cases) et applis.
+    const [first, ...rest] = list;
+    const big = first ? tileFor(first, 'cx-big') : null;
+    if (big) big.append(h('div', { class: 'cx-big-label' }, h('span', { class: 'eyebrow' }, recent.length ? 'Reprendre' : 'À la une'), h('b', {}, first.name)));
+    const gameRest = rest.filter((g) => g.source !== 'app');
+    const appRest = rest.filter((g) => g.source === 'app');
+    return root(
+      h('section', { class: 'cx-mosaic', 'data-fscale': '1.03' }, big, ...gameRest.map((g) => tileFor(g)),
+        ...widgetIds.map((w) => widgetCard(w)), ...appRest.map((g) => tileFor(g)), libTile()),
+      systemsShelf());
   }
 
   // ---------- Réorganisation à la souris (mode édition de l'accueil) ----------
@@ -2065,8 +2218,7 @@
   }
   // L'horloge du widget suit l'heure sans redessiner l'accueil.
   setInterval(() => {
-    const el = document.querySelector('[data-clock]');
-    if (el) el.textContent = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    for (const el of document.querySelectorAll('[data-clock]')) el.textContent = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   }, 15000);
   setInterval(() => { S.weather = null; }, 20 * 60 * 1000);
 
@@ -2231,6 +2383,11 @@
     };
     const tog = (on) => h('span', { class: 'toggle' + (on ? ' on' : '') });
     const section = (t) => rows.push(h('div', { class: 'set-section' }, t));
+
+    section('Disposition');
+    const lay = HOME_LAYOUTS[home.layout] || HOME_LAYOUTS.lumen;
+    add('Disposition de l’accueil', lay.name, () => openMenu('Disposition de l’accueil', Object.entries(HOME_LAYOUTS).map(([id, l]) => [l.name + (id === (home.layout || 'lumen') ? '  ✓' : ''), () => { home.layout = id; reopen('Disposition de l’accueil'); }])),
+      lay.desc + (home.layout && home.layout !== 'lumen' ? ' Les blocs et leur ordre plus bas ne servent qu’à la disposition Lumen.' : ''));
 
     section('Styles tout prêts');
     for (const [id, p] of Object.entries(STYLE_PRESETS)) add(p.name, 'Appliquer', async () => { await applyStylePreset(id); openHomeEditor(p.name); }, `${p.desc} ${wallLabel({ ...wallCfg(), ...p.wall }).replace(/^f/, 'F')}.`, { focus: () => paintHome({ preset: id }) });
@@ -2422,9 +2579,9 @@
     const ext = await openPrompt({ title: 'Extensions des jeux', value: (c.ext || []).join(', '), help: 'Séparées par des virgules : iso, chd, pkg, adf, exe… Vide = tous les fichiers.' });
     if (ext === null) return;
     c.ext = ext.split(/[,\s;]+/).map((x) => x.trim().replace(/^\./, '').toLowerCase()).filter(Boolean);
-    const exe = await api.pickFile(`Émulateur pour ${c.name} (Annuler = ouvrir avec Windows)`, '');
+    const exe = await api.pickFile(`Émulateur pour ${c.name} (Annuler = ouvrir avec ${OS})`, '');
     if (exe) {
-      const args = await openPrompt({ title: 'Options de lancement', value: c.args || '"{rom}"', help: 'Ce qui suit l’émulateur. {rom} = le jeu. Exemples : "{rom}" · -f "{rom}" · -L "C:\\cores\\core.dll" "{rom}"' });
+      const args = await openPrompt({ title: 'Options de lancement', value: c.args || '"{rom}"', help: 'Ce qui suit l’émulateur. {rom} = le jeu. Exemples : "{rom}" · -f "{rom}" · ' + (MAC ? '-L "{retroarchCores}/core_libretro.dylib" "{rom}"' : '-L "C:\\cores\\core.dll" "{rom}"') });
       if (args === null) return;
       c.args = args.trim() || '"{rom}"';
       c.command = `"${exe}" ${c.args}`;
@@ -2865,7 +3022,7 @@
     if (api.apps) {
       cat('apps');
       section('Applications');
-      row('Ajouter une application', '＋', () => addApp(), 'Word, navigateur, Discord… : un programme (.exe) ou un raccourci du menu Démarrer. Elles apparaissent dans Consoles → Applications.');
+      row('Ajouter une application', '＋', () => addApp(), MAC ? 'Pages, navigateur, Discord… : une application (.app) du dossier Applications. Elles apparaissent dans Consoles → Applications.' : 'Word, navigateur, Discord… : un programme (.exe) ou un raccourci du menu Démarrer. Elles apparaissent dans Consoles → Applications.');
       for (const a of c.apps || []) {
         row(a.name, 'Modifier', () => openMenu(a.name, appMenuItems(a.id)), a.target);
       }
@@ -2904,7 +3061,7 @@
         rerender();
       });
       row('Mot de passe', st.hasPassword ? '•••••••• enregistré' : 'Non défini', async () => {
-        const v = await openPrompt({ title: 'Mot de passe RomM', value: '', keyboard: 'url', secret: true, help: 'Chiffré par Windows sur ce PC. Le jeton client est préférable : il peut être révoqué sans changer ton mot de passe.' });
+        const v = await openPrompt({ title: 'Mot de passe RomM', value: '', keyboard: 'url', secret: true, help: (MAC ? 'Chiffré dans le trousseau de ce Mac.' : 'Chiffré par Windows sur ce PC.') + ' Le jeton client est préférable : il peut être révoqué sans changer ton mot de passe.' });
         if (v === null || !v) return;
         await api.romm.setSecret('password', v);
         await refreshRommStatus();
@@ -2969,7 +3126,7 @@
       row('Activer la télécommande', toggle(!!(ri && ri.enabled)), async () => {
         S.remoteInfo = await api.remote.set(!(ri && ri.enabled));
         S.cfg.remote = { ...(S.cfg.remote || {}), enabled: S.remoteInfo.enabled, pin: S.remoteInfo.pin };
-        if (S.remoteInfo.enabled) { pushRemoteLibrary(); toast('Télécommande active · Windows peut demander d’autoriser Lumen sur le réseau privé'); }
+        if (S.remoteInfo.enabled) { pushRemoteLibrary(); toast(MAC ? 'Télécommande active · macOS peut demander d’autoriser les connexions entrantes' : 'Télécommande active · Windows peut demander d’autoriser Lumen sur le réseau privé'); }
         rerender();
       }, 'Depuis ton téléphone, sur le même Wi-Fi : choisir et lancer un jeu, la musique, Lueur, quitter le jeu. Rien n’est accessible hors de ton réseau.');
       if (ri && ri.enabled) {
@@ -2985,7 +3142,7 @@
       row(`${PAD_LABEL[p.type] || 'Manette'} · n°${p.index + 1}`, p.rumble ? 'Tester la vibration' : '', p.rumble ? () => Input.rumble(0.8, 400) : null,
         `${p.name.replace(/\s*\(.*$/, '')} · disposition ${p.mapping === 'standard' ? 'standard' : 'non standard (corrigée par Lumen)'} · ${p.buttons} boutons`);
     }
-    row('Tester la manette', 'Ouvrir', () => openPadTest(), 'Affiche en direct ce que Lumen reçoit : boutons pressés et sticks. Appuie d’abord sur un bouton, Windows ne montre la manette qu’après.');
+    row('Tester la manette', 'Ouvrir', () => openPadTest(), 'Affiche en direct ce que Lumen reçoit : boutons pressés et sticks. Appuie d’abord sur un bouton, ' + OS + ' ne montre la manette qu’après.');
     section('Boutons');
     row('Clavier : onglet précédent', tabKeyLabel('lb'), () => pickTabKey('lb'), 'Touche pour passer à l’onglet de gauche.');
     row('Clavier : onglet suivant', tabKeyLabel('rb'), () => pickTabKey('rb'), 'Touche pour passer à l’onglet de droite.');
@@ -3096,7 +3253,7 @@
     section('Profils');
     row('Profil actuel', activeProfile().name, () => openProfileMenu(), plural(profiles().length, 'profil', 'profils') + ' sur ce PC. Chacun a ses favoris, notes, temps de jeu, dossiers et son accueil.');
     section('Lumen');
-    row('Version', api.version || '', null, 'Frontend de jeux pour Windows : ROMs, jeux PC et applications.');
+    row('Version', api.version || '', null, MAC ? 'Frontend de jeux pour macOS : ROMs, jeux Mac et applications.' : 'Frontend de jeux pour Windows : ROMs, jeux PC et applications.');
     if (api.update) {
       const u = S.update || {};
       const label = { checking: 'Recherche…', downloading: `Téléchargement ${u.version || ''} · ${u.progress || 0} %`, ready: `${u.version} prête · redémarrer`,
@@ -3785,7 +3942,7 @@
         h('p', { class: 'muted' }, 'RetroArch fait tourner la plupart des consoles rétro. Les émulateurs autonomes (Dolphin, PCSX2…) se règlent dans Réglages → Émulateurs.'),
         h('div', { class: 'wiz-status' + (S.cfg.emulators.retroarch ? ' ok' : '') }, S.cfg.emulators.retroarch ? `Trouvé : ${S.cfg.emulators.retroarch}` : 'RetroArch n’a pas été détecté automatiquement'),
         h('div', { class: 'actions' },
-          actionButton(S.cfg.emulators.retroarch ? 'Changer' : 'Indiquer retroarch.exe', async () => { closeOverlay(true); await pickEmulator('retroarch'); openWelcome(3); }, !S.cfg.emulators.retroarch),
+          actionButton(S.cfg.emulators.retroarch ? 'Changer' : (MAC ? 'Indiquer RetroArch.app' : 'Indiquer retroarch.exe'), async () => { closeOverlay(true); await pickEmulator('retroarch'); openWelcome(3); }, !S.cfg.emulators.retroarch),
           actionButton(S.cfg.emulators.retroarch ? 'Continuer' : 'Passer', next, !!S.cfg.emulators.retroarch)),
       ];
     } else if (step === 4) {
@@ -4618,7 +4775,7 @@
       title: `Commande · ${sys.name}`,
       value: current,
       resetValue: '',
-      help: 'Variables : {rom}, {romDir}, {romName}, {retroarch}, {retroarchDir}, {dolphin}, {pcsx2}, {cemu}, {eden}, {azahar}. Mets {open} pour ouvrir le fichier avec Windows.',
+      help: 'Variables : {rom}, {romDir}, {romName}, {retroarch}, {retroarchDir}, {dolphin}, {pcsx2}, {cemu}, {eden}, {azahar}' + (MAC ? ', {retroarchCores}' : '') + '. Mets {open} pour ouvrir le fichier avec ' + OS + '.',
     });
     if (v === null) return;
     if (!v.trim() || v.trim() === sys.command) delete S.cfg.commands[sys.id];
@@ -4877,7 +5034,7 @@
     const u = S.update || {};
     el.hidden = u.status !== 'ready' && u.status !== 'downloading';
     el.classList.toggle('ready', u.status === 'ready');
-    el.textContent = u.status === 'ready' ? '⬆ Mise à jour prête · Redémarrer' : `⬇ Mise à jour · ${u.progress || 0} %`;
+    el.textContent = u.status === 'ready' ? (u.manual ? '⬆ Nouvelle version · Télécharger' : '⬆ Mise à jour prête · Redémarrer') : `⬇ Mise à jour · ${u.progress || 0} %`;
     el.title = u.status === 'ready' ? `Lumen ${u.version} est téléchargée` : `Téléchargement de Lumen ${u.version || ''}`;
     el.onclick = u.status === 'ready' ? () => offerUpdate(true) : null;
   }
@@ -4893,15 +5050,16 @@
       h('div', { class: 'eyebrow' }, '⬆ Mise à jour prête'),
       h('h2', {}, `Lumen ${u.version}`),
       notes.length ? h('ul', { class: 'upd-notes' }, notes.map((l) => h('li', {}, l))) : h('p', { class: 'muted' }, 'Une nouvelle version est téléchargée.'),
-      h('p', { class: 'muted upd-hint' }, 'Le redémarrage prend quelques secondes. « Plus tard » : elle s’installera quand tu fermeras Lumen.'),
+      h('p', { class: 'muted upd-hint' }, u.manual ? 'Sur Mac, télécharge le nouveau .dmg sur GitHub puis remplace Lumen dans Applications.' : 'Le redémarrage prend quelques secondes. « Plus tard » : elle s’installera quand tu fermeras Lumen.'),
       h('div', { class: 'actions' },
-        actionButton('⟳ Redémarrer maintenant', () => installUpdateNow(), true),
+        u.manual ? actionButton('⬇ Télécharger', () => { closeOverlay(true); api.update.install(); }, true) : actionButton('⟳ Redémarrer maintenant', () => installUpdateNow(), true),
         actionButton('Plus tard', () => closeOverlay()))));
     sfx('select');
   }
   // Écran plein « Mise à jour en cours » : l'installation est silencieuse, Lumen revient tout seul.
   function installUpdateNow() {
     const u = S.update || {};
+    if (u.manual) { api.update.install(); return; }
     if (S.overlay) closeOverlay(true);
     document.body.append(h('div', { class: 'upd-screen' },
       h('span', { class: 'logo-mark big' }),

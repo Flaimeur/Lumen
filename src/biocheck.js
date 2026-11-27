@@ -3,20 +3,16 @@
 // BIOS / clés trouvés là où l'émulateur les cherche. Lecture seule, rien n'est téléchargé.
 const fs = require('fs');
 const path = require('path');
+const P = require('./platform');
 
 const exists = (p) => { try { return !!p && fs.existsSync(p); } catch { return false; } };
 const lower = (dir) => { try { return new Set(fs.readdirSync(dir).map((f) => f.toLowerCase())); } catch { return new Set(); } };
 const hasAny = (dir, re) => { try { return fs.readdirSync(dir).some((f) => re.test(f)); } catch { return false; } };
 
-// Dossier « system » de RetroArch : celui de retroarch.cfg, sinon <RetroArch>\system.
+// Dossier « system » de RetroArch : celui de retroarch.cfg, sinon <RetroArch>\system
+// (Mac : ~/Library/Application Support/RetroArch/system).
 function raSystemDir(raExe) {
-  const base = path.dirname(raExe);
-  try {
-    const cfg = fs.readFileSync(path.join(base, 'retroarch.cfg'), 'utf8');
-    const m = /^\s*system_directory\s*=\s*"([^"]*)"/m.exec(cfg);
-    if (m && m[1] && m[1] !== 'default') return m[1].replace(/^:[\\/]/, base + path.sep);
-  } catch { /* pas de cfg */ }
-  return path.join(base, 'system');
+  return P.retroarchSetting(raExe, 'system_directory') || path.join(P.retroarchHome(raExe), 'system');
 }
 
 // BIOS par cœur RetroArch : chaque entrée = un des fichiers suffit. required:false = conseillé seulement.
@@ -41,13 +37,13 @@ const RA_BIOS = {
 
 // Émulateurs autonomes : où ils rangent leurs BIOS ou leurs clés.
 function standaloneChecks(key, exe) {
-  const docs = path.join(process.env.USERPROFILE || '', 'Documents');
-  const appdata = process.env.APPDATA || '';
-  const dir = path.dirname(exe);
-  if (key === 'duckstation') return [{ label: 'BIOS PlayStation', ok: [path.join(docs, 'DuckStation', 'bios'), path.join(dir, 'bios')].some((d) => hasAny(d, /\.(bin|rom)$/i)) }];
-  if (key === 'pcsx2') return [{ label: 'BIOS PlayStation 2', ok: [path.join(docs, 'PCSX2', 'bios'), path.join(dir, 'bios')].some((d) => hasAny(d, /\.(bin|rom0)$/i)) }];
+  const docs = P.documents();
+  const appdata = P.appData();
+  const dir = path.dirname(P.resolveApp(exe));
+  if (key === 'duckstation') return [{ label: 'BIOS PlayStation', ok: [path.join(docs, 'DuckStation', 'bios'), path.join(appdata, 'DuckStation', 'bios'), path.join(dir, 'bios')].some((d) => hasAny(d, /\.(bin|rom)$/i)) }];
+  if (key === 'pcsx2') return [{ label: 'BIOS PlayStation 2', ok: [path.join(docs, 'PCSX2', 'bios'), path.join(appdata, 'PCSX2', 'bios'), path.join(dir, 'bios')].some((d) => hasAny(d, /\.(bin|rom0)$/i)) }];
   if (key === 'eden' || key === 'switch2') {
-    const name = path.parse(exe).name.toLowerCase().replace(/[^a-z]/g, '');
+    const name = path.parse(exe).name.toLowerCase().replace(/\.app$/, '').replace(/[^a-z]/g, '');
     const dirs = [path.join(dir, 'user', 'keys'), path.join(appdata, 'eden', 'keys'), path.join(appdata, 'yuzu', 'keys'), path.join(appdata, 'Ryujinx', 'system'), path.join(appdata, name, 'keys'), path.join(appdata, 'citron', 'keys'), path.join(appdata, 'sudachi', 'keys')];
     return [{ label: 'Clés Switch (prod.keys)', ok: dirs.some((d) => exists(path.join(d, 'prod.keys'))) }];
   }
@@ -63,7 +59,7 @@ function check(systems, emulators = {}, romsRoot = '') {
     const okList = [];
     const tpl = String(s.command || '');
     if (!tpl || tpl.trim() === '{open}') continue;
-    const keys = [...new Set([...tpl.matchAll(/\{(\w+?)(Dir)?\}/g)].map((m) => m[1]).filter((k) => !['rom', 'romName', 'romDir'].includes(k)))];
+    const keys = [...new Set([...tpl.matchAll(/\{(\w+?)(Dir|Cores)?\}/g)].map((m) => m[1]).filter((k) => !['rom', 'romName', 'romDir'].includes(k)))];
     let emuOk = true;
     for (const k of keys) {
       const p = emulators[k];
@@ -71,12 +67,12 @@ function check(systems, emulators = {}, romsRoot = '') {
       else if (!exists(p)) { issues.push({ kind: 'emu', text: `Émulateur introuvable : ${p}`, fix: 'emulators' }); emuOk = false; }
     }
     // Commande sans variable (chemin écrit en dur).
-    if (!keys.length) { const m = /^"([^"]+\.exe)"/i.exec(tpl.trim()); if (m && !exists(m[1])) { issues.push({ kind: 'emu', text: `Émulateur introuvable : ${m[1]}`, fix: 'commands' }); emuOk = false; } }
+    if (!keys.length) { const m = /^"([^"]+\.(?:exe|app))"/i.exec(tpl.trim()); if (m && !exists(m[1])) { issues.push({ kind: 'emu', text: `Émulateur introuvable : ${m[1]}`, fix: 'commands' }); emuOk = false; } }
     if (emuOk && keys.length) okList.push('Émulateur');
     // RetroArch : cœur et BIOS du cœur.
-    const core = /cores[\\/]+([\w-]+)_libretro\.dll/i.exec(tpl);
+    const core = /([\w-]+)_libretro\.(?:dll|dylib|so)/i.exec(tpl);
     if (core && emulators.retroarch && exists(emulators.retroarch)) {
-      const coreFile = path.join(path.dirname(emulators.retroarch), 'cores', `${core[1]}_libretro.dll`);
+      const coreFile = path.join(P.retroarchCores(P.resolveApp(emulators.retroarch)), `${core[1]}_libretro.${P.CORE_EXT}`);
       if (!exists(coreFile)) issues.push({ kind: 'core', text: `Cœur RetroArch manquant : ${core[1]}`, help: 'RetroArch → Menu principal → Mise à jour en ligne → Télécharger un cœur.' });
       else okList.push('Cœur ' + core[1]);
       const sysDir = raSystemDir(emulators.retroarch);

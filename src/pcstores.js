@@ -5,6 +5,7 @@ const fs = require('fs');
 const fsp = fs.promises;
 const path = require('path');
 const { execFile } = require('child_process');
+const P = require('./platform');
 
 const STEAM_SKIP_IDS = new Set([228980, 1070560, 1391110, 1628350, 1493710, 250820, 1826330, 2180100]);
 const STEAM_SKIP_NAME = /steamworks|redistributable|proton|steam linux runtime|steamvr|soundtrack|dedicated server|\bsdk\b/i;
@@ -243,6 +244,7 @@ async function readSteamPlaytime(steamDir) {
 }
 
 async function getSteamDir() {
+  if (P.IS_MAC) { const d = path.join(P.appData(), 'Steam'); return fs.existsSync(path.join(d, 'steamapps')) ? d : ''; }
   const raw = await regValue('HKCU\\Software\\Valve\\Steam', 'SteamPath');
   const dir = raw ? path.normalize(raw) : '';
   return dir && fs.existsSync(dir) ? dir : '';
@@ -349,7 +351,8 @@ function epicImages(item) {
 
 async function scanEpic() {
   const programData = process.env.ProgramData || 'C:\\ProgramData';
-  const dataDir = path.join(programData, 'Epic', 'EpicGamesLauncher', 'Data');
+  // Mac : ~/Library/Application Support/Epic/EpicGamesLauncher/Data.
+  const dataDir = P.IS_MAC ? path.join(P.appData(), 'Epic', 'EpicGamesLauncher', 'Data') : path.join(programData, 'Epic', 'EpicGamesLauncher', 'Data');
   const dir = path.join(dataDir, 'Manifests');
   let files = [];
   try { files = (await fsp.readdir(dir)).filter((f) => f.endsWith('.item')); } catch { return []; }
@@ -381,6 +384,7 @@ async function scanEpic() {
 
 // ---------- GOG Galaxy ----------
 async function scanGog() {
+  if (P.IS_MAC) return scanGogMac();
   const out = await regQuery(['HKLM\\SOFTWARE\\WOW6432Node\\GOG.com\\Games', '/s']);
   if (!out) return [];
   const games = [];
@@ -407,12 +411,45 @@ async function scanGog() {
   return games;
 }
 
+// Mac : pas de registre. Les jeux GOG installés (Galaxy ou installeur) ont un « goggame-<id>.info »
+// dans Contents/Resources de leur .app, rangé dans /Applications ou « /Applications/GOG Games ».
+async function scanGogMac() {
+  const roots = ['/Applications', '/Applications/GOG Games', path.join(P.home(), 'Applications'), path.join(P.home(), 'GOG Games')];
+  const galaxy = ['/Applications/GOG Galaxy.app', path.join(P.home(), 'Applications', 'GOG Galaxy.app')].find((p) => fs.existsSync(p));
+  const games = [];
+  const seen = new Set();
+  for (const root of roots) {
+    let entries = [];
+    try { entries = await fsp.readdir(root); } catch { continue; }
+    for (const name of entries) {
+      if (!/\.app$/i.test(name)) continue;
+      const appPath = path.join(root, name);
+      const res = path.join(appPath, 'Contents', 'Resources');
+      let info = null;
+      try {
+        const f = (await fsp.readdir(res)).find((x) => /^goggame-\d+\.info$/i.test(x));
+        if (f) info = JSON.parse(await readText(path.join(res, f)));
+      } catch { /* pas un jeu GOG */ }
+      const gameId = info && (info.gameId || info.rootGameId);
+      if (!gameId || seen.has(gameId) || (info.rootGameId && info.rootGameId !== info.gameId)) continue;
+      seen.add(gameId);
+      games.push({
+        id: `gog:${gameId}`, store: 'gog', name: info.name || name.replace(/\.app$/i, ''),
+        cover: null, background: null,
+        // Lancé directement (les jeux GOG sont sans DRM) ; Galaxy n'a pas de commande de lancement sur Mac.
+        exe: appPath, args: [], cwd: root, dir: appPath, galaxy: !!galaxy,
+      });
+    }
+  }
+  return games;
+}
+
 // ---------- itch ----------
 // Chaque jeu installé par l'appli itch a un reçu « .itch/receipt.json.gz » dans son dossier : titre, image,
 // liste des fichiers. Les jeux itch sont sans DRM : on lance directement leur exécutable.
 const ITCH_SKIP_EXE = /unitycrashhandler|crashpad|unins\d*|setup|vc_?redist|dxsetup|ue4prereq|notification_helper|uninstall|crash_?report/i;
 function itchInstallDirs() {
-  const appdata = process.env.APPDATA || '';
+  const appdata = P.appData();
   const dirs = [path.join(appdata, 'itch', 'apps')];
   try {
     const prefs = JSON.parse(fs.readFileSync(path.join(appdata, 'itch', 'preferences.json'), 'utf8'));
@@ -421,6 +458,13 @@ function itchInstallDirs() {
   return [...new Set(dirs)];
 }
 function itchExe(dir, files) {
+  if (P.IS_MAC) {
+    // Mac : l'application .app la moins profonde du jeu (les fichiers listés sont dedans).
+    const apps = [...new Set((files || []).map((f) => (/^(.*?\.app)(\/|$)/i.exec(f) || [])[1]).filter(Boolean))]
+      .filter((a) => !ITCH_SKIP_EXE.test(path.basename(a)))
+      .sort((a, b) => a.split('/').length - b.split('/').length);
+    return apps.length && fs.existsSync(path.join(dir, apps[0])) ? path.join(dir, apps[0]) : '';
+  }
   const exes = (files || []).filter((f) => /\.exe$/i.test(f) && !ITCH_SKIP_EXE.test(path.basename(f)));
   // Le moins profond d'abord, puis le plus gros (le vrai jeu plutôt qu'un outil).
   const scored = exes.map((f) => { let size = 0; try { size = fs.statSync(path.join(dir, f)).size; } catch { return null; } return { f, depth: f.split(/[\\/]/).length, size }; }).filter(Boolean);

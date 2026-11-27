@@ -11,9 +11,25 @@ const { buildLaunch, tokenize } = require('../src/launcher');
   // Commandes
   assert.deepStrictEqual(tokenize('"C:\\Program Files\\RA\\retroarch.exe" -f -L "C:\\a b\\core.dll" "D:\\Jeux\\x (USA).sfc"'),
     ['C:\\Program Files\\RA\\retroarch.exe', '-f', '-L', 'C:\\a b\\core.dll', 'D:\\Jeux\\x (USA).sfc']);
-  const cmd = buildLaunch('"{retroarch}" -f -L "{retroarchDir}\\cores\\snes9x_libretro.dll" "{rom}"', 'D:\\ROMs\\snes\\Jeu.sfc', { retroarch: 'C:\\RetroArch\\retroarch.exe' });
-  assert.strictEqual(cmd.exe, 'C:\\RetroArch\\retroarch.exe');
-  assert.deepStrictEqual(cmd.args, ['-f', '-L', 'C:\\RetroArch\\cores\\snes9x_libretro.dll', 'D:\\ROMs\\snes\\Jeu.sfc']);
+  if (process.platform === 'win32') {
+    const cmd = buildLaunch('"{retroarch}" -f -L "{retroarchDir}\\cores\\snes9x_libretro.dll" "{rom}"', 'D:\\ROMs\\snes\\Jeu.sfc', { retroarch: 'C:\\RetroArch\\retroarch.exe' });
+    assert.strictEqual(cmd.exe, 'C:\\RetroArch\\retroarch.exe');
+    assert.deepStrictEqual(cmd.args, ['-f', '-L', 'C:\\RetroArch\\cores\\snes9x_libretro.dll', 'D:\\ROMs\\snes\\Jeu.sfc']);
+  } else {
+    // Mac / Linux : chemins POSIX ; {retroarchCores} = dossier des cœurs de RetroArch.
+    const cmd = buildLaunch('"{retroarch}" -f -L "{retroarchCores}/snes9x_libretro.dylib" "{rom}"', '/ROMs/snes/Jeu.sfc', { retroarch: '/opt/RetroArch/retroarch' });
+    assert.strictEqual(cmd.exe, '/opt/RetroArch/retroarch');
+    assert.ok(/[\\/]cores\/snes9x_libretro\.dylib$/.test(cmd.args[2]), cmd.args[2]);
+    // Une appli .app est lancée par son programme (Contents/MacOS/…).
+    if (process.platform === 'darwin') {
+      const appDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lumen-app-')) + '/Emu.app';
+      fs.mkdirSync(path.join(appDir, 'Contents', 'MacOS'), { recursive: true });
+      fs.writeFileSync(path.join(appDir, 'Contents', 'MacOS', 'emu-bin'), '');
+      fs.writeFileSync(path.join(appDir, 'Contents', 'Info.plist'), '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>CFBundleExecutable</key><string>emu-bin</string></dict></plist>');
+      assert.strictEqual(buildLaunch('"{dolphin}" -b -e "{rom}"', '/x.iso', { dolphin: appDir }).exe, path.join(appDir, 'Contents', 'MacOS', 'emu-bin'));
+      fs.rmSync(path.dirname(appDir), { recursive: true, force: true });
+    }
+  }
   assert.throws(() => buildLaunch('"{dolphin}" -e "{rom}"', 'x.iso', { dolphin: '' }), /dolphin/);
 
   // Détection des dossiers et noms

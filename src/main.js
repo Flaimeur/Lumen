@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, ipcMain, dialog, protocol, net, shell, globalShortcut, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, protocol, net, shell, globalShortcut, safeStorage, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -14,6 +14,7 @@ const { scanPcStores, fetchSteamGridDB, getSteamDir, steamAccounts, setSteamAcco
 const achievements = require('./achievements');
 const { fetchIidb, applyIidb, iidbOptions, listCollections, gameIcons } = require('./iidb');
 const { STORES } = require('./pcstores');
+const P = require('./platform');
 
 let pcLaunchers = new Map(); // id « steam:123 » → infos de lancement (rempli à chaque scan)
 const WEB_COVER_HOSTS = /^https:\/\/(cdn\.cloudflare\.steamstatic\.com|shared\.cloudflare\.steamstatic\.com|steamcdn-a\.akamaihd\.net|cdn2\.steamgriddb\.com|assets\.iisu\.network|media\.retroachievements\.org|cdn[0-9]*\.epicgames\.com|cdn[0-9]*\.unrealengine\.com|img\.itch\.zone)\//;
@@ -26,8 +27,10 @@ protocol.registerSchemesAsPrivileged([
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 
 const MEDIA_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.mp4', '.webm', '.mkv', '.mp3', '.ogg', '.opus', '.wav', '.m4a', '.flac']);
-const QUIT_SHORTCUT = 'CommandOrControl+Shift+Q';
-const MENU_SHORTCUT = 'CommandOrControl+Shift+M';
+// Mac : Ctrl (et pas Cmd) pour ne pas prendre Cmd+Maj+Q, qui ferme la session macOS.
+const MOD = P.IS_MAC ? 'Control' : 'CommandOrControl';
+const QUIT_SHORTCUT = `${MOD}+Shift+Q`;
+const MENU_SHORTCUT = `${MOD}+Shift+M`;
 const ingame = require('./ingame');
 let win = null;
 let currentGame = null; // { child, path }
@@ -129,6 +132,18 @@ ipcMain.handle('store:open', async (_e, store, mode) => {
   try {
     if (store === 'steam') { await shell.openExternal(mode === 'bigpicture' ? 'steam://open/bigpicture' : 'steam://open/main'); return { ok: true }; }
     if (store === 'epic') { await shell.openExternal('com.epicgames.launcher://store'); return { ok: true }; }
+    if (store === 'gog' && P.IS_MAC) {
+      const app_ = ['/Applications/GOG Galaxy.app', path.join(os.homedir(), 'Applications', 'GOG Galaxy.app')].find((p) => fs.existsSync(p));
+      if (app_) { const err = await shell.openPath(app_); return err ? { ok: false, error: err } : { ok: true }; }
+      await shell.openExternal('goggalaxy://');
+      return { ok: true };
+    }
+    if (store === 'itch' && P.IS_MAC) {
+      const app_ = ['/Applications/itch.app', path.join(os.homedir(), 'Applications', 'itch.app')].find((p) => fs.existsSync(p));
+      if (!app_) return { ok: false, error: 'itch introuvable sur ce Mac.' };
+      const err = await shell.openPath(app_);
+      return err ? { ok: false, error: err } : { ok: true };
+    }
     if (store === 'gog') {
       const pf = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
       const exe = [path.join(pf, 'GOG Galaxy', 'GalaxyClient.exe'), path.join(process.env.ProgramFiles || '', 'GOG Galaxy', 'GalaxyClient.exe')].find((p) => fs.existsSync(p));
@@ -248,6 +263,13 @@ async function rommLibrary(cfg, { refresh }) {
 }
 
 function detectRetroArch() {
+  if (P.IS_MAC) {
+    return [
+      '/Applications/RetroArch.app',
+      path.join(os.homedir(), 'Applications', 'RetroArch.app'),
+      path.join(P.appData(), 'Steam', 'steamapps', 'common', 'RetroArch', 'RetroArch.app'),
+    ].find((p) => fs.existsSync(p)) || '';
+  }
   const pf = process.env.ProgramFiles || 'C:\\Program Files';
   const pf86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
   const candidates = [
@@ -304,6 +326,15 @@ function createWindow() {
     },
   });
   win.removeMenu();
+  if (P.IS_MAC) {
+    // Mac : la barre de menus est commune à l'appli ; on garde le minimum (Cmd+Q, copier/coller, plein écran).
+    Menu.setApplicationMenu(Menu.buildFromTemplate([
+      { role: 'appMenu' },
+      { role: 'editMenu' },
+      { label: 'Présentation', submenu: [{ role: 'togglefullscreen', label: 'Plein écran' }, { role: 'reload', label: 'Recharger' }, { role: 'toggleDevTools', label: 'Outils de développement' }] },
+      { role: 'windowMenu', label: 'Fenêtre' },
+    ]));
+  }
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.on('closed', () => { win = null; });
@@ -313,14 +344,35 @@ function createWindow() {
 function quitCurrentGame() {
   if (!currentGame) return false;
   const { child } = currentGame;
+  if (P.IS_MAC) {
+    // Processus enfants d'abord (certains émulateurs en lancent), puis l'émulateur ; forcé après 3 s.
+    execFile('/usr/bin/pkill', ['-TERM', '-P', String(child.pid)], () => {});
+    try { child.kill('SIGTERM'); } catch { /* déjà fermé */ }
+    setTimeout(() => { if (child.exitCode === null && child.signalCode === null) { try { child.kill('SIGKILL'); } catch { /* déjà fermé */ } } }, 3000);
+    return true;
+  }
   // taskkill /T ferme aussi les processus enfants (certains émulateurs en lancent).
   execFile('taskkill', ['/PID', String(child.pid), '/T', '/F'], () => {});
   return true;
 }
 
 // ---------- Veille / redémarrage / extinction du PC ----------
+let macPowerTimer = null;
 function powerAction(action) {
   const { execFile } = require('child_process');
+  if (P.IS_MAC) {
+    if (action === 'sleep') { execFile('/usr/bin/pmset', ['sleepnow'], () => {}); return { ok: true }; }
+    if (action === 'shutdown' || action === 'restart') {
+      // 5 s pour annuler, comme sur Windows. macOS demande une fois l'autorisation de piloter « System Events ».
+      clearTimeout(macPowerTimer);
+      macPowerTimer = setTimeout(() => {
+        execFile('/usr/bin/osascript', ['-e', `tell application "System Events" to ${action === 'shutdown' ? 'shut down' : 'restart'}`], () => {});
+      }, 5000);
+      return { ok: true };
+    }
+    if (action === 'cancel') { clearTimeout(macPowerTimer); macPowerTimer = null; return { ok: true }; }
+    return { ok: false, error: 'Action inconnue' };
+  }
   if (action === 'sleep') {
     // Veille (pas l'hibernation) via l'API Windows.
     execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Application]::SetSuspendState([System.Windows.Forms.PowerState]::Suspend, $false, $false)'], { windowsHide: true }, () => {});
@@ -401,6 +453,7 @@ function onGameEnded(gamePath, code, started) {
   if (!win) return;
   if (win.isMinimized()) win.restore();
   win.show();
+  if (P.IS_MAC) app.focus({ steal: true });
   win.focus();
   win.webContents.send('game:exit', { path: gamePath, code, seconds: Math.round((Date.now() - started) / 1000) });
 }
@@ -600,7 +653,9 @@ ipcMain.handle('dialog:file', async (_e, title, defaultPath) => {
     title,
     defaultPath: defaultPath || undefined,
     properties: ['openFile'],
-    filters: [{ name: 'Programmes', extensions: ['exe', 'bat', 'cmd'] }, { name: 'Tous les fichiers', extensions: ['*'] }],
+    filters: P.IS_MAC
+      ? [{ name: 'Applications', extensions: ['app'] }, { name: 'Tous les fichiers', extensions: ['*'] }]
+      : [{ name: 'Programmes', extensions: ['exe', 'bat', 'cmd'] }, { name: 'Tous les fichiers', extensions: ['*'] }],
   });
   return r.canceled ? null : r.filePaths[0];
 });
@@ -738,7 +793,7 @@ ipcMain.handle('achnotify:test', () => { achNotify({ game: 'Lumen', name: 'Premi
 // ---------- Captures d'écran en jeu ----------
 // Le rendu « arme » la capture au lancement d'un jeu (nom du jeu) ; Ctrl+Maj+S capture tant qu'elle est armée.
 const capture = require('./capture');
-const CAPTURE_SHORTCUT = 'CommandOrControl+Shift+S';
+const CAPTURE_SHORTCUT = `${MOD}+Shift+S`;
 let captureGame = null;
 let captureBusy = false;
 async function doCapture() {
@@ -868,19 +923,21 @@ function appsSystem(cfg) {
   };
 }
 ipcMain.handle('apps:add', async () => {
-  const startMenu = path.join(process.env.ProgramData || 'C:\\ProgramData', 'Microsoft', 'Windows', 'Start Menu', 'Programs');
+  const startMenu = P.IS_MAC ? '/Applications' : path.join(process.env.ProgramData || 'C:\\ProgramData', 'Microsoft', 'Windows', 'Start Menu', 'Programs');
   const r = await dialog.showOpenDialog(win, {
-    title: 'Choisir une application (programme ou raccourci du menu Démarrer)',
+    title: P.IS_MAC ? 'Choisir une application' : 'Choisir une application (programme ou raccourci du menu Démarrer)',
     defaultPath: startMenu,
     properties: ['openFile'],
-    filters: [{ name: 'Applications', extensions: ['exe', 'lnk', 'url', 'bat', 'cmd'] }, { name: 'Tous les fichiers', extensions: ['*'] }],
+    filters: P.IS_MAC
+      ? [{ name: 'Applications', extensions: ['app'] }, { name: 'Tous les fichiers', extensions: ['*'] }]
+      : [{ name: 'Applications', extensions: ['exe', 'lnk', 'url', 'bat', 'cmd'] }, { name: 'Tous les fichiers', extensions: ['*'] }],
   });
   if (r.canceled || !r.filePaths[0]) return null;
-  const target = r.filePaths[0];
+  const target = r.filePaths[0].replace(/\/$/, '');
   const cfg = loadConfig();
   const id = require('crypto').randomBytes(6).toString('hex');
   await makeAppIcon(id, target);
-  const entry = { id, name: path.parse(target).name, target, image: '' };
+  const entry = { id, name: (P.IS_MAC && P.plistValue(target, 'CFBundleDisplayName')) || path.parse(target).name, target, image: '' };
   cfg.apps = [...(cfg.apps || []), entry];
   saveConfig(cfg);
   return entry;
@@ -967,10 +1024,16 @@ function sendUpdate() { if (win && !win.isDestroyed()) win.webContents.send('upd
 function setupUpdater() {
   if (!app.isPackaged || updater) return;
   try { updater = require('electron-updater').autoUpdater; } catch { return; }
-  updater.autoDownload = true;
-  updater.autoInstallOnAppQuit = true;
+  // Mac : l'appli n'est pas signée par Apple, macOS refuse l'installation automatique.
+  // On signale la nouvelle version et le bouton ouvre la page de téléchargement.
+  updater.autoDownload = !P.IS_MAC;
+  updater.autoInstallOnAppQuit = !P.IS_MAC;
   updater.on('checking-for-update', () => { Object.assign(updateState, { status: 'checking', error: null }); sendUpdate(); });
-  updater.on('update-available', (i) => { Object.assign(updateState, { status: 'downloading', version: i.version, progress: 0 }); sendUpdate(); });
+  updater.on('update-available', (i) => {
+    if (P.IS_MAC) Object.assign(updateState, { status: 'ready', manual: true, version: i.version, progress: 100, notes: notesText(i.releaseNotes) });
+    else Object.assign(updateState, { status: 'downloading', version: i.version, progress: 0 });
+    sendUpdate();
+  });
   updater.on('update-not-available', () => { Object.assign(updateState, { status: 'uptodate' }); sendUpdate(); });
   updater.on('download-progress', (p) => { updateState.progress = Math.round(p.percent || 0); sendUpdate(); });
   updater.on('update-downloaded', (i) => {
@@ -1031,7 +1094,11 @@ ipcMain.handle('update:check', async () => {
   return updateState;
 });
 // Installation silencieuse (pas d'assistant Windows), puis Lumen se relance tout seul.
-ipcMain.handle('update:install', () => { if (updater && updateState.status === 'ready') setTimeout(() => updater.quitAndInstall(true, true), 900); return true; });
+ipcMain.handle('update:install', () => {
+  if (P.IS_MAC) { shell.openExternal('https://github.com/Flaimeur/Lumen/releases/latest'); return true; }
+  if (updater && updateState.status === 'ready') setTimeout(() => updater.quitAndInstall(true, true), 900);
+  return true;
+});
 
 // Sauvegarde / restauration : la config (favoris, dossiers, profils manette, images et sons choisis,
 // accueil, applications…) dans un fichier .json. Les clés et mots de passe chiffrés n'y sont jamais.
@@ -1211,6 +1278,7 @@ ipcMain.handle('game:launch', async (_e, game) => {
     if (!l) return { ok: false, error: 'Jeu PC introuvable : il a peut-être été désinstallé.' };
     try {
       if (l.uri) await shell.openExternal(l.uri);
+      else if (P.IS_MAC && /\.app$/i.test(l.exe)) spawn('/usr/bin/open', ['-a', l.exe, ...(l.args && l.args.length ? ['--args', ...l.args] : [])], { detached: true, stdio: 'ignore' }).unref();
       else spawn(l.exe, l.args || [], { cwd: l.cwd, detached: true, stdio: 'ignore' }).unref();
       return { ok: true, detached: true };
     } catch (err) {
@@ -1322,4 +1390,5 @@ if (!app.requestSingleInstanceLock()) {
 
   app.on('will-quit', () => globalShortcut.unregisterAll());
   app.on('window-all-closed', () => app.quit());
+  app.on('activate', () => { if (!win && app.isReady()) createWindow(); });
 }

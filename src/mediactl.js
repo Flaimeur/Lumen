@@ -133,6 +133,7 @@ function start(dir) {
 
 // Envoie une commande ('state', 'toggle', 'next', 'prev') et attend la réponse (8 s max).
 async function ask(cmd, dir) {
+  if (process.platform === 'darwin') return require('./macmedia').ask(cmd, dir || coverDir);
   if (process.platform !== 'win32') return { active: false };
   if (!proc) start(dir || coverDir);
   if (!proc) return { active: false };

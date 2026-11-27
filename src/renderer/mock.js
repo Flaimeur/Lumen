@@ -46,7 +46,10 @@
   systems.push({ id: 'apps', name: 'Applications', short: 'Apps', color: '#0e7490', folder: null, pc: true, apps: true,
     games: [{ path: 'app:demo', system: 'apps', name: 'Word', source: 'app', cover: null, appIcon: true, target: 'C:/Demo/WINWORD.EXE' }] });
 
+  // Aperçu : ?layout=ps5 (ps4, xbox, switch) ouvre l'accueil dans cette disposition.
+  const layoutParam = new URLSearchParams(location.search).get('layout');
   let cfg = {
+    ...(layoutParam ? { home: { layout: layoutParam, widgets: ['nowplaying', 'clock', 'achievements', 'surprise', 'favorites'], wide: {} } } : {}),
     romsRoot: 'C:/Demo', mediaRoot: '', gamelistsRoot: '',
     emulators: { retroarch: '', dolphin: '', pcsx2: '', cemu: '', eden: '', azahar: '' },
     commands: {}, swapAB: false, fullscreen: true, sounds: true, soundbites: true, videos: true, volume: 0.7,

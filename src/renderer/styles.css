@@ -1447,3 +1447,134 @@ body.evening::before { content: ""; position: fixed; inset: 0; z-index: 9998; po
 .chk-row.good .chk-state { color: #4ade80; }
 .chk-row.warn .chk-state { color: #fcd34d; }
 .chk-row.bad .chk-state { color: #f87171; }
+
+/* ---------- Mac : effets allégés ----------
+   Sur écran Retina, chaque panneau en verre dépoli (backdrop-filter) refait un flou de tout ce qui est derrière lui
+   à chaque image des fonds animés : le GPU tourne en permanence et l'interface saccade. On garde le même rendu
+   avec des panneaux un peu plus opaques, et les halos de fond sont flous une fois pour toutes (pas d'animation). */
+html.mac { --panel: rgba(18, 22, 34, 0.86); }
+html.mac *, html.mac *::before, html.mac *::after { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+html.mac .aurora, html.mac .bg-layer.on { animation: none; }
+html.mac .aurora { mix-blend-mode: normal; }
+html.mac .grain { display: none; }
+/* Le zoom lent des bannières (Ken Burns) redessine une grande image à chaque image : ~10 % de GPU en continu. */
+html.mac .hero-art img, html.mac .hero-art .gen, html.mac .sys-banner img { animation: none; }
+
+/* ---------- Accueil façon consoles (disposition PS5, PS4, Xbox, Switch) ---------- */
+.cx { display: flex; flex-direction: column; min-height: 100%; }
+.cx .cx-row { gap: 14px; padding: 18px 10px 22px; overflow-y: visible; scroll-padding: 0 120px; }
+.cx-lib { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; background: rgba(255, 255, 255, 0.07); }
+.cx-lib-ico { font-size: calc(var(--tile) * 0.3); line-height: 1; opacity: 0.85; }
+.cx-lib-name { font-size: 12px; font-weight: 700; color: var(--muted); }
+.cx-info { margin: 4px 14px 0; min-height: 170px; }
+.cx-info h1 { font-size: clamp(30px, 3.4vw, 54px); line-height: 1.02; letter-spacing: -0.03em; margin: 0 0 10px; font-weight: 850; text-shadow: 0 4px 30px rgba(0, 0, 0, 0.6); text-wrap: balance; max-width: 900px; }
+.cx-logo { display: block; max-width: 400px; max-height: 130px; object-fit: contain; object-position: left center; margin: 0 0 12px; filter: drop-shadow(0 6px 20px rgba(0, 0, 0, 0.6)); }
+.cx-meta { color: #c9d1e3; font-weight: 600; font-size: 15px; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6); }
+.cx-info .actions { margin-top: 18px; }
+.cx-cards { display: flex; gap: 14px; overflow-x: auto; padding: 12px 10px 20px; margin-top: auto; }
+.cx-cards .widget { flex: 0 0 clamp(240px, 19vw, 320px); height: clamp(150px, 10.5vw, 196px); overflow: hidden; }
+.cx-cards .widget.wide { flex-basis: clamp(420px, 34vw, 600px); }
+
+/* PS5 : petites vignettes en haut ; la sélectionnée s'agrandit, les autres se poussent. */
+.cx-ps5 { --tile: clamp(80px, 6.4vw, 116px); }
+.cx-ps5 .cx-row { align-items: flex-start; min-height: calc(var(--tile) * 1.5 + 40px); }
+.cx-ps5 .cx-row .tile { flex: 0 0 var(--tile); border-radius: 16px; transition: flex-basis 0.22s var(--out); }
+.cx-ps5 .cx-row .focused.tile { flex-basis: calc(var(--tile) * 1.5); scale: 1; }
+.cx-ps5 .cx-info { margin-top: 2vh; min-height: 30vh; }
+.cx-ps5 .cx-row .app-name { display: none; }
+
+/* PS4 : barre de widgets au-dessus, grand ruban ; la vignette sélectionnée s'élargit. */
+.cx-ps4 { --tile: clamp(128px, 11vw, 200px); }
+.cx-ps4 .cx-bar { order: -1; display: flex; gap: 10px; overflow-x: auto; padding: 8px 10px 4px; }
+/* Widgets complets mais réduits (zoom) : rien n'est coupé. */
+.cx-ps4 .cx-bar .widget { flex: 0 0 280px; height: 160px; zoom: 0.72; overflow: hidden; }
+.cx-ps4 .cx-bar .widget.wide { flex-basis: 470px; }
+.cx-ps4 .cx-row { margin-top: 7vh; align-items: flex-start; }
+.cx-ps4 .cx-row .tile { flex: 0 0 var(--tile); height: var(--tile); aspect-ratio: auto; border-radius: 6px; transition: flex-basis 0.22s var(--out); }
+.cx-ps4 .cx-row .focused.tile { flex-basis: calc(var(--tile) * 1.9); scale: 1; }
+.cx-ps4 .cx-info { margin-top: 8px; }
+
+/* Switch : grandes vignettes carrées, nom au-dessus, raccourcis ronds. */
+.cx-switch { --tile: clamp(170px, 15vw, 270px); }
+.cx-switch .cx-info { min-height: 0; margin-top: 4vh; }
+.cx-switch .cx-info h1 { font-size: clamp(20px, 1.8vw, 28px); color: var(--accent); margin: 0; }
+.cx-switch .cx-row { gap: 12px; }
+.cx-switch .cx-row .tile { flex: 0 0 var(--tile); border-radius: 6px; }
+.cx-rounds { display: flex; justify-content: center; gap: clamp(14px, 2vw, 30px); padding: 6px 10px 18px; }
+.cx-round { position: relative; width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, 0.1); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12); }
+.cx-round-ico { font-size: 26px; }
+.cx-round-label { position: absolute; top: calc(100% + 6px); left: 50%; translate: -50% 0; white-space: nowrap; font-size: 12px; font-weight: 700; opacity: 0; transition: opacity 0.15s; }
+.cx-round.focused .cx-round-label { opacity: 1; color: var(--accent); }
+
+/* Xbox : mosaïque de tuiles carrées, jeu à reprendre en grand, widgets épinglés sur deux cases. */
+.cx-xbox .cx-mosaic { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); grid-auto-rows: clamp(118px, 11.5vw, 200px); grid-auto-flow: dense; gap: 10px; padding: 14px 10px 6px; }
+.cx-xbox .cx-mosaic > .tile { aspect-ratio: auto; height: 100%; border-radius: 6px; }
+.cx-xbox .cx-mosaic > .cx-big { grid-column: span 2; grid-row: span 2; }
+.cx-xbox .cx-mosaic > .widget { grid-column: span 2; height: 100%; margin: 0; border-radius: 6px; overflow: hidden; }
+.cx-big-label { position: absolute; inset: auto 0 0 0; z-index: 2; padding: 40px 18px 16px; display: flex; flex-direction: column; gap: 4px; background: linear-gradient(transparent, rgba(0, 0, 0, 0.78)); }
+.cx-big-label b { font-size: clamp(18px, 1.7vw, 26px); font-weight: 800; letter-spacing: -0.01em; }
+@media (prefers-reduced-motion: reduce) { .cx .cx-row .tile { transition: none; } }
+.cx-big .gen .gen-title, .cx-big .gen .gen-chip { display: none; }
+
+/* ---------- Listes (PSP, DS) ---------- */
+.cx-li { display: flex; align-items: center; gap: 14px; padding: 8px 14px 8px 8px; border-radius: 14px; }
+.cx-li-art { position: relative; flex: none; width: 64px; height: 64px; border-radius: 10px; overflow: hidden; --tile: 64px; display: grid; place-items: center; background: rgba(255, 255, 255, 0.08); }
+.cx-li-art img { width: 100%; height: 100%; object-fit: cover; }
+.cx-li-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cx-li-text b { font-size: 17px; font-weight: 750; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cx-li-text span { font-size: 13px; color: var(--muted); }
+.cx-li.focused { background: rgba(255, 255, 255, 0.1); }
+.xmb-ico { font-size: 28px; }
+
+/* PSP : barre de catégories, la liste de la catégorie sélectionnée part sous son icône. */
+.cx-psp { --cat: 150px; }
+.xmb-bar { display: flex; padding: 6vh 0 0 calc(10vw); }
+.xmb-cat { flex: 0 0 var(--cat); display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px 0; border-radius: 16px; opacity: 0.6; transition: opacity 0.15s; }
+.xmb-cat.focused { opacity: 1; }
+.xmb-cat-ico { font-size: 42px; line-height: 1; filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.5)); }
+.xmb-cat-label { font-size: 13px; font-weight: 700; }
+.xmb-list { display: flex; flex-direction: column; gap: 6px; width: min(560px, 60vw); padding: 18px 0 30px; margin-left: calc(10vw + var(--i, 0) * var(--cat) + var(--cat) / 2 - 40px); transition: margin-left 0.2s var(--out); }
+.xmb-list .widget { height: 170px; zoom: 0.85; overflow: hidden; }
+
+/* PS Vita : bulles rondes. */
+.cx-vita .cx-info { min-height: 0; margin-top: 3vh; }
+.cx-vita .cx-info h1 { font-size: clamp(20px, 1.8vw, 28px); margin: 0; }
+.vita-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(clamp(96px, 9vw, 150px), 1fr)); gap: 22px 18px; padding: 18px 4vw 10px; --tile: clamp(96px, 9vw, 150px); }
+.vita-grid > .tile { border-radius: 50%; box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45), inset 0 0 0 3px rgba(255, 255, 255, 0.15); }
+.vita-grid > .tile .app-name, .vita-grid > .tile .badge-media { display: none; }
+.vita-grid > .cx-lib .cx-lib-name { font-size: 11px; }
+
+/* 3DS et DS : deux écrans encadrés, celui du bas plus petit. */
+.ds-screen { position: relative; margin: 0 auto; border-radius: 14px; background: rgba(8, 10, 18, 0.72); box-shadow: 0 0 0 10px rgba(255, 255, 255, 0.06), 0 20px 50px rgba(0, 0, 0, 0.5); overflow: hidden; }
+.ds-top { width: min(1000px, 78vw); min-height: 34vh; margin-top: 3vh; padding: 20px 26px; }
+.ds-bottom { width: min(760px, 60vw); margin-top: 34px; margin-bottom: 24px; padding: 18px; }
+.ds-top .cx-info { margin: 0; min-height: 0; }
+.ds-top .cx-info h1 { font-size: clamp(24px, 2.4vw, 38px); }
+.ds-widgets { display: flex; gap: 12px; overflow-x: auto; padding-top: 14px; }
+.ds-widgets .widget { flex: 0 0 280px; height: 160px; zoom: 0.75; overflow: hidden; }
+.n3ds-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; --tile: 96px; }
+.n3ds-grid > .tile { border-radius: 10px; }
+.n3ds-grid > .tile .app-name { display: none; }
+.ds-menu { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ds-btn { background: rgba(255, 255, 255, 0.06); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
+.ds-clock { font-size: clamp(60px, 8vw, 120px); font-weight: 800; text-align: center; padding-top: 6vh; letter-spacing: -0.03em; }
+
+/* Wii : grille de chaînes, barre du bas avec l'horloge. */
+.wii-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: clamp(110px, 11vw, 180px); gap: 16px; padding: 3vh 4vw 10px; }
+.wii-grid > .wii-ch { aspect-ratio: auto; height: 100%; border-radius: 22px; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4), inset 0 0 0 3px rgba(255, 255, 255, 0.22); }
+.wii-grid > .widget.wii-ch { margin: 0; overflow: hidden; }
+.wii-bar { display: flex; align-items: center; justify-content: center; gap: 6vw; margin: 14px 0 20px; }
+.wii-bar .cx-round { width: 78px; height: 78px; }
+.wii-clock { display: flex; flex-direction: column; align-items: center; }
+.wii-clock b { font-size: clamp(36px, 3.6vw, 56px); font-weight: 750; letter-spacing: 0.02em; }
+.wii-clock span { font-size: 14px; color: var(--muted); text-transform: capitalize; }
+
+/* Wii U : icônes carrées dans un panneau arrondi. */
+.cx-wiiu .cx-info { min-height: 0; margin-top: 2vh; }
+.cx-wiiu .cx-info h1 { font-size: clamp(20px, 1.8vw, 28px); margin: 0; }
+.wiiu-panel { display: grid; grid-template-columns: repeat(auto-fill, minmax(clamp(88px, 8vw, 130px), 1fr)); gap: 14px; margin: 12px 3vw 14px; padding: 18px; border-radius: 26px; background: rgba(255, 255, 255, 0.06); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); --tile: clamp(88px, 8vw, 130px); }
+.wiiu-panel > .tile { border-radius: 14px; }
+.wiiu-panel > .tile .app-name { display: none; }
+.cx-n3ds .ds-top, .cx-ds .ds-top { order: -1; }
+.ds-top-center { display: flex; flex-direction: column; justify-content: center; }
+.vita-grid > .tile .gen-title, .vita-grid > .tile .gen-chip { display: none; }

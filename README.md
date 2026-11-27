@@ -6,7 +6,7 @@
 
 **Tous tes jeux au même endroit, à piloter à la manette.**
 
-ROMs, Steam, Epic, GOG, RomM et tes applications dans une seule interface plein écran pour Windows.
+ROMs, Steam, Epic, GOG, RomM et tes applications dans une seule interface plein écran pour Windows et macOS.
 
 [![Dernière version](https://img.shields.io/github/v/release/Flaimeur/Lumen?label=version&color=8b7cf0)](https://github.com/Flaimeur/Lumen/releases/latest)
 [![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-5eead4)](https://github.com/Flaimeur/Lumen/releases/latest)
@@ -52,6 +52,15 @@ Lumen range ta bibliothèque, trouve les images de tes jeux et lance tes émulat
 > **« Windows a protégé votre ordinateur » ?** L'installateur n'est pas signé avec un certificat payant, alors SmartScreen affiche cet avertissement la première fois. Clique sur **Informations complémentaires**, puis sur **Exécuter quand même**.
 >
 > Si le navigateur bloque le fichier (« n'est pas fréquemment téléchargé »), ouvre le menu **⋯** du téléchargement → **Conserver** → **Conserver quand même**. Le code est entièrement ouvert ici.
+
+### Sur Mac
+
+1. Télécharge `Lumen-x.y.z-mac.dmg` (Apple Silicon et Intel), ouvre-le et glisse **Lumen** dans **Applications**.
+2. L'appli n'est pas signée par Apple : au premier lancement, fais **clic droit → Ouvrir**, puis **Ouvrir**. Si macOS dit qu'elle est « endommagée » : `xattr -cr /Applications/Lumen.app`.
+3. Émulateurs : indique les applications `.app` (RetroArch, Dolphin, PCSX2, DuckStation, PPSSPP, Azahar, Ryujinx…). Les cœurs RetroArch sont lus dans `~/Library/Application Support/RetroArch/cores`.
+4. Les jeux Mac se rangent dans `ROMs/mac/` (applications `.app`). Steam, Epic, GOG et itch sont détectés.
+
+Différences avec Windows : pas d'EA app / Ubisoft / Battle.net / Amazon / Xbox dans la bibliothèque, pas de profils manette → clavier, et le widget musique suit Spotify et Musique. Les raccourcis globaux utilisent **Ctrl** (Ctrl + Maj + Q pour quitter un jeu). Les mises à jour ne s'installent pas toutes seules : Lumen te prévient et ouvre la page de téléchargement.
 
 ### Ranger ses jeux
 

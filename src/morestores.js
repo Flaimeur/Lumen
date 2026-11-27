@@ -119,16 +119,25 @@ async function scanXboxNow() {
   }));
 }
 
+// Ces launchers sont lus dans le registre Windows : rien à scanner sur Mac.
+const winOnly = (fn) => (process.platform === 'win32' ? fn : async () => []);
 const MORE_STORES = {
-  ea: { name: 'EA app', short: 'EA', color: '#ff4747', scan: scanEa },
-  ubisoft: { name: 'Ubisoft Connect', short: 'Ubisoft', color: '#0070ff', scan: scanUbisoft },
-  battlenet: { name: 'Battle.net', short: 'Battle.net', color: '#148eff', scan: scanBattlenet },
-  amazon: { name: 'Amazon Games', short: 'Amazon', color: '#ff9900', scan: scanAmazon },
-  xbox: { name: 'Xbox', short: 'Xbox', color: '#107c10', scan: scanXbox },
+  ea: { name: 'EA app', short: 'EA', color: '#ff4747', scan: winOnly(scanEa) },
+  ubisoft: { name: 'Ubisoft Connect', short: 'Ubisoft', color: '#0070ff', scan: winOnly(scanUbisoft) },
+  battlenet: { name: 'Battle.net', short: 'Battle.net', color: '#148eff', scan: winOnly(scanBattlenet) },
+  amazon: { name: 'Amazon Games', short: 'Amazon', color: '#ff9900', scan: winOnly(scanAmazon) },
+  xbox: { name: 'Xbox', short: 'Xbox', color: '#107c10', scan: winOnly(scanXbox) },
 };
 
 // Ouvrir le launcher lui-même.
 function launcherCommand(store) {
+  if (process.platform === 'darwin') {
+    const app = (name) => ['/Applications', path.join(require('os').homedir(), 'Applications')].map((d) => path.join(d, name)).find(exists);
+    if (store === 'battlenet') { const a = app('Battle.net.app'); return a ? { exe: '/usr/bin/open', args: [a] } : { uri: 'battlenet://' }; }
+    if (store === 'ea') { const a = app('EA app.app'); return a ? { exe: '/usr/bin/open', args: [a] } : null; }
+    if (store === 'ubisoft') { const a = app('Ubisoft Connect.app'); return a ? { exe: '/usr/bin/open', args: [a] } : { uri: 'uplay://' }; }
+    return null;
+  }
   const pf86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
   const pf = process.env.ProgramFiles || 'C:\\Program Files';
   if (store === 'ea') { const exe = [path.join(pf, 'Electronic Arts', 'EA Desktop', 'EA Desktop', 'EADesktop.exe')].find(exists); return exe ? { exe } : null; }

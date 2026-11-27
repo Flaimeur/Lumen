@@ -45,6 +45,8 @@ function next() {
     webPreferences: { sandbox: true, contextIsolation: true, javascript: false },
   });
   w.setAlwaysOnTop(true, 'screen-saver');
+  // Mac : visible aussi par-dessus un jeu en plein écran (qui a son propre Space).
+  if (process.platform === 'darwin') w.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   w.setIgnoreMouseEvents(true);
   w.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(page(item)));
   w.once('ready-to-show', () => w.showInactive());
