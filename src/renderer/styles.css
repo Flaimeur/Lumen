@@ -1578,3 +1578,14 @@ html.mac .hero-art img, html.mac .hero-art .gen, html.mac .sys-banner img { anim
 .cx-n3ds .ds-top, .cx-ds .ds-top { order: -1; }
 .ds-top-center { display: flex; flex-direction: column; justify-content: center; }
 .vita-grid > .tile .gen-title, .vita-grid > .tile .gen-chip { display: none; }
+
+/* Icônes dessinées des dispositions consoles (raccourcis ronds, barre PSP, Bibliothèque) : même trait que le dock. */
+.cx-round-ico, .xmb-cat-ico, .xmb-ico, .cx-lib-ico { display: grid; place-items: center; color: currentColor; }
+.cx-round-ico svg, .cx-round-ico .ico { width: 28px; height: 28px; }
+.wii-bar .cx-round-ico svg, .wii-bar .cx-round-ico .ico { width: 32px; height: 32px; }
+.xmb-cat-ico svg, .xmb-cat-ico .ico { width: 46px; height: 46px; }
+.xmb-ico svg, .xmb-ico .ico { width: 26px; height: 26px; }
+.cx-lib-ico svg, .cx-lib-ico .ico { width: calc(var(--tile) * 0.28); height: calc(var(--tile) * 0.28); }
+.cx-round-ico .ico, .xmb-cat-ico .ico, .xmb-ico .ico, .cx-lib-ico .ico { display: grid; place-items: center; }
+.cx-round-ico .ico svg, .xmb-cat-ico .ico svg, .xmb-ico .ico svg, .cx-lib-ico .ico svg { width: 100%; height: 100%; }
+.cx-round-ico .gi, .xmb-cat-ico .gi, .xmb-ico .gi, .cx-lib-ico .gi { margin: 0; }

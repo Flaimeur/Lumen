@@ -1581,7 +1581,9 @@
       return t;
     };
     // Dernière vignette : toute la bibliothèque (onglet Consoles).
-    const libTile = () => focusable(h('div', { class: 'tile cx-lib' }, h('span', { class: 'cx-lib-ico' }, '▦'), h('span', { class: 'cx-lib-name' }, 'Bibliothèque')),
+    // Icônes dessinées de Lumen (comme le dock) plutôt que des émojis, qui changent de style d'un PC à l'autre.
+    const cxIco = (name) => (ICONS[name] ? icon(name) : window.LumenGlyphs ? window.LumenGlyphs.svg(name) : h('span', {}, '•'));
+    const libTile = () => focusable(h('div', { class: 'tile cx-lib' }, h('span', { class: 'cx-lib-ico' }, cxIco('library')), h('span', { class: 'cx-lib-name' }, 'Bibliothèque')),
       { a: () => openTab('systems'), focus: () => { setTitle('Bibliothèque', 'Toutes tes consoles'); setHints('action'); } });
     const row = (fscale) => h('div', { class: 'row cx-row', 'data-fscale': fscale }, list.map((g) => tileFor(g)), libTile());
     const cards = (cls) => (widgetIds.length ? h('section', { class: cls }, widgetIds.map((w) => widgetCard(w))) : null);
@@ -1591,8 +1593,8 @@
       S.homeEdit ? h('div', { class: 'edit-banner' }, '✏ Glisse les widgets pour changer leur ordre · Échap pour terminer') : null, ...kids);
 
     // Raccourcis ronds vers les onglets (Switch, Wii, Wii U) ; items du menu « Lumen » de la PSP.
-    const SHORTCUTS = [['🔎', 'Recherche', 'search'], ['🎮', 'Consoles', 'systems'], ['📁', 'Dossiers', 'favorites'], ['🏆', 'Succès', 'achievements'], ['📊', 'Stats', 'stats'], ['⚙', 'Réglages', 'settings']];
-    const round = (ico, label, fn) => focusable(h('div', { class: 'cx-round' }, h('span', { class: 'cx-round-ico' }, ico), h('span', { class: 'cx-round-label' }, label)),
+    const SHORTCUTS = [['search', 'Recherche', 'search'], ['systems', 'Consoles', 'systems'], ['favorites', 'Dossiers', 'favorites'], ['achievements', 'Succès', 'achievements'], ['stats', 'Stats', 'stats'], ['settings', 'Réglages', 'settings']];
+    const round = (ico, label, fn) => focusable(h('div', { class: 'cx-round' }, h('span', { class: 'cx-round-ico' }, cxIco(ico)), h('span', { class: 'cx-round-label' }, label)),
       { a: fn, focus: () => { setTitle(label, ''); setHints('action'); } });
     const rounds = (only) => h('div', { class: 'cx-rounds' }, SHORTCUTS.filter(([, , id]) => !only || only.includes(id)).map(([ico, label, id]) => round(ico, label, () => openTab(id))));
     // Ligne de liste (PSP, DS) : petite image, nom et console.
@@ -1609,10 +1611,10 @@
     if (layout === 'psp') {
       // Barre de catégories : la liste de la catégorie sélectionnée s'affiche sous son icône.
       const cats = [
-        { id: 'games', ico: '🎮', label: 'Jeux', make: () => games.slice(0, 14).map((g) => listRow(g, 'cx-li xmb-item')) },
-        { id: 'apps', ico: '▦', label: 'Applications', make: () => apps.map((g) => listRow(g, 'cx-li xmb-item')) },
-        { id: 'widgets', ico: '✦', label: 'Widgets', make: () => widgetIds.map((w) => widgetCard(w)) },
-        { id: 'lumen', ico: '☾', label: 'Lumen', make: () => SHORTCUTS.map(([ico, label, id]) => focusable(h('div', { class: 'cx-li xmb-item' }, h('div', { class: 'cx-li-art xmb-ico' }, ico), h('div', { class: 'cx-li-text' }, h('b', {}, label))), { a: () => openTab(id), focus: () => { setTitle(label, ''); setHints('action'); } })) },
+        { id: 'games', ico: 'systems', label: 'Jeux', make: () => games.slice(0, 14).map((g) => listRow(g, 'cx-li xmb-item')) },
+        { id: 'apps', ico: 'library', label: 'Applications', make: () => apps.map((g) => listRow(g, 'cx-li xmb-item')) },
+        { id: 'widgets', ico: 'sparkle', label: 'Widgets', make: () => widgetIds.map((w) => widgetCard(w)) },
+        { id: 'lumen', ico: 'moon', label: 'Lumen', make: () => SHORTCUTS.map(([ico, label, id]) => focusable(h('div', { class: 'cx-li xmb-item' }, h('div', { class: 'cx-li-art xmb-ico' }, cxIco(ico)), h('div', { class: 'cx-li-text' }, h('b', {}, label))), { a: () => openTab(id), focus: () => { setTitle(label, ''); setHints('action'); } })) },
       ].filter((c) => c.id !== 'apps' || apps.length).filter((c) => c.id !== 'widgets' || widgetIds.length);
       if (!cats.some((c) => c.id === S.cxCat)) S.cxCat = 'games';
       const listEl = h('div', { class: 'xmb-list' });
@@ -1621,7 +1623,7 @@
         listEl.style.setProperty('--i', String(i));
         listEl.replaceChildren(...cats[i].make());
       };
-      const bar = h('div', { class: 'xmb-bar' }, cats.map((c) => focusable(h('div', { class: 'xmb-cat' }, h('span', { class: 'xmb-cat-ico' }, c.ico), h('span', { class: 'xmb-cat-label' }, c.label)), {
+      const bar = h('div', { class: 'xmb-bar' }, cats.map((c) => focusable(h('div', { class: 'xmb-cat' }, h('span', { class: 'xmb-cat-ico' }, cxIco(c.ico)), h('span', { class: 'xmb-cat-label' }, c.label)), {
         a: () => { const f = listEl.querySelector('.f'); if (f) setFocus(f); },
         focus: () => { setTitle(c.label, ''); setHints('action'); if (S.cxCat !== c.id) { S.cxCat = c.id; paintList(); } },
       })));
@@ -1639,7 +1641,7 @@
       const top = h('div', { class: 'ds-screen ds-top ds-top-center' }, widgetIds.length ? cards('ds-widgets') : h('div', { class: 'ds-clock' }, clockText()));
       return root(
         h('div', { class: 'ds-screen ds-bottom ds-menu' }, list.slice(0, 8).map((g) => listRow(g, 'cx-li ds-btn')),
-          focusable(h('div', { class: 'cx-li ds-btn' }, h('div', { class: 'cx-li-art xmb-ico' }, '▦'), h('div', { class: 'cx-li-text' }, h('b', {}, 'Bibliothèque'), h('span', {}, 'Toutes tes consoles'))), { a: () => openTab('systems'), focus: () => { setTitle('Bibliothèque', ''); setHints('action'); } })),
+          focusable(h('div', { class: 'cx-li ds-btn' }, h('div', { class: 'cx-li-art xmb-ico' }, cxIco('library')), h('div', { class: 'cx-li-text' }, h('b', {}, 'Bibliothèque'), h('span', {}, 'Toutes tes consoles'))), { a: () => openTab('systems'), focus: () => { setTitle('Bibliothèque', ''); setHints('action'); } })),
         top); // affiché au-dessus (CSS order)
     }
     if (layout === 'wii') {
@@ -1649,9 +1651,9 @@
         h('section', { class: 'wii-grid', 'data-fscale': '1.04' }, list.slice(0, 11 - Math.min(3, widgetIds.length)).map((g) => tileFor(g, 'wii-ch')),
           ...widgetIds.slice(0, 3).map((w) => ch(widgetCard(w))), ch(libTile())),
         h('div', { class: 'wii-bar' },
-          round('⚙', 'Réglages', () => openTab('settings')),
+          round('settings', 'Réglages', () => openTab('settings')),
           h('div', { class: 'wii-clock' }, h('b', { 'data-clock': '' }, clockText()), h('span', {}, new Date().toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'numeric' }))),
-          round('🔎', 'Recherche', () => openTab('search'))));
+          round('search', 'Recherche', () => openTab('search'))));
     }
     if (layout === 'wiiu') return root(info, h('section', { class: 'wiiu-panel', 'data-fscale': '1.06' }, list.map((g) => tileFor(g)), libTile()), rounds(), cards('cx-cards'));
 
